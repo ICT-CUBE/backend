@@ -1,0 +1,36 @@
+name: backend-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e '.[dev]'
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        # 생존 API 테스트는 실제 DB 연결 없이 실행되며 readiness는 통합 테스트에서 확인합니다.
+        run: pytest
+
+      - name: Validate container build
+        run: docker build -t hanium-backend:ci .
+

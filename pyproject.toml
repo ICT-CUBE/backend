@@ -1,0 +1,54 @@
+# ==============================================================================
+# 파이썬 프로젝트 설정 및 패키지 관리 파일 (pyproject.toml)
+#
+# [역할]
+# 이 파이썬 백엔드 프로젝트의 이름, 파이썬 요구 버전, 의존성 라이브러리(FastAPI, 
+# SQLAlchemy, Alembic 등) 및 개발 도구(Pytest, Ruff) 설정을 통합 관리하는 중앙 파일입니다.
+#
+# [주요 항목]
+# 1. dependencies            : 백엔드 서버 구동에 필수적인 파이썬 라이브러리 목록
+# 2. optional-dependencies.dev: 코드 검사(Ruff) 및 테스트(Pytest)용 개발 전용 패키지
+# 3. tool.pytest / tool.ruff  : 테스트 프레임워크 및 린터 상세 설정
+# ==============================================================================
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hanium-backend"
+version = "0.1.0"
+description = "Hanium backend API"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "alembic>=1.14,<2",
+  "asyncmy>=0.2.10,<1",
+  "fastapi>=0.115,<1",
+  "openai>=1.60,<2",
+  "pydantic-settings>=2.7,<3",
+  "sqlalchemy[asyncio]>=2.0.36,<3",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28,<1",
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.25,<1",
+  "ruff>=0.9,<1",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
