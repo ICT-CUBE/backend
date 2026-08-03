@@ -7,11 +7,9 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+import app.models  # noqa: F401  # 모든 모델을 Base.metadata에 등록합니다.
 from app.core.config import get_settings
 from app.db.base import Base
-
-# 모델 모듈을 만들면 여기에 import해야 autogenerate가 테이블을 인식합니다.
-# from app.models import user  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

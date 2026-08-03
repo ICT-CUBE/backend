@@ -46,7 +46,7 @@ uvicorn app.main:app --reload
 
 - 라우터: `app/api/routes/`
 - 라우터 등록: `app/api/router.py`
-- DB 모델: `app/models/`를 만든 뒤 `app/db/base.py`의 `Base` 상속
+- DB 모델: `app/models/`의 도메인 파일에 추가하고 `app/db/base.py`의 `Base` 상속
 - 비즈니스/외부 API 로직: `app/services/`
 - 설정값: `app/core/config.py`와 `.env.example` 양쪽에 추가
 
