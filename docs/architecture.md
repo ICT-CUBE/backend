@@ -1,8 +1,8 @@
 # 백엔드 시스템 아키텍처
 
 이 문서는 현재 저장소에 구성된 FastAPI 백엔드의 구조와 로컬·Azure 실행 흐름을 설명합니다.
-API 명세에 따른 도메인 기능과 DB 모델은 이후 작업에서 추가되며, 여기서는 현재 구현된 기반
-구조를 기준으로 설명합니다.
+`docs/erd.md`의 1차 도메인 DB 모델과 migration까지 구현되어 있으며, API 명세에 따른 실제
+엔드포인트와 비즈니스 로직은 이후 작업에서 추가됩니다.
 
 ## 1. 아키텍처 목표
 
@@ -197,15 +197,20 @@ Pydantic이 문자열, Boolean, 정수, 배열 등의 타입을 검증합니다.
 `app/db/base.py`의 `Base`가 모든 ORM 모델의 공통 부모입니다. 모든 모델이 같은 Metadata에
 등록되어야 Alembic이 테이블 변경을 감지할 수 있습니다.
 
-향후 모델 구조 예시:
+현재 모델 구조:
 
 ```text
 app/models/
+├─ enums.py
 ├─ user.py
 ├─ cube.py
+├─ reward.py
 ├─ album.py
 └─ conversation.py
 ```
+
+ERD의 27개 엔티티를 위 5개 도메인 모델 파일로 나눴습니다. Enum 값은 MySQL 종속 ENUM 대신
+`VARCHAR + CHECK` 제약으로 저장해 값 변경을 migration으로 관리하기 쉽게 했습니다.
 
 ### 비동기 Engine과 Session
 
@@ -248,11 +253,28 @@ flowchart LR
     Revision --> MySQL["MySQL Schema"]
 ```
 
-새 모델 모듈이 Alembic 실행 시 import되지 않으면 자동 생성에서 누락될 수 있습니다. 모델을
-모은 `app/models/__init__.py`를 만들고 `migrations/env.py`가 이를 import하도록 구성해야 합니다.
+`app/models/__init__.py`가 모든 모델을 import하고 `migrations/env.py`가 이 패키지를 읽으므로
+현재 27개 테이블이 모두 `Base.metadata`에 등록됩니다. 새 모델 파일을 만들면 반드시
+`app/models/__init__.py`에도 import를 추가해야 자동 생성에서 누락되지 않습니다.
 
-현재 ERD 초안은 `docs/erd.md`에 있으며, ORM 모델과 실제 migration은 이후 DB 설계 작업에서
-구현합니다.
+최초 revision은 `migrations/versions/20260803_0001_initial_schema.py`입니다. 이 파일은 1차
+스키마의 고정된 스냅샷이며 이미 공유하거나 적용한 뒤에는 수정하지 않습니다.
+
+### 커뮤니티·마켓 도메인 후속 추가
+
+커뮤니티와 마켓 기능은 현재 구조에 문제없이 추가할 수 있습니다. 기존 최초 migration을 다시
+작성하지 않고 다음 순서로 별도의 변경 이력을 만듭니다.
+
+1. `docs/erd.md`에 새 엔티티와 관계 추가
+2. `app/models/community.py`, `app/models/market.py` 추가
+3. `app/models/__init__.py`에 새 모델 import
+4. `alembic revision --autogenerate -m "add community and market tables"`
+5. 생성된 FK·Unique·Index와 downgrade 순서 검토
+6. `alembic upgrade head`로 적용
+
+예를 들어 게시글이 사용자와 연결되면 `community_posts.user_id → users.id`, 거래가 큐브
+소유권과 연결되면 `market_trades.cube_ownership_id → cube_ownerships.id`와 같이 기존 테이블을
+참조할 수 있습니다. 기존 데이터는 유지되고 새 테이블·컬럼만 다음 revision에서 추가됩니다.
 
 ## 8. 서비스와 외부 API
 
@@ -508,7 +530,8 @@ flowchart LR
 - 환경변수 기반 설정
 - 비동기 MySQL 연결
 - 상태 확인 API
-- Alembic 기반
+- ERD 기반 27개 SQLAlchemy 모델
+- 최초 Alembic migration과 구조 일치 테스트
 - OpenAI 클라이언트 생성 지점
 - Dockerfile과 Docker Compose
 - Azure Bicep과 배포 스크립트
@@ -516,14 +539,13 @@ flowchart LR
 
 아직 구현되지 않음:
 
-- `docs/erd.md`를 반영한 실제 SQLAlchemy 모델
-- 최초 도메인 migration
 - API 명세 기반 실제 엔드포인트
 - 인증과 권한
+- 커뮤니티·마켓 ERD 및 모델
 - OpenAI 실제 서비스 로직
 - MySQL을 사용하는 CI 통합 테스트
 - 프론트엔드 연동 테스트
 - 실제 Azure 최초 배포 검증
 
-다음 개발 순서는 **ERD 확정 → SQLAlchemy 모델과 migration → 인증/핵심 도메인 API → OpenAI
-연동 → 통합 테스트 → Azure 배포**를 권장합니다.
+다음 개발 순서는 **로컬 MySQL에 최초 migration 적용 → 인증/핵심 도메인 API → 커뮤니티·마켓
+ERD 확장 → OpenAI 연동 → 통합 테스트 → Azure 배포**를 권장합니다.
