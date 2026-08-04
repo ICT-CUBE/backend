@@ -43,6 +43,8 @@ class OwnershipStatus(StrEnum):
 
 
 class LevelName(StrEnum):
+    """DB에 저장되는 친밀도 레벨 코드."""
+
     INTRO = "Intro"
     FRIEND = "Friend"
     CLOSE = "Close"

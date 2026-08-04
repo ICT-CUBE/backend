@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import get_settings
+from app.core.exceptions import ApiError, api_error_handler
 from app.core.logging import configure_logging
 from app.db.session import dispose_engine
 
@@ -28,6 +29,7 @@ app = FastAPI(
     redoc_url="/redoc" if settings.environment != "production" else None,
     lifespan=lifespan,
 )
+app.add_exception_handler(ApiError, api_error_handler)  # type: ignore[arg-type]
 
 # 운영 환경에서는 CORS_ORIGINS에 실제 프론트엔드 도메인만 넣으세요.
 app.add_middleware(
