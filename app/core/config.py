@@ -46,6 +46,10 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
+    # 로그인 기능을 사용하지 않는 데모 단계의 고정 사용자 설정입니다.
+    seed_demo_data: bool = True
+    demo_user_email: str = "demo@hanium.local"
+
     openai_api_key: SecretStr | None = None
     openai_model: str = "gpt-4.1-mini"
 

@@ -4,11 +4,19 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import get_settings
+from app.core.exceptions import (
+    ApiError,
+    api_error_handler,
+    request_validation_error_handler,
+    unhandled_exception_handler,
+)
 from app.core.logging import configure_logging
+from app.core.openapi import configure_openapi
 from app.db.session import dispose_engine
 
 
@@ -28,6 +36,9 @@ app = FastAPI(
     redoc_url="/redoc" if settings.environment != "production" else None,
     lifespan=lifespan,
 )
+app.add_exception_handler(ApiError, api_error_handler)  # type: ignore[arg-type]
+app.add_exception_handler(RequestValidationError, request_validation_error_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 # 운영 환경에서는 CORS_ORIGINS에 실제 프론트엔드 도메인만 넣으세요.
 app.add_middleware(
@@ -38,6 +49,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(api_router, prefix=settings.api_v1_prefix)
+configure_openapi(app)
 
 
 @app.get("/", tags=["system"])

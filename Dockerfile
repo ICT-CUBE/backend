@@ -42,6 +42,6 @@ USER app
 
 EXPOSE 8000
 
-# 마이그레이션은 배포 스크립트/Job으로 분리할 수 있습니다. 초기 단계에서는 기동 전에 적용합니다.
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# 초기 단계에서는 마이그레이션과 데모 데이터 준비 후 API 서버를 실행합니다.
+CMD ["sh", "-c", "alembic upgrade head && python -m app.db.demo_seed && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
 
