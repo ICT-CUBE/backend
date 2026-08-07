@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "hanium-api"
     environment: str = Field(default="development")
     debug: bool = Field(default=True)
+    api_v1_prefix: str = Field(default="/api/v1")
 
     mysql_host: str = Field(default="localhost")
     mysql_port: int = Field(default=3306)
