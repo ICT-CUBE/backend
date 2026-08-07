@@ -169,7 +169,7 @@ erDiagram
         int track_count "NOT NULL"
         int track_total_second "NOT NULL"
         text description "NULL"
-        varchar_500 cover_image_code "NOT NULL"
+        varchar_500 cover_image_url "NOT NULL"
         date release_date "NOT NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
@@ -180,9 +180,9 @@ erDiagram
         bigint album_id FK "NOT NULL"
         varchar_150 title "NOT NULL"
         text description "NULL"
-        varchar_500 video_code "NOT NULL"
+        varchar_500 video_url "NOT NULL"
         varchar_20 video_type "NOT NULL, Enum: MUSIC_VIDEO | CONCERT_VIDEO"
-        varchar_500 thumbnail_code "NULL"
+        varchar_500 thumbnail_url "NULL"
         int duration_seconds "NOT NULL"
         datetime recorded_at "NOT NULL"
         boolean is_active "NOT NULL, DEFAULT: true"
@@ -208,7 +208,7 @@ erDiagram
     STAGE_CAPTURE {
         bigint id PK
         bigint stage_session_id FK "NOT NULL"
-        varchar_500 stage_capture_img_code "NOT NULL"
+        varchar_500 stage_capture_img_url "NOT NULL"
         int captured_position_seconds "NULL"
         datetime captured_at "NOT NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
@@ -221,7 +221,7 @@ erDiagram
         bigint album_id FK "NOT NULL"
         varchar_150 title "NOT NULL"
         varchar_100 artist_name "NOT NULL"
-        varchar_500 audio_code "NOT NULL"
+        varchar_500 audio_url "NOT NULL"
         int duration_seconds "NOT NULL"
         varchar_5000 lyrics "NOT NULL"
         int track_number "NOT NULL"
@@ -247,7 +247,7 @@ erDiagram
     TRACK_CAPTURE {
         bigint id PK
         bigint track_session_id FK "NOT NULL"
-        varchar_500 track_capture_img_code "NOT NULL"
+        varchar_500 track_capture_img_url "NOT NULL"
         int captured_position_seconds "NULL"
         datetime captured_at "NOT NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
@@ -260,7 +260,7 @@ erDiagram
         bigint album_id FK "NOT NULL"
         varchar_150 title "NULL"
         varchar_30 image_type "NOT NULL, Enum: ALBUM_IMAGE | CONCERT_STILLCUT | YEZUL_FRAME"
-        varchar_500 album_contents_img_code "NOT NULL"
+        varchar_500 album_contents_img_url "NOT NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
     }
@@ -271,7 +271,7 @@ erDiagram
         varchar_20 conversation_type "NOT NULL, Enum: TEXT | VOICE"
         datetime started_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime ended_at "NULL"
-        varchar_500 audio_code "NULL"
+        varchar_500 audio_url "NULL"
         int audio_duration_seconds "NULL"
         varchar_50 conversation_title "NULL"
         varchar_20 status "NOT NULL, DEFAULT: ACTIVE, Enum: ACTIVE | NOT_ACTIVE"
@@ -297,7 +297,7 @@ erDiagram
         bigint id PK
         bigint conversation_session_id FK "NOT NULL"
         int sequence_number "NOT NULL"
-        varchar_500 sent_image_code "NOT NULL"
+        varchar_500 sent_image_url "NOT NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
     }
@@ -324,7 +324,7 @@ erDiagram
     AVATAR_INTERACTION_PICTURE {
         bigint id PK
         bigint interaction_session_id FK "NOT NULL"
-        varchar_500 picture_img_code "NULL"
+        varchar_500 picture_img_url "NULL"
         datetime pictured_at "NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"

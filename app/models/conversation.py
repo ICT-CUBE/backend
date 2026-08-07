@@ -35,7 +35,7 @@ class AvatarConversationSession(TimestampMixin, Base):
         DateTime, nullable=False, server_default=func.current_timestamp()
     )
     ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    audio_code: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     audio_duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     conversation_title: Mapped[str | None] = mapped_column(String(50), nullable=True)
     status: Mapped[ConversationSessionStatus] = mapped_column(
@@ -99,7 +99,7 @@ class AvatarConversationImage(TimestampMixin, Base):
         index=True,
     )
     sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    sent_image_code: Mapped[str] = mapped_column(String(500), nullable=False)
+    sent_image_url: Mapped[str] = mapped_column(String(500), nullable=False)
 
 
 class ConversationReport(TimestampMixin, Base):
@@ -154,5 +154,5 @@ class AvatarInteractionPicture(TimestampMixin, SoftDeleteMixin, Base):
         nullable=False,
         index=True,
     )
-    picture_img_code: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    picture_img_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     pictured_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

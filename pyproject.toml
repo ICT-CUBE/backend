@@ -23,6 +23,8 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
   "alembic>=1.14,<2",
   "asyncmy>=0.2.10,<1",
+  # 캡처 이미지를 Azure Blob Storage에 저장할 때 사용합니다.
+  "azure-storage-blob>=12.30,<13",
   # MySQL 8의 기본 인증 방식(caching_sha2_password)으로 접속할 때 필요합니다.
   "cryptography>=44,<46",
   "fastapi>=0.115,<1",

@@ -40,7 +40,7 @@ class Album(TimestampMixin, Base):
     track_count: Mapped[int] = mapped_column(Integer, nullable=False)
     track_total_second: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    cover_image_code: Mapped[str] = mapped_column(String(500), nullable=False)
+    cover_image_url: Mapped[str] = mapped_column(String(500), nullable=False)
     release_date: Mapped[date] = mapped_column(Date, nullable=False)
 
 
@@ -55,12 +55,12 @@ class Stage(TimestampMixin, Base):
     )
     title: Mapped[str] = mapped_column(String(150), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    video_code: Mapped[str] = mapped_column(String(500), nullable=False)
+    video_url: Mapped[str] = mapped_column(String(500), nullable=False)
     video_type: Mapped[VideoType] = mapped_column(
         enum_type(VideoType, name="video_type", length=20),
         nullable=False,
     )
-    thumbnail_code: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    thumbnail_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     is_active: Mapped[bool] = mapped_column(
@@ -112,7 +112,7 @@ class StageCapture(TimestampMixin, SoftDeleteMixin, Base):
     stage_session_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("stage_sessions.id"), nullable=False, index=True
     )
-    stage_capture_img_code: Mapped[str] = mapped_column(String(500), nullable=False)
+    stage_capture_img_url: Mapped[str] = mapped_column(String(500), nullable=False)
     captured_position_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     captured_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
@@ -128,7 +128,7 @@ class Track(TimestampMixin, Base):
     )
     title: Mapped[str] = mapped_column(String(150), nullable=False)
     artist_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    audio_code: Mapped[str] = mapped_column(String(500), nullable=False)
+    audio_url: Mapped[str] = mapped_column(String(500), nullable=False)
     duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     lyrics: Mapped[str] = mapped_column(String(5000), nullable=False)
     track_number: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -180,7 +180,7 @@ class TrackCapture(TimestampMixin, SoftDeleteMixin, Base):
     track_session_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("track_sessions.id"), nullable=False, index=True
     )
-    track_capture_img_code: Mapped[str] = mapped_column(String(500), nullable=False)
+    track_capture_img_url: Mapped[str] = mapped_column(String(500), nullable=False)
     captured_position_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     captured_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
@@ -199,4 +199,4 @@ class AlbumImage(TimestampMixin, Base):
         enum_type(AlbumImageType, name="album_image_type", length=30),
         nullable=False,
     )
-    album_contents_img_code: Mapped[str] = mapped_column(String(500), nullable=False)
+    album_contents_img_url: Mapped[str] = mapped_column(String(500), nullable=False)

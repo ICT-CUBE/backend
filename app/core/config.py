@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     openai_model: str = "gpt-4.1-mini"
 
+    # 캡처 이미지 저장용 Azure Blob Storage 설정입니다.
+    azure_storage_account_name: str | None = None
+    azure_storage_account_key: SecretStr | None = None
+    azure_storage_container_name: str = "hanium"
+
     @property
     def database_url(self) -> str:
         """특수문자가 포함된 계정 정보도 안전하게 SQLAlchemy URL로 변환합니다."""
