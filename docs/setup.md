@@ -46,9 +46,13 @@ MYSQL_DATABASE=hanium
 MYSQL_USER=hanium
 MYSQL_PASSWORD=hanium_password
 MYSQL_SSL_ENABLED=false
+
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
 ```
 
 `.env`는 Git에 올리지 않습니다.
+`OPENAI_API_KEY`는 OpenAI GPT 기능을 붙일 때만 입력합니다. 실제 키는 `.env`, Azure App Service 환경변수, GitHub Secrets 같은 비공개 저장소에만 넣고 코드에는 커밋하지 않습니다.
 
 ## Azure 개발 서버
 
@@ -115,6 +119,8 @@ MYSQL_DATABASE=hanium
 MYSQL_USER=haniumadmin
 MYSQL_PASSWORD=...
 MYSQL_SSL_ENABLED=true
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4.1-mini
 ```
 
 ## MySQL 방화벽

@@ -80,6 +80,17 @@ MYSQL_SSL_ENABLED=true
 MYSQL_SSL_ENABLED=false
 ```
 
+## OpenAI GPT
+
+OpenAI GPT 기능은 환경변수로 분리합니다.
+
+```env
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+`OPENAI_API_KEY`는 비밀값이므로 Git에 커밋하지 않습니다. 로컬에서는 `.env`, Azure에서는 App Service 환경변수에만 설정합니다.
+
 ## CI/CD
 
 워크플로 파일:

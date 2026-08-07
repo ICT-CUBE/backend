@@ -20,6 +20,8 @@ NEXT_PUBLIC_API_BASE_URL=https://hanium.azurewebsites.net
 - DB Health: https://hanium.azurewebsites.net/health/db
 - Swagger UI: https://hanium.azurewebsites.net/docs
 
+OpenAI GPT 기능은 `OPENAI_API_KEY`, `OPENAI_MODEL` 환경변수로 설정합니다. 실제 API 키는 저장소에 올리지 않습니다.
+
 ## 로컬 개발 서버
 
 ```powershell

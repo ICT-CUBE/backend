@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     mysql_password: str = Field(default="hanium_password")
     mysql_ssl_enabled: bool = Field(default=False)
 
+    openai_api_key: str = Field(default="")
+    openai_model: str = Field(default="gpt-4.1-mini")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
