@@ -1,12 +1,10 @@
 .git
+.venv
 .env
 .env.*
+
 __pycache__
-*.pyc
+*.py[cod]
 .pytest_cache
-.mypy_cache
 .ruff_cache
-.venv
-venv
 *.egg-info
-mysql-data
