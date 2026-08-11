@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     azure_storage_connection_string: str = Field(default="")
     azure_storage_container_name: str = Field(default="hanium")
     azure_storage_stage_capture_prefix: str = Field(default="stage_capture")
+    azure_storage_track_capture_prefix: str = Field(default="track_capture")
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -132,6 +132,7 @@ Status Code : 409
 
 - `lastPositionSeconds`: 영상을 종료한 시점의 재생 위치
 - `viewedSeconds`: 사용자가 실제로 시청한 누적 시간
+- 두 숫자의 범위와 영상 길이는 검증하지 않고 필수값 누락 여부만 확인한다.
 
 ---
 
@@ -172,7 +173,11 @@ Status Code : 409
 
 AR 관람 리포트에서 사용자가 특정 사진의 `Gallery에 저장하기`를 누르면 호출한다.
 
-프론트가 임시 저장하고 있던 이미지 파일을 백엔드로 전송하면 백엔드는 해당 이미지를 서버에 저장하고 이미지 code로 변환하여 db에 저장한다.
+프론트가 임시 저장하고 있던 이미지 파일을 백엔드로 전송하면 백엔드는 해당 이미지를 Azure Blob Storage에 저장하고 Azure Blob URL을 DB에 저장한다.
+
+- 파일 크기, 촬영 위치 값, 세션 상태, 관람 모드는 별도로 검증하지 않는다.
+- 동일한 사진을 여러 번 요청하면 각각 새로운 캡처로 저장한다.
+- Azure 저장 경로: `stage_capture/{userId}/{stageSessionId}/{UUID}.확장자`
 
 ---
 
@@ -197,6 +202,9 @@ capturedAt: 2026-07-29T15:05:20+09:00
 ```
 
 - `image`: 프론트 임시 저장소에 있는 실제 이미지 파일
+    - **허용 형식:** JPEG(`.jpg`, `.jpeg`), PNG, WebP (GIF 불가)
+    - 허용하지 않는 파일은 공통 `400 INVALID_REQUEST`
+    반환
 - `capturedPositionSeconds`: 이미지를 촬영했을 때의 영상 재생 위치
 - `capturedAt`: 실제 이미지를 촬영한 시각
     - KST 오프셋(+09:00) 포함 문자열로 보내줘야 한다. (한국 시간 사용)
@@ -212,6 +220,17 @@ Status Code : 204
 ---
 
 ### 오류 응답 데이터
+
+Status Code : 400
+
+필수 multipart 필드가 없거나 JPEG, PNG, WebP 이외의 파일 형식이면 반환한다.
+
+```json
+{
+  "code": "INVALID_REQUEST",
+  "message": "요청값이 올바르지 않습니다."
+}
+```
 
 Status Code : 404
 

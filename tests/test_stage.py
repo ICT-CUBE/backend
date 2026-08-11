@@ -2,7 +2,7 @@
 
 from collections.abc import Iterator
 from datetime import datetime
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -11,7 +11,7 @@ from app.core.database import get_db
 from app.main import app
 from app.models.cube import CubeOwnership
 from app.models.enums import OwnershipStatus, StageSessionStatus, StageViewMode
-from app.models.stage import Stage, StageSession
+from app.models.stage import Stage, StageCapture, StageSession
 
 
 def request_stage_session(
@@ -54,6 +54,42 @@ def save_stage_session_request(
                     "status": "CANCELLED",
                     "lastPositionSeconds": 74,
                     "viewedSeconds": 62,
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+
+def save_stage_capture_request(
+    db: Mock,
+    *,
+    stage_session_id: int = 501,
+    content_type: str = "image/png",
+    data: dict[str, str] | None = None,
+    include_image: bool = True,
+    raise_server_exceptions: bool = True,
+):
+    def override_get_db() -> Iterator[Session]:
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        files = (
+            {"image": ("capture.png", b"fake-image", content_type)}
+            if include_image
+            else None
+        )
+        with TestClient(
+            app, raise_server_exceptions=raise_server_exceptions
+        ) as client:
+            return client.post(
+                f"/api/v1/users/me/stage-sessions/{stage_session_id}/captures",
+                files=files,
+                data=data
+                if data is not None
+                else {
+                    "capturedPositionSeconds": "74",
+                    "capturedAt": "2026-07-29T15:05:20+09:00",
                 },
             )
     finally:
@@ -152,25 +188,25 @@ def test_create_stage_session_returns_400_for_invalid_view_mode() -> None:
     assert response.json()["code"] == "INVALID_REQUEST"
 
 
-def test_create_stage_session_returns_400_for_non_positive_stage_id() -> None:
-    response = request_stage_session(Mock(spec=Session), stage_id=0)
+def test_create_stage_session_does_not_apply_positive_path_validation() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
 
-    assert response.status_code == 400
+    response = request_stage_session(db, stage_id=0)
+
+    assert response.status_code == 404
+    db.scalar.assert_called_once()
 
 
 def test_stage_session_swagger_responses() -> None:
     operation = app.openapi()["paths"]["/api/v1/stages/{stageId}/sessions"]["post"]
 
-    assert set(operation["responses"]) == {"201", "400", "404", "409"}
+    assert set(operation["responses"]) == {"201", "404", "409"}
     assert "security" not in operation
 
 
-def stage_session_result(
-    db: Mock, session: StageSession | None, duration: int = 222
-) -> None:
-    db.execute.return_value.one_or_none.return_value = (
-        None if session is None else (session, duration)
-    )
+def stage_session_result(db: Mock, session: StageSession | None) -> None:
+    db.scalar.return_value = session
 
 
 def test_save_stage_session_updates_orm_model() -> None:
@@ -233,7 +269,7 @@ def test_save_stage_session_returns_409_when_already_ended() -> None:
     db.rollback.assert_called_once()
 
 
-def test_save_stage_session_returns_400_when_position_exceeds_duration() -> None:
+def test_save_stage_session_accepts_unchecked_numeric_values() -> None:
     db = Mock(spec=Session)
     session = playing_session()
     stage_session_result(db, session)
@@ -242,28 +278,27 @@ def test_save_stage_session_returns_400_when_position_exceeds_duration() -> None
         db,
         body={
             "status": "COMPLETED",
-            "lastPositionSeconds": 223,
-            "viewedSeconds": 223,
+            "lastPositionSeconds": -10,
+            "viewedSeconds": 999999,
         },
+    )
+
+    assert response.status_code == 204
+    assert session.last_position_seconds == -10
+    assert session.viewed_seconds == 999999
+    db.commit.assert_called_once()
+
+
+def test_save_stage_session_returns_common_400_when_field_is_missing() -> None:
+    db = Mock(spec=Session)
+    response = save_stage_session_request(
+        db,
+        body={"status": "CANCELLED", "lastPositionSeconds": 74},
     )
 
     assert response.status_code == 400
     assert response.json()["code"] == "INVALID_REQUEST"
-    db.rollback.assert_called_once()
-    db.commit.assert_not_called()
-
-
-def test_save_stage_session_returns_400_for_invalid_body_values() -> None:
-    invalid_bodies = [
-        {"status": "PLAYING", "lastPositionSeconds": 74, "viewedSeconds": 62},
-        {"status": "CANCELLED", "lastPositionSeconds": -1, "viewedSeconds": 62},
-        {"status": "CANCELLED", "lastPositionSeconds": 74, "viewedSeconds": -1},
-    ]
-
-    for body in invalid_bodies:
-        response = save_stage_session_request(Mock(spec=Session), body=body)
-        assert response.status_code == 400
-        assert response.json()["code"] == "INVALID_REQUEST"
+    db.scalar.assert_not_called()
 
 
 def test_save_stage_session_swagger_responses() -> None:
@@ -271,5 +306,95 @@ def test_save_stage_session_swagger_responses() -> None:
         "/api/v1/users/me/stage-sessions/{stageSessionId}"
     ]["patch"]
 
-    assert set(operation["responses"]) == {"204", "400", "404", "409"}
+    assert set(operation["responses"]) == {"204", "404", "409"}
+    assert "security" not in operation
+
+
+def test_save_stage_capture_uploads_image_and_adds_orm_model() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = playing_session()
+
+    with patch(
+        "app.services.stage.upload_stage_capture",
+        return_value=(
+            "https://haniumstorage.blob.core.windows.net/hanium/"
+            "stage_capture/test.png"
+        ),
+    ) as upload:
+        response = save_stage_capture_request(db)
+
+    assert response.status_code == 204
+    assert response.content == b""
+    upload.assert_called_once()
+    assert upload.call_args.kwargs["user_id"] == 1
+    assert upload.call_args.kwargs["stage_session_id"] == 501
+    capture = db.add.call_args.args[0]
+    assert isinstance(capture, StageCapture)
+    assert capture.stage_session_id == 501
+    assert capture.stage_capture_img_url.endswith("stage_capture/test.png")
+    assert capture.captured_position_seconds == 74
+    assert capture.captured_at == datetime.fromisoformat("2026-07-29T15:05:20")
+    db.commit.assert_called_once()
+
+
+def test_save_stage_capture_returns_404_for_unknown_or_other_user_session() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    with patch("app.services.stage.upload_stage_capture") as upload:
+        response = save_stage_capture_request(db)
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "STAGE_SESSION_NOT_FOUND"
+    upload.assert_not_called()
+    db.add.assert_not_called()
+
+
+def test_save_stage_capture_returns_400_for_unsupported_content_type() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = playing_session()
+
+    with patch("app.services.stage.upload_stage_capture") as upload:
+        response = save_stage_capture_request(db, content_type="image/gif")
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_REQUEST"
+    upload.assert_not_called()
+
+
+def test_save_stage_capture_returns_400_when_required_form_field_is_missing() -> None:
+    response = save_stage_capture_request(
+        Mock(spec=Session),
+        data={"capturedPositionSeconds": "74"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_REQUEST"
+
+
+def test_save_stage_capture_uses_common_500_when_azure_upload_fails() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = playing_session()
+
+    with patch(
+        "app.services.stage.upload_stage_capture",
+        side_effect=RuntimeError("storage unavailable"),
+    ):
+        response = save_stage_capture_request(
+            db,
+            raise_server_exceptions=False,
+        )
+
+    assert response.status_code == 500
+    assert response.json()["code"] == "INTERNAL_SERVER_ERROR"
+    db.add.assert_not_called()
+
+
+def test_save_stage_capture_swagger_contract() -> None:
+    operation = app.openapi()["paths"][
+        "/api/v1/users/me/stage-sessions/{stageSessionId}/captures"
+    ]["post"]
+
+    assert set(operation["responses"]) == {"204", "400", "404"}
+    assert "multipart/form-data" in operation["requestBody"]["content"]
     assert "security" not in operation

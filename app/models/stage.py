@@ -82,3 +82,27 @@ class StageSession(Base):
         back_populates="stage_sessions"
     )
     stage: Mapped[Stage] = relationship(back_populates="sessions")
+    captures: Mapped[list["StageCapture"]] = relationship(
+        back_populates="stage_session"
+    )
+
+
+class StageCapture(Base):
+    """Azure에 저장한 스테이지 캡처의 DB 정보입니다."""
+
+    __tablename__ = "stage_capture"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    stage_session_id: Mapped[int] = mapped_column(ForeignKey("stage_session.id"))
+    stage_capture_img_url: Mapped[str] = mapped_column(String(500))
+    captured_position_seconds: Mapped[int | None] = mapped_column(Integer)
+    captured_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    stage_session: Mapped[StageSession] = relationship(back_populates="captures")

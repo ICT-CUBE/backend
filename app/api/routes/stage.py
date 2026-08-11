@@ -1,8 +1,9 @@
 """스테이지 도메인 API 라우터."""
 
+from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, File, Form, Path, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -12,7 +13,11 @@ from app.schemas.stage import (
     StageSessionCreateResponse,
     StageSessionUpdateRequest,
 )
-from app.services.stage import create_stage_session, save_stage_session
+from app.services.stage import (
+    create_stage_session,
+    save_stage_capture,
+    save_stage_session,
+)
 
 router = APIRouter()
 stage_session_router = APIRouter()
@@ -28,18 +33,6 @@ stage_session_router = APIRouter()
         "재생 세션을 생성합니다."
     ),
     responses={
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "stageId 또는 요청 Body가 올바르지 않음",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "code": "INVALID_REQUEST",
-                        "message": "요청값이 올바르지 않습니다.",
-                    }
-                }
-            },
-        },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
             "description": "활성 스테이지 또는 큐브 소유권 정보가 없음",
@@ -77,7 +70,7 @@ stage_session_router = APIRouter()
     },
 )
 def create_playback_session(
-    stage_id: Annotated[int, Path(alias="stageId", ge=1)],
+    stage_id: Annotated[int, Path(alias="stageId")],
     body: StageSessionCreateRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> StageSessionCreateResponse:
@@ -98,18 +91,6 @@ def create_playback_session(
         "종료 상태와 한국시간 종료 시각을 저장합니다."
     ),
     responses={
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Path·Body가 잘못됐거나 최종 재생 위치가 영상 길이를 초과함",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "code": "INVALID_REQUEST",
-                        "message": "요청값이 올바르지 않습니다.",
-                    }
-                }
-            },
-        },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
             "description": "세션이 없거나 현재 사용자의 세션이 아님",
@@ -137,7 +118,7 @@ def create_playback_session(
     },
 )
 def update_playback_session(
-    stage_session_id: Annotated[int, Path(alias="stageSessionId", ge=1)],
+    stage_session_id: Annotated[int, Path(alias="stageSessionId")],
     body: StageSessionUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> Response:
@@ -148,5 +129,61 @@ def update_playback_session(
         end_status=body.status,
         last_position_seconds=body.lastPositionSeconds,
         viewed_seconds=body.viewedSeconds,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@stage_session_router.post(
+    "/{stageSessionId}/captures",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="스테이지 캡처 저장",
+    description=(
+        "고정 사용자 ID 1의 스테이지 세션을 확인하고, 캡처 이미지를 Azure Blob "
+        "Storage에 업로드한 뒤 이미지 URL과 촬영 정보를 DB에 저장합니다."
+    ),
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "필수 multipart 필드가 없거나 지원하지 않는 이미지 형식",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "INVALID_REQUEST",
+                        "message": "요청값이 올바르지 않습니다.",
+                    }
+                }
+            },
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "세션이 없거나 현재 사용자의 세션이 아님",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "STAGE_SESSION_NOT_FOUND",
+                        "message": "스테이지 재생 세션을 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def create_stage_capture(
+    stage_session_id: Annotated[int, Path(alias="stageSessionId", ge=1)],
+    image: Annotated[UploadFile, File(description="JPEG, PNG 또는 WebP 이미지")],
+    captured_position_seconds: Annotated[
+        int, Form(alias="capturedPositionSeconds")
+    ],
+    captured_at: Annotated[datetime, Form(alias="capturedAt")],
+    db: Annotated[Session, Depends(get_db)],
+) -> Response:
+    """POST /api/v1/users/me/stage-sessions/{stageSessionId}/captures"""
+    save_stage_capture(
+        db=db,
+        stage_session_id=stage_session_id,
+        image_file=image.file,
+        image_content_type=image.content_type,
+        captured_position_seconds=captured_position_seconds,
+        captured_at=captured_at,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

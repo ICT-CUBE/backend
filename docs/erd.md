@@ -198,7 +198,7 @@ erDiagram
         datetime started_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime ended_at "NULL"
         int last_position_seconds "NOT NULL, DEFAULT: 0"
-        int viewed_seconds "NOT NULL, DEFAULT: 0"
+        int viewed_seconds "NULL, DEFAULT: 0"
         varchar_20 view_mode "NOT NULL, Enum: NORMAL | AR"
         varchar_20 status "NOT NULL, DEFAULT: PLAYING, Enum: PLAYING | COMPLETED | CANCELLED"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"

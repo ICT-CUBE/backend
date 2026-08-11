@@ -1,6 +1,7 @@
 """큐브, 큐브 소유권, 친밀도, 레벨 테이블 ORM 매핑."""
 
 from datetime import datetime
+from enum import Enum as PythonEnum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String
@@ -14,9 +15,9 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
-def enum_values(enum_class: type) -> list[str]:
+def enum_values(enum_class: type[PythonEnum]) -> list[str]:
     """SQLAlchemy가 Enum 이름이 아니라 DDL의 실제 문자열 값을 사용하게 합니다."""
-    return [item.value for item in enum_class]
+    return [str(item.value) for item in enum_class.__members__.values()]
 
 
 class Cube(Base):

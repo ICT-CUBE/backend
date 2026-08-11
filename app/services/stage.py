@@ -1,6 +1,7 @@
 """스테이지 재생 세션 생성·저장 로직."""
 
 from datetime import datetime, timedelta, timezone
+from typing import BinaryIO
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -8,13 +9,14 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import ApiError
 from app.models.cube import CubeOwnership
 from app.models.enums import OwnershipStatus, StageSessionStatus
-from app.models.stage import Stage, StageSession
+from app.models.stage import Stage, StageCapture, StageSession
 from app.schemas.stage import (
     StageSessionCreateResponse,
     StageSessionEndStatus,
     StageSessionResponse,
     StageViewMode,
 )
+from app.services.blob_storage import IMAGE_EXTENSIONS, upload_stage_capture
 
 CURRENT_USER_ID = 1
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
@@ -97,6 +99,71 @@ def create_stage_session(
     )
 
 
+def save_stage_capture(
+    *,
+    db: Session,
+    stage_session_id: int,
+    image_file: BinaryIO,
+    image_content_type: str | None,
+    captured_position_seconds: int,
+    captured_at: datetime,
+) -> None:
+    """현재 사용자의 세션에 속한 캡처를 Azure와 DB에 저장합니다."""
+    # 세션 상태와 관람 모드는 프론트 흐름을 신뢰하고 검사하지 않습니다.
+    stage_session = db.scalar(
+        select(StageSession)
+        .join(StageSession.cube_ownership)
+        .where(
+            StageSession.id == stage_session_id,
+            CubeOwnership.user_id == CURRENT_USER_ID,
+        )
+        .limit(1)
+    )
+    if stage_session is None:
+        raise ApiError(
+            status_code=404,
+            code="STAGE_SESSION_NOT_FOUND",
+            message="스테이지 재생 세션을 찾을 수 없습니다.",
+        )
+
+    # 파일 용량은 제한하지 않고 합의한 세 가지 이미지 Content-Type만 허용합니다.
+    if image_content_type is None or image_content_type not in IMAGE_EXTENSIONS:
+        raise ApiError(
+            status_code=400,
+            code="INVALID_REQUEST",
+            message="요청값이 올바르지 않습니다.",
+        )
+
+    try:
+        image_url = upload_stage_capture(
+            file=image_file,
+            content_type=image_content_type,
+            user_id=CURRENT_USER_ID,
+            stage_session_id=stage_session.id,
+        )
+    except Exception as exc:
+        # DEBUG 설정과 무관하게 외부 저장소 오류를 공통 500 JSON으로 반환합니다.
+        raise ApiError(
+            status_code=500,
+            code="INTERNAL_SERVER_ERROR",
+            message="서버 내부 오류가 발생했습니다.",
+        ) from exc
+    captured_at_kst = captured_at.astimezone(KOREA_TIMEZONE).replace(tzinfo=None)
+    capture = StageCapture(
+        stage_session_id=stage_session.id,
+        stage_capture_img_url=image_url,
+        captured_position_seconds=captured_position_seconds,
+        captured_at=captured_at_kst,
+        deleted_at=None,
+    )
+    try:
+        db.add(capture)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
 def save_stage_session(
     *,
     db: Session,
@@ -106,26 +173,24 @@ def save_stage_session(
     viewed_seconds: int,
 ) -> None:
     """현재 사용자의 PLAYING 세션을 종료 상태로 갱신합니다."""
-    result = db.execute(
-        select(StageSession, Stage.duration_seconds)
+    stage_session = db.scalar(
+        select(StageSession)
         .join(StageSession.cube_ownership)
-        .join(StageSession.stage)
         .where(
             StageSession.id == stage_session_id,
             CubeOwnership.user_id == CURRENT_USER_ID,
         )
         .limit(1)
         .with_for_update()
-    ).one_or_none()
+    )
 
-    if result is None:
+    if stage_session is None:
         raise ApiError(
             status_code=404,
             code="STAGE_SESSION_NOT_FOUND",
             message="스테이지 재생 세션을 찾을 수 없습니다.",
         )
 
-    stage_session, duration_seconds = result
     if stage_session.status != StageSessionStatus.PLAYING:
         db.rollback()
         raise ApiError(
@@ -133,14 +198,6 @@ def save_stage_session(
             code="STAGE_SESSION_ALREADY_ENDED",
             message="이미 종료된 스테이지 재생 세션입니다.",
         )
-    if last_position_seconds > duration_seconds:
-        db.rollback()
-        raise ApiError(
-            status_code=400,
-            code="INVALID_REQUEST",
-            message="요청값이 올바르지 않습니다.",
-        )
-
     stage_session.status = StageSessionStatus(end_status.value)
     stage_session.last_position_seconds = last_position_seconds
     stage_session.viewed_seconds = viewed_seconds

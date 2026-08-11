@@ -2,7 +2,7 @@
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.models.enums import StageViewMode
 
@@ -30,5 +30,5 @@ class StageSessionCreateResponse(BaseModel):
 
 class StageSessionUpdateRequest(BaseModel):
     status: StageSessionEndStatus
-    lastPositionSeconds: int = Field(ge=0)
-    viewedSeconds: int = Field(ge=0)
+    lastPositionSeconds: int
+    viewedSeconds: int

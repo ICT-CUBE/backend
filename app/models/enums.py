@@ -28,3 +28,14 @@ class StageSessionStatus(StrEnum):
     PLAYING = "PLAYING"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
+
+
+class TrackPlayMode(StrEnum):
+    NORMAL = "NORMAL"
+    SPECIAL = "SPECIAL"
+
+
+class TrackSessionStatus(StrEnum):
+    PLAYING = "PLAYING"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
