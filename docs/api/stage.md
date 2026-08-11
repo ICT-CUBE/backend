@@ -160,3 +160,64 @@ Status Code : 409
   "message": "이미 종료된 스테이지 재생 세션입니다."
 }
 ```
+
+
+
+
+## 스테이지 캡쳐 저장
+- http 메서드: post
+- 엔드포인트: api/v1/users/me/stage-sessions/{stageSessionId}/captures
+
+### API 설명
+
+AR 관람 리포트에서 사용자가 특정 사진의 `Gallery에 저장하기`를 누르면 호출한다.
+
+프론트가 임시 저장하고 있던 이미지 파일을 백엔드로 전송하면 백엔드는 해당 이미지를 서버에 저장하고 이미지 code로 변환하여 db에 저장한다.
+
+---
+
+### 요청 Query
+
+---
+
+### 요청 Path
+
+요청 예시: api/v1/users/me/stage-sessions/501/captures
+
+---
+
+### 요청 Body
+
+이미지 파일을 전송해야 하므로 JSON이 아니라 `multipart/form-data` 형식을 사용한다.
+
+```json
+image: <이미지 파일>
+capturedPositionSeconds: 74
+capturedAt: 2026-07-29T15:05:20+09:00
+```
+
+- `image`: 프론트 임시 저장소에 있는 실제 이미지 파일
+- `capturedPositionSeconds`: 이미지를 촬영했을 때의 영상 재생 위치
+- `capturedAt`: 실제 이미지를 촬영한 시각
+    - KST 오프셋(+09:00) 포함 문자열로 보내줘야 한다. (한국 시간 사용)
+
+`capturedAt`은 Gallery 저장 버튼을 누른 시각이 아니라 원래 사진을 촬영한 시각이다.
+
+---
+
+### 정상 응답 데이터
+
+Status Code : 204
+
+---
+
+### 오류 응답 데이터
+
+Status Code : 404
+
+```json
+{
+  "code": "STAGE_SESSION_NOT_FOUND",
+  "message": "스테이지 재생 세션을 찾을 수 없습니다."
+}
+```
