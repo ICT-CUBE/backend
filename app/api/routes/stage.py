@@ -42,7 +42,7 @@ stage_session_router = APIRouter()
         },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "활성 스테이지 또는 마지막 활성 큐브 소유권이 없음",
+            "description": "활성 스테이지 또는 큐브 소유권 정보가 없음",
             "content": {
                 "application/json": {
                     "examples": {
@@ -52,10 +52,10 @@ stage_session_router = APIRouter()
                                 "message": "스테이지 영상을 찾을 수 없습니다.",
                             }
                         },
-                        "activeCubeOwnershipNotFound": {
+                        "cubeOwnershipNotFound": {
                             "value": {
-                                "code": "ACTIVE_CUBE_OWNERSHIP_NOT_FOUND",
-                                "message": "활성화된 큐브 소유권을 찾을 수 없습니다.",
+                                "code": "CUBE_OWNERSHIP_NOT_FOUND",
+                                "message": "큐브 소유권 정보를 찾을 수 없습니다.",
                             }
                         },
                     }

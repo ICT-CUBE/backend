@@ -51,8 +51,8 @@ def create_stage_session(
     if ownership is None:
         raise ApiError(
             status_code=404,
-            code="ACTIVE_CUBE_OWNERSHIP_NOT_FOUND",
-            message="활성화된 큐브 소유권을 찾을 수 없습니다.",
+            code="CUBE_OWNERSHIP_NOT_FOUND",
+            message="큐브 소유권 정보를 찾을 수 없습니다.",
         )
 
     playing_session_id = db.scalar(

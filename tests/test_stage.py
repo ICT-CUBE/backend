@@ -127,7 +127,10 @@ def test_create_stage_session_returns_404_without_last_active_ownership() -> Non
     response = request_stage_session(db)
 
     assert response.status_code == 404
-    assert response.json()["code"] == "ACTIVE_CUBE_OWNERSHIP_NOT_FOUND"
+    assert response.json() == {
+        "code": "CUBE_OWNERSHIP_NOT_FOUND",
+        "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+    }
 
 
 def test_create_stage_session_returns_409_when_already_playing() -> None:

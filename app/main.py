@@ -10,6 +10,7 @@ from app.core.database import get_db, ping_database
 from app.core.exceptions import (
     ApiError,
     api_error_handler,
+    internal_server_error_handler,
     request_validation_error_handler,
 )
 from app.core.openapi import configure_openapi
@@ -21,8 +22,9 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         debug=settings.debug,
     )
-    app.add_exception_handler(ApiError, api_error_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(  # type: ignore[arg-type]
+    app.add_exception_handler(ApiError, api_error_handler)
+    app.add_exception_handler(Exception, internal_server_error_handler)
+    app.add_exception_handler(
         RequestValidationError,
         request_validation_error_handler,
     )
