@@ -324,8 +324,8 @@ erDiagram
     AVATAR_INTERACTION_PICTURE {
         bigint id PK
         bigint interaction_session_id FK "NOT NULL"
-        varchar_500 picture_img_url "NULL"
-        datetime pictured_at "NULL"
+        varchar_500 picture_img_url "NOT NULL"
+        datetime pictured_at "NOT NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime deleted_at "NULL"

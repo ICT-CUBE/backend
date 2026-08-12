@@ -1,8 +1,9 @@
 from fastapi import APIRouter
 
-from app.api.routes import home, stage, track
+from app.api.routes import gallery, home, stage, track
 
 api_router = APIRouter()
+api_router.include_router(gallery.router, prefix="/users/me", tags=["gallery"])
 api_router.include_router(home.router, prefix="/users/me", tags=["home"])
 api_router.include_router(stage.router, prefix="/stages", tags=["stage"])
 api_router.include_router(track.router, prefix="/tracks", tags=["track"])

@@ -39,3 +39,14 @@ class TrackSessionStatus(StrEnum):
     PLAYING = "PLAYING"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
+
+
+class AlbumImageType(StrEnum):
+    ALBUM_IMAGE = "ALBUM_IMAGE"
+    CONCERT_STILLCUT = "CONCERT_STILLCUT"
+    YEZUL_FRAME = "YEZUL_FRAME"
+
+
+class AvatarInteractionSessionStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"

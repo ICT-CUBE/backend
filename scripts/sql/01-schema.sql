@@ -486,8 +486,8 @@ CREATE TABLE `avatar_interaction_session` (
 CREATE TABLE `avatar_interaction_picture` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `interaction_session_id` BIGINT NOT NULL,
-    `picture_img_url` VARCHAR(500) NULL,
-    `pictured_at` DATETIME NULL,
+    `picture_img_url` VARCHAR(500) NOT NULL,
+    `pictured_at` DATETIME NOT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted_at` DATETIME NULL,
