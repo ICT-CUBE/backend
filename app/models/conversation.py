@@ -1,0 +1,129 @@
+"""아바타 대화 세션과 메시지 테이블 ORM 매핑."""
+
+from datetime import datetime
+
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    func,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.models.base import Base
+from app.models.cube import CubeOwnership, enum_values
+from app.models.enums import (
+    AvatarConversationSessionStatus,
+    ConversationMessageSenderType,
+    ConversationMessageStatus,
+    ConversationType,
+)
+
+
+class AvatarConversationSession(Base):
+    __tablename__ = "avatar_conversation_session"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    cube_ownership_id: Mapped[int] = mapped_column(ForeignKey("cube_ownership.id"))
+    conversation_type: Mapped[ConversationType] = mapped_column(
+        Enum(
+            ConversationType,
+            values_callable=enum_values,
+            native_enum=False,
+            create_constraint=False,
+        )
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime)
+    audio_url: Mapped[str | None] = mapped_column(String(500))
+    audio_duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    conversation_title: Mapped[str | None] = mapped_column(String(50))
+    status: Mapped[AvatarConversationSessionStatus] = mapped_column(
+        Enum(
+            AvatarConversationSessionStatus,
+            values_callable=enum_values,
+            native_enum=False,
+            create_constraint=False,
+        )
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    cube_ownership: Mapped[CubeOwnership] = relationship()
+    messages: Mapped[list["AvatarConversationMessage"]] = relationship(
+        back_populates="conversation_session"
+    )
+    images: Mapped[list["AvatarConversationImage"]] = relationship(
+        back_populates="conversation_session"
+    )
+
+
+class AvatarConversationMessage(Base):
+    __tablename__ = "avatar_conversation_message"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    conversation_session_id: Mapped[int] = mapped_column(
+        ForeignKey("avatar_conversation_session.id")
+    )
+    sender_type: Mapped[ConversationMessageSenderType] = mapped_column(
+        Enum(
+            ConversationMessageSenderType,
+            values_callable=enum_values,
+            native_enum=False,
+            create_constraint=False,
+        )
+    )
+    content: Mapped[str] = mapped_column(Text)
+    sequence_number: Mapped[int] = mapped_column(Integer)
+    is_text_saved: Mapped[bool] = mapped_column(Boolean)
+    status: Mapped[ConversationMessageStatus] = mapped_column(
+        Enum(
+            ConversationMessageStatus,
+            values_callable=enum_values,
+            native_enum=False,
+            create_constraint=False,
+        )
+    )
+    violation_type: Mapped[str | None] = mapped_column(String(20))
+    sent_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp()
+    )
+
+    conversation_session: Mapped[AvatarConversationSession] = relationship(
+        back_populates="messages"
+    )
+
+
+class AvatarConversationImage(Base):
+    __tablename__ = "avatar_conversation_image"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    conversation_session_id: Mapped[int] = mapped_column(
+        ForeignKey("avatar_conversation_session.id")
+    )
+    sequence_number: Mapped[int] = mapped_column(Integer)
+    sent_image_url: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp()
+    )
+
+    conversation_session: Mapped[AvatarConversationSession] = relationship(
+        back_populates="images"
+    )

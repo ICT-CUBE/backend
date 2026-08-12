@@ -50,3 +50,23 @@ class AlbumImageType(StrEnum):
 class AvatarInteractionSessionStatus(StrEnum):
     ACTIVE = "ACTIVE"
     COMPLETED = "COMPLETED"
+
+
+class ConversationType(StrEnum):
+    TEXT = "TEXT"
+    VOICE = "VOICE"
+
+
+class AvatarConversationSessionStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    NOT_ACTIVE = "NOT_ACTIVE"
+
+
+class ConversationMessageSenderType(StrEnum):
+    USER = "USER"
+    AVATAR = "AVATAR"
+
+
+class ConversationMessageStatus(StrEnum):
+    ALLOWED = "ALLOWED"
+    BLOCKED = "BLOCKED"

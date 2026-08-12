@@ -277,6 +277,7 @@ erDiagram
         varchar_20 status "NOT NULL, DEFAULT: ACTIVE, Enum: ACTIVE | NOT_ACTIVE"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
+        datetime deleted_at "NULL"
     }
 
     AVATAR_CONVERSATION_MESSAGE {

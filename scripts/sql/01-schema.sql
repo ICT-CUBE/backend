@@ -415,6 +415,7 @@ CREATE TABLE `avatar_conversation_session` (
     `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted_at` DATETIME NULL,
     PRIMARY KEY (`id`),
     KEY `idx_avatar_conversation_session_ownership_id` (`cube_ownership_id`),
     CONSTRAINT `fk_avatar_conversation_session_cube_ownership` FOREIGN KEY (`cube_ownership_id`) REFERENCES `cube_ownership` (`id`),
