@@ -61,3 +61,12 @@ class ConversationDetailSessionResponse(BaseModel):
 
 class ConversationDetailResponse(BaseModel):
     conversationSession: ConversationDetailSessionResponse
+
+
+class ConversationMessageSaveItemResponse(BaseModel):
+    id: int
+    isTextSaved: bool
+
+
+class ConversationMessageSaveResponse(BaseModel):
+    conversationMessage: ConversationMessageSaveItemResponse

@@ -9,9 +9,20 @@ from app.core.config import get_settings
 
 IMAGE_EXTENSIONS = {
     "image/jpeg": "jpg",
+    "image/jpg": "jpg",
     "image/png": "png",
     "image/webp": "webp",
 }
+
+
+def normalize_image_content_type(content_type: str | None) -> str | None:
+    """지원하는 이미지 Content-Type을 비교 가능한 소문자 값으로 정규화합니다."""
+    if content_type is None:
+        return None
+    normalized_content_type = content_type.lower()
+    if normalized_content_type not in IMAGE_EXTENSIONS:
+        return None
+    return normalized_content_type
 
 
 def upload_stage_capture(
@@ -59,6 +70,35 @@ def upload_track_capture(
     blob_name = (
         f"{settings.azure_storage_track_capture_prefix}/"
         f"{user_id}/{track_session_id}/{uuid4()}.{extension}"
+    )
+    blob = service.get_blob_client(
+        container=settings.azure_storage_container_name,
+        blob=blob_name,
+    )
+    blob.upload_blob(
+        file,
+        overwrite=False,
+        content_settings=ContentSettings(content_type=content_type),
+    )
+    return blob.url
+
+
+def upload_avatar_interaction_picture(
+    *,
+    file: BinaryIO,
+    content_type: str,
+    user_id: int,
+    avatar_interaction_session_id: int,
+) -> str:
+    """아바타 소환 사진을 Azure에 업로드하고 공개 Blob URL을 반환합니다."""
+    settings = get_settings()
+    service = BlobServiceClient.from_connection_string(
+        settings.azure_storage_connection_string
+    )
+    extension = IMAGE_EXTENSIONS[content_type]
+    blob_name = (
+        f"{settings.azure_storage_avatar_interaction_picture_prefix}/"
+        f"{user_id}/{avatar_interaction_session_id}/{uuid4()}.{extension}"
     )
     blob = service.get_blob_client(
         container=settings.azure_storage_container_name,

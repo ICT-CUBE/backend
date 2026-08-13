@@ -10,6 +10,7 @@ from app.models.enums import ConversationType
 from app.schemas.common import ErrorResponse
 from app.schemas.conversation import (
     ConversationDetailResponse,
+    ConversationMessageSaveResponse,
     ConversationSessionCreateRequest,
     ConversationSessionCreateResponse,
     ConversationSessionsResponse,
@@ -20,6 +21,7 @@ from app.services.conversation import (
     delete_conversation_session,
     get_conversation_session_detail,
     get_conversation_sessions,
+    toggle_conversation_message_save,
 )
 
 router = APIRouter()
@@ -112,6 +114,63 @@ def delete_existing_conversation_session(
         conversation_session_id=conversation_session_id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch(
+    "/conversation-messages/{conversationMessageId}/save",
+    response_model=ConversationMessageSaveResponse,
+    summary="대화 텍스트 보관",
+    description=(
+        "고정 사용자 ID 1의 활성 큐브 소유권에 속한 아바타 텍스트 대화 "
+        "메시지의 보관 여부를 토글합니다."
+    ),
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "대화 메시지를 찾을 수 없거나 보관할 수 없는 메시지임",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "conversationMessageNotFound": {
+                            "value": {
+                                "code": "CONVERSATION_MESSAGE_NOT_FOUND",
+                                "message": "대화 메시지를 찾을 수 없습니다.",
+                            }
+                        },
+                        "userConversationMessageSaveNotAvailable": {
+                            "value": {
+                                "code": (
+                                    "USER_CONVERSATION_MESSAGE_SAVE_NOT_AVAILABLE"
+                                ),
+                                "message": "사용자 대화는 보관이 불가합니다.",
+                            }
+                        },
+                        "voiceConversationMessageSaveNotAvailable": {
+                            "value": {
+                                "code": (
+                                    "VOICE_CONVERSATION_MESSAGE_SAVE_NOT_AVAILABLE"
+                                ),
+                                "message": "음성 대화는 보관이 불가합니다.",
+                            }
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
+def save_conversation_message(
+    db: Annotated[Session, Depends(get_db)],
+    conversation_message_id: Annotated[
+        int,
+        Path(alias="conversationMessageId", ge=1),
+    ],
+) -> ConversationMessageSaveResponse:
+    """PATCH /api/v1/users/me/conversation-messages/{conversationMessageId}/save"""
+    return toggle_conversation_message_save(
+        db=db,
+        conversation_message_id=conversation_message_id,
+    )
 
 
 @router.get(

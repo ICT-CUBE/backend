@@ -358,6 +358,34 @@ def test_save_track_capture_returns_400_for_unsupported_content_type() -> None:
     upload.assert_not_called()
 
 
+def test_save_track_capture_accepts_image_jpg_content_type() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = playing_track_session()
+
+    with patch(
+        "app.services.track.upload_track_capture",
+        return_value="https://cdn.example.com/track_capture/test.jpg",
+    ) as upload:
+        response = save_track_capture_request(db, content_type="image/jpg")
+
+    assert response.status_code == 204
+    assert upload.call_args.kwargs["content_type"] == "image/jpg"
+
+
+def test_save_track_capture_accepts_uppercase_jpeg_content_type() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = playing_track_session()
+
+    with patch(
+        "app.services.track.upload_track_capture",
+        return_value="https://cdn.example.com/track_capture/test.jpg",
+    ) as upload:
+        response = save_track_capture_request(db, content_type="IMAGE/JPEG")
+
+    assert response.status_code == 204
+    assert upload.call_args.kwargs["content_type"] == "image/jpeg"
+
+
 def test_save_track_capture_returns_400_when_required_field_is_missing() -> None:
     response = save_track_capture_request(
         Mock(spec=Session),

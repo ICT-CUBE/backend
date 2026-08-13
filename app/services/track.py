@@ -19,7 +19,7 @@ from app.schemas.track import (
     TrackSessionEndStatus,
     TrackSessionResponse,
 )
-from app.services.blob_storage import IMAGE_EXTENSIONS, upload_track_capture
+from app.services.blob_storage import normalize_image_content_type, upload_track_capture
 
 CURRENT_USER_ID = 1
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
@@ -174,7 +174,8 @@ def save_track_capture(
             message="트랙 재생 세션을 찾을 수 없습니다.",
         )
 
-    if image_content_type is None or image_content_type not in IMAGE_EXTENSIONS:
+    normalized_content_type = normalize_image_content_type(image_content_type)
+    if normalized_content_type is None:
         raise ApiError(
             status_code=400,
             code="INVALID_REQUEST",
@@ -184,7 +185,7 @@ def save_track_capture(
     try:
         image_url = upload_track_capture(
             file=image_file,
-            content_type=image_content_type,
+            content_type=normalized_content_type,
             user_id=CURRENT_USER_ID,
             track_session_id=track_session.id,
         )

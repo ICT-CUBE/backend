@@ -203,6 +203,7 @@ capturedAt: 2026-07-29T15:05:20+09:00
 
 - `image`: 프론트 임시 저장소에 있는 실제 이미지 파일
     - **허용 형식:** JPEG(`.jpg`, `.jpeg`), PNG, WebP (GIF 불가)
+    - MIME 타입은 `image/jpeg`, `image/jpg`, `image/png`, `image/webp`를 허용하며 대소문자는 구분하지 않는다.
     - 허용하지 않는 파일은 공통 `400 INVALID_REQUEST`
     반환
 - `capturedPositionSeconds`: 이미지를 촬영했을 때의 영상 재생 위치

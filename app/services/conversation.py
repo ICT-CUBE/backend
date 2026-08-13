@@ -13,6 +13,7 @@ from app.models.conversation import (
 from app.models.cube import CubeOwnership
 from app.models.enums import (
     AvatarConversationSessionStatus,
+    ConversationMessageSenderType,
     ConversationType,
     OwnershipStatus,
 )
@@ -21,6 +22,8 @@ from app.schemas.conversation import (
     ConversationDetailResponse,
     ConversationDetailSessionResponse,
     ConversationLastMessageResponse,
+    ConversationMessageSaveItemResponse,
+    ConversationMessageSaveResponse,
     ConversationPaginationResponse,
     ConversationSessionCreateItemResponse,
     ConversationSessionCreateResponse,
@@ -181,6 +184,63 @@ def delete_conversation_session(
         raise
 
 
+def toggle_conversation_message_save(
+    *,
+    db: Session,
+    conversation_message_id: int,
+) -> ConversationMessageSaveResponse:
+    """아바타 텍스트 대화 메시지의 보관 여부를 토글합니다."""
+    row = db.execute(
+        select(AvatarConversationMessage, AvatarConversationSession)
+        .join(
+            AvatarConversationSession,
+            AvatarConversationMessage.conversation_session_id
+            == AvatarConversationSession.id,
+        )
+        .join(
+            CubeOwnership,
+            AvatarConversationSession.cube_ownership_id == CubeOwnership.id,
+        )
+        .where(
+            AvatarConversationMessage.id == conversation_message_id,
+            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            AvatarConversationSession.deleted_at.is_(None),
+        )
+        .limit(1)
+    ).first()
+    if row is None:
+        _raise_conversation_message_not_found()
+
+    conversation_message, conversation_session = row
+    if conversation_session.conversation_type == ConversationType.VOICE:
+        raise ApiError(
+            status_code=404,
+            code="VOICE_CONVERSATION_MESSAGE_SAVE_NOT_AVAILABLE",
+            message="음성 대화는 보관이 불가합니다.",
+        )
+    if conversation_message.sender_type == ConversationMessageSenderType.USER:
+        raise ApiError(
+            status_code=404,
+            code="USER_CONVERSATION_MESSAGE_SAVE_NOT_AVAILABLE",
+            message="사용자 대화는 보관이 불가합니다.",
+        )
+
+    conversation_message.is_text_saved = not conversation_message.is_text_saved
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return ConversationMessageSaveResponse(
+        conversationMessage=ConversationMessageSaveItemResponse(
+            id=conversation_message.id,
+            isTextSaved=conversation_message.is_text_saved,
+        )
+    )
+
+
 def get_conversation_session_detail(
     *,
     db: Session,
@@ -249,6 +309,14 @@ def _raise_deletable_conversation_session_not_found() -> None:
         status_code=404,
         code="CONVERSATION_SESSION_NOT_FOUND",
         message="삭제할 대화 세션을 찾을 수 없습니다.",
+    )
+
+
+def _raise_conversation_message_not_found() -> None:
+    raise ApiError(
+        status_code=404,
+        code="CONVERSATION_MESSAGE_NOT_FOUND",
+        message="대화 메시지를 찾을 수 없습니다.",
     )
 
 

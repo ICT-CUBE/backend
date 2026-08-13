@@ -368,3 +368,103 @@ Status Code : 404
 ```
 
 - 존재하지 않는 세션 id, 현재 사용자의 활성 큐브 소유권에 속하지 않는 세션, 이미 삭제된 세션인 경우 위 응답을 반환한다.
+
+
+
+
+## 대화 텍스트 보관
+- http 메서드: patch
+- 엔드포인트: api/v1/users/me/conversation-messages/{conversationMessageId}/save
+
+### API 설명
+
+아바타의 응답에 대해 보관함에 저장을 시도하면 호출한다.
+
+대화 메시지 id를 받아서 보관 여부를 토글한다.
+
+- `sender_type = AVATAR`인 메시지만 보관할 수 있다.
+- `sender_type = USER`인 메시지는 보관할 수 없다.
+- 텍스트 대화 세션(`conversation_type = TEXT`)에 속한 메시지만 보관할 수 있다.
+- 음성 대화 세션(`conversation_type = VOICE`)에 속한 메시지는 보관할 수 없다.
+- 삭제된 대화 세션(`deleted_at`이 null이 아닌 항목)에 속한 메시지는 찾을 수 없는 메시지로 처리한다.
+- 대화 메시지의 `status`는 필터링하지 않고 `ALLOWED`, `BLOCKED` 모두 보관할 수 있다.
+- `content` 값은 별도로 검사하지 않는다.
+- `is_text_saved = false`인 메시지에 요청하면 `true`로 변경한다.
+- `is_text_saved = true`인 메시지에 요청하면 `false`로 변경한다.
+
+---
+
+### 요청 Query
+
+---
+
+### 요청 Path
+
+```json
+{
+	"conversationMessageId": 5006
+}
+```
+
+요청 예시: api/v1/users/me/conversation-messages/5006/save
+
+---
+
+### 요청 Body
+
+---
+
+### 정상 응답 데이터
+
+Status Code : 200
+
+```json
+{
+  "conversationMessage": {
+    "id": 5006,
+    "isTextSaved": true
+  }
+}
+```
+
+```json
+{
+  "conversationMessage": {
+    "id": 5006,
+    "isTextSaved": false
+  }
+}
+```
+
+---
+
+### 오류 응답 데이터
+
+Status Code : 404
+
+```json
+{
+  "code": "CONVERSATION_MESSAGE_NOT_FOUND",
+  "message": "대화 메시지를 찾을 수 없습니다."
+}
+```
+
+- 존재하지 않는 메시지 id, 삭제된 대화 세션에 속한 메시지인 경우 위 응답을 반환한다.
+
+```json
+{
+  "code": "USER_CONVERSATION_MESSAGE_SAVE_NOT_AVAILABLE",
+  "message": "사용자 대화는 보관이 불가합니다."
+}
+```
+
+- `sender_type = USER`인 메시지 id로 요청한 경우 위 응답을 반환한다.
+
+```json
+{
+  "code": "VOICE_CONVERSATION_MESSAGE_SAVE_NOT_AVAILABLE",
+  "message": "음성 대화는 보관이 불가합니다."
+}
+```
+
+- `conversation_type = VOICE`인 세션에 속한 메시지 id로 요청한 경우 위 응답을 반환한다.

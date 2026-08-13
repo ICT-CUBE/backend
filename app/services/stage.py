@@ -16,7 +16,7 @@ from app.schemas.stage import (
     StageSessionResponse,
     StageViewMode,
 )
-from app.services.blob_storage import IMAGE_EXTENSIONS, upload_stage_capture
+from app.services.blob_storage import normalize_image_content_type, upload_stage_capture
 
 CURRENT_USER_ID = 1
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
@@ -126,8 +126,9 @@ def save_stage_capture(
             message="스테이지 재생 세션을 찾을 수 없습니다.",
         )
 
-    # 파일 용량은 제한하지 않고 합의한 세 가지 이미지 Content-Type만 허용합니다.
-    if image_content_type is None or image_content_type not in IMAGE_EXTENSIONS:
+    # 파일 용량은 제한하지 않고 합의한 이미지 Content-Type만 허용합니다.
+    normalized_content_type = normalize_image_content_type(image_content_type)
+    if normalized_content_type is None:
         raise ApiError(
             status_code=400,
             code="INVALID_REQUEST",
@@ -137,7 +138,7 @@ def save_stage_capture(
     try:
         image_url = upload_stage_capture(
             file=image_file,
-            content_type=image_content_type,
+            content_type=normalized_content_type,
             user_id=CURRENT_USER_ID,
             stage_session_id=stage_session.id,
         )

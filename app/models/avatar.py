@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -25,8 +25,12 @@ class AvatarInteractionSession(Base):
             create_constraint=False,
         )
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime)
-    updated_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp()
+    )
 
     cube_ownership: Mapped[CubeOwnership] = relationship()
     pictures: Mapped[list["AvatarInteractionPicture"]] = relationship(
@@ -43,8 +47,12 @@ class AvatarInteractionPicture(Base):
     )
     picture_img_url: Mapped[str | None] = mapped_column(String(500))
     pictured_at: Mapped[datetime] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime)
-    updated_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp()
+    )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     interaction_session: Mapped[AvatarInteractionSession] = relationship(
