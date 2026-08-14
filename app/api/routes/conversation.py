@@ -2,7 +2,17 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Path,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -10,6 +20,8 @@ from app.models.enums import ConversationType
 from app.schemas.common import ErrorResponse
 from app.schemas.conversation import (
     ConversationDetailResponse,
+    ConversationMessageReplyRequest,
+    ConversationMessageReplyResponse,
     ConversationMessageSaveResponse,
     ConversationSessionCreateRequest,
     ConversationSessionCreateResponse,
@@ -21,6 +33,8 @@ from app.services.conversation import (
     delete_conversation_session,
     get_conversation_session_detail,
     get_conversation_sessions,
+    reply_to_conversation_message,
+    save_conversation_session,
     toggle_conversation_message_save,
 )
 
@@ -218,3 +232,92 @@ def read_conversation_session_detail(
         db=db,
         conversation_session_id=conversation_session_id,
     )
+
+
+@router.post(
+    "/conversation-sessions/{conversationSessionId}/messages",
+    response_model=ConversationMessageReplyResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="대화 메시지 응답",
+    description=(
+        "고정 사용자 ID 1의 대화 세션에 사용자 메시지를 받고, OpenAI GPT로 "
+        "아바타 응답을 생성한 뒤 USER/AVATAR 메시지를 함께 저장해 반환합니다."
+    ),
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "대화 세션이 없거나 현재 사용자의 세션이 아님",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "CONVERSATION_SESSION_NOT_FOUND",
+                        "message": "대화 세션을 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def create_conversation_message_reply(
+    db: Annotated[Session, Depends(get_db)],
+    conversation_session_id: Annotated[
+        int,
+        Path(alias="conversationSessionId", ge=1),
+    ],
+    body: ConversationMessageReplyRequest,
+) -> ConversationMessageReplyResponse:
+    """POST /api/v1/users/me/conversation-sessions/{conversationSessionId}/messages"""
+    return reply_to_conversation_message(
+        db=db,
+        conversation_session_id=conversation_session_id,
+        body=body,
+    )
+
+
+@router.patch(
+    "/conversation-sessions/{conversationSessionId}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="대화 세션 상태 저장",
+    description=(
+        "고정 사용자 ID 1의 대화 세션을 NOT_ACTIVE로 변경하고 종료 시각을 저장합니다. "
+        "제목이 없고 메시지가 있으면 첫 메시지 2개로 GPT 제목을 생성합니다."
+    ),
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "대화 세션이 없거나 현재 사용자의 세션이 아님",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "CONVERSATION_SESSION_NOT_FOUND",
+                        "message": "대화 세션을 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def update_conversation_session(
+    db: Annotated[Session, Depends(get_db)],
+    conversation_session_id: Annotated[
+        int,
+        Path(alias="conversationSessionId", ge=1),
+    ],
+    audio: Annotated[
+        UploadFile | None,
+        File(description="M4A, MP3, WAV 또는 WebM 오디오 파일"),
+    ] = None,
+    audio_duration_seconds: Annotated[
+        int | None,
+        Form(alias="audioDurationSeconds"),
+    ] = None,
+) -> Response:
+    """PATCH /api/v1/users/me/conversation-sessions/{conversationSessionId}"""
+    save_conversation_session(
+        db=db,
+        conversation_session_id=conversation_session_id,
+        audio_file=audio.file if audio is not None else None,
+        audio_content_type=audio.content_type if audio is not None else None,
+        audio_duration_seconds=audio_duration_seconds,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

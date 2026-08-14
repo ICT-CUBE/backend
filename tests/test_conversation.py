@@ -2,7 +2,7 @@
 
 from collections.abc import Iterator
 from datetime import datetime
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -100,6 +100,55 @@ def save_conversation_message_request(
         app.dependency_overrides.clear()
 
 
+def reply_conversation_message_request(
+    db: Mock,
+    conversation_session_id: int = 1001,
+    body: dict | None = None,
+    raise_server_exceptions: bool = True,
+):
+    def override_get_db() -> Iterator[Session]:
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(
+            app,
+            raise_server_exceptions=raise_server_exceptions,
+        ) as client:
+            return client.post(
+                f"/api/v1/users/me/conversation-sessions/"
+                f"{conversation_session_id}/messages",
+                json=body if body is not None else {"content": "오늘 뭐 하고 있었어?"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+
+def update_conversation_session_request(
+    db: Mock,
+    conversation_session_id: int = 1001,
+    data: dict | None = None,
+    files: dict | None = None,
+    raise_server_exceptions: bool = True,
+):
+    def override_get_db() -> Iterator[Session]:
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(
+            app,
+            raise_server_exceptions=raise_server_exceptions,
+        ) as client:
+            return client.patch(
+                f"/api/v1/users/me/conversation-sessions/{conversation_session_id}",
+                data=data,
+                files=files,
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+
 def request_conversation_sessions(db: Mock, query: str = "?conversationType=TEXT"):
     def override_get_db() -> Iterator[Session]:
         yield db
@@ -145,7 +194,7 @@ def message(
     *,
     id: int,
     content: str = "헐! 대박인데?",
-    sent_at: datetime = datetime.fromisoformat("2026-07-29T12:25:00"),
+    sent_at: datetime | None = None,
     sequence_number: int = 1,
     sender_type: ConversationMessageSenderType = ConversationMessageSenderType.USER,
     is_text_saved: bool = False,
@@ -154,7 +203,7 @@ def message(
     return AvatarConversationMessage(
         id=id,
         content=content,
-        sent_at=sent_at,
+        sent_at=sent_at or datetime.fromisoformat("2026-07-29T12:25:00"),
         sequence_number=sequence_number,
         sender_type=sender_type,
         is_text_saved=is_text_saved,
@@ -723,4 +772,360 @@ def test_conversation_session_detail_swagger_contract() -> None:
     ]["get"]
 
     assert set(operation["responses"]) == {"200", "404"}
+    assert "security" not in operation
+
+
+def test_reply_conversation_message_saves_user_and_avatar_messages() -> None:
+    db = Mock(spec=Session)
+    conversation_session = session(
+        id=1001,
+        conversation_type=ConversationType.TEXT,
+    )
+    conversation_session.cube_ownership_id = 1
+    db.scalar.side_effect = [conversation_session, 12]
+
+    def set_message_ids() -> None:
+        for index, inserted in enumerate(db.add.call_args_list, start=5025):
+            inserted.args[0].id = index
+
+    db.flush.side_effect = set_message_ids
+
+    with patch(
+        "app.services.conversation.generate_avatar_reply",
+        return_value="오늘 연습하고 있었어! 너는 오늘 하루 어땠어?",
+    ):
+        response = reply_conversation_message_request(db)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["userMessage"] == {
+        "id": 5025,
+        "senderType": "USER",
+        "content": "오늘 뭐 하고 있었어?",
+        "sequenceNumber": 13,
+        "sentAt": body["userMessage"]["sentAt"],
+    }
+    assert body["avatarMessage"] == {
+        "id": 5026,
+        "senderType": "AVATAR",
+        "content": "오늘 연습하고 있었어! 너는 오늘 하루 어땠어?",
+        "sequenceNumber": 14,
+        "sentAt": body["avatarMessage"]["sentAt"],
+    }
+
+    user_message = db.add.call_args_list[0].args[0]
+    avatar_message = db.add.call_args_list[1].args[0]
+    assert isinstance(user_message, AvatarConversationMessage)
+    assert isinstance(avatar_message, AvatarConversationMessage)
+    assert user_message.conversation_session_id == 1001
+    assert user_message.sender_type == ConversationMessageSenderType.USER
+    assert user_message.content == "오늘 뭐 하고 있었어?"
+    assert user_message.sequence_number == 13
+    assert user_message.is_text_saved is False
+    assert user_message.status == ConversationMessageStatus.ALLOWED
+    assert user_message.violation_type is None
+    assert avatar_message.sender_type == ConversationMessageSenderType.AVATAR
+    assert avatar_message.sequence_number == 14
+    db.commit.assert_called_once()
+
+
+def test_reply_conversation_message_allows_not_active_session_and_blank_content() -> None:
+    db = Mock(spec=Session)
+    conversation_session = session(
+        id=1001,
+        conversation_type=ConversationType.VOICE,
+    )
+    conversation_session.status = AvatarConversationSessionStatus.NOT_ACTIVE
+    db.scalar.side_effect = [conversation_session, None]
+    db.flush.side_effect = lambda: [
+        setattr(call.args[0], "id", index)
+        for index, call in enumerate(db.add.call_args_list, start=1)
+    ]
+
+    with patch(
+        "app.services.conversation.generate_avatar_reply",
+        return_value="잘 못 들었어. 다시 한 번 말해줄래?",
+    ) as generate_reply:
+        response = reply_conversation_message_request(
+            db,
+            conversation_session_id=1001,
+            body={"content": "   \n"},
+        )
+
+    assert response.status_code == 201
+    generate_reply.assert_called_once_with("   \n")
+    assert response.json()["userMessage"]["content"] == "   \n"
+    assert response.json()["avatarMessage"]["content"] == (
+        "잘 못 들었어. 다시 한 번 말해줄래?"
+    )
+
+
+def test_reply_conversation_message_returns_404_for_unknown_or_deleted_session() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = reply_conversation_message_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "CONVERSATION_SESSION_NOT_FOUND",
+        "message": "대화 세션을 찾을 수 없습니다.",
+    }
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_reply_conversation_message_rolls_back_when_commit_fails() -> None:
+    db = Mock(spec=Session)
+    db.scalar.side_effect = [
+        session(id=1001, conversation_type=ConversationType.TEXT),
+        0,
+    ]
+    db.commit.side_effect = RuntimeError("db failed")
+
+    with patch(
+        "app.services.conversation.generate_avatar_reply",
+        return_value="좋아, 계속 얘기해줘!",
+    ):
+        response = reply_conversation_message_request(
+            db,
+            raise_server_exceptions=False,
+        )
+
+    assert response.status_code == 500
+    db.rollback.assert_called_once()
+
+
+def test_reply_conversation_message_does_not_save_when_gpt_fails() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = session(id=1001, conversation_type=ConversationType.TEXT)
+
+    with patch(
+        "app.services.conversation.generate_avatar_reply",
+        side_effect=RuntimeError("openai failed"),
+    ):
+        response = reply_conversation_message_request(
+            db,
+            raise_server_exceptions=False,
+        )
+
+    assert response.status_code == 500
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+    db.rollback.assert_not_called()
+
+
+def test_reply_conversation_message_swagger_contract() -> None:
+    operation = app.openapi()["paths"][
+        "/api/v1/users/me/conversation-sessions/{conversationSessionId}/messages"
+    ]["post"]
+
+    assert set(operation["responses"]) == {"201", "404"}
+    assert "security" not in operation
+
+
+def test_update_text_conversation_session_sets_title_and_ends_session() -> None:
+    db = Mock(spec=Session)
+    conversation_session = session(
+        id=1001,
+        conversation_type=ConversationType.TEXT,
+        title=None,
+    )
+    messages = [
+        message(
+            id=5001,
+            content="오늘 뭐 했어?",
+            sequence_number=1,
+            sender_type=ConversationMessageSenderType.USER,
+        ),
+        message(
+            id=5002,
+            content="연습하고 있었어!",
+            sequence_number=2,
+            sender_type=ConversationMessageSenderType.AVATAR,
+        ),
+    ]
+    db.scalar.return_value = conversation_session
+    db.scalars.return_value.all.return_value = messages
+
+    with patch(
+        "app.services.conversation.generate_conversation_title",
+        return_value="오늘의 연습 이야기",
+    ) as generate_title:
+        response = update_conversation_session_request(db)
+
+    assert response.status_code == 204
+    generate_title.assert_called_once_with(messages)
+    assert conversation_session.conversation_title == "오늘의 연습 이야기"
+    assert isinstance(conversation_session.ended_at, datetime)
+    assert conversation_session.ended_at.tzinfo is None
+    assert conversation_session.status == AvatarConversationSessionStatus.NOT_ACTIVE
+    assert conversation_session.audio_url is None
+    assert conversation_session.audio_duration_seconds is None
+    db.commit.assert_called_once()
+
+
+def test_update_conversation_session_accepts_no_multipart_and_empty_messages() -> None:
+    db = Mock(spec=Session)
+    conversation_session = session(
+        id=1001,
+        conversation_type=ConversationType.TEXT,
+        title=None,
+    )
+    db.scalar.return_value = conversation_session
+    db.scalars.return_value.all.return_value = []
+
+    with patch(
+        "app.services.conversation.generate_conversation_title",
+    ) as generate_title:
+        response = update_conversation_session_request(db)
+
+    assert response.status_code == 204
+    generate_title.assert_not_called()
+    assert conversation_session.conversation_title is None
+    assert conversation_session.status == AvatarConversationSessionStatus.NOT_ACTIVE
+    assert isinstance(conversation_session.ended_at, datetime)
+
+
+def test_update_voice_conversation_session_uploads_audio_and_saves_url() -> None:
+    db = Mock(spec=Session)
+    conversation_session = session(
+        id=1101,
+        conversation_type=ConversationType.VOICE,
+        title="기존 제목",
+    )
+    conversation_session.status = AvatarConversationSessionStatus.NOT_ACTIVE
+    db.scalar.return_value = conversation_session
+    db.scalars.return_value.all.return_value = [
+        message(id=1, content="음성 대화", sequence_number=1)
+    ]
+
+    with (
+        patch(
+            "app.services.conversation.generate_conversation_title",
+        ) as generate_title,
+        patch(
+            "app.services.conversation.upload_conversation_audio",
+            return_value="https://storage.example.com/conversation_audio/1/1101/a.m4a",
+        ) as upload_audio,
+    ):
+        response = update_conversation_session_request(
+            db,
+            conversation_session_id=1101,
+            data={"audioDurationSeconds": "300"},
+            files={
+                "audio": (
+                    "voice.m4a",
+                    b"audio-bytes",
+                    "audio/mp4",
+                )
+            },
+        )
+
+    assert response.status_code == 204
+    generate_title.assert_not_called()
+    upload_audio.assert_called_once()
+    assert upload_audio.call_args.kwargs["content_type"] == "audio/mp4"
+    assert upload_audio.call_args.kwargs["user_id"] == 1
+    assert upload_audio.call_args.kwargs["conversation_session_id"] == 1101
+    assert conversation_session.conversation_title == "기존 제목"
+    assert conversation_session.audio_url == (
+        "https://storage.example.com/conversation_audio/1/1101/a.m4a"
+    )
+    assert conversation_session.audio_duration_seconds == 300
+    assert conversation_session.status == AvatarConversationSessionStatus.NOT_ACTIVE
+    assert isinstance(conversation_session.ended_at, datetime)
+
+
+def test_update_voice_conversation_session_returns_common_400_without_audio() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = session(
+        id=1101,
+        conversation_type=ConversationType.VOICE,
+    )
+
+    response = update_conversation_session_request(
+        db,
+        conversation_session_id=1101,
+        files={
+            "audio": (
+                "voice.m4a",
+                b"audio-bytes",
+                "audio/mp4",
+            )
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "code": "INVALID_REQUEST",
+        "message": "요청값이 올바르지 않습니다.",
+    }
+    db.commit.assert_not_called()
+
+
+def test_update_voice_conversation_session_returns_common_400_for_invalid_audio_type() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = session(
+        id=1101,
+        conversation_type=ConversationType.VOICE,
+    )
+
+    response = update_conversation_session_request(
+        db,
+        conversation_session_id=1101,
+        data={"audioDurationSeconds": "300"},
+        files={
+            "audio": (
+                "voice.txt",
+                b"not-audio",
+                "text/plain",
+            )
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "code": "INVALID_REQUEST",
+        "message": "요청값이 올바르지 않습니다.",
+    }
+    db.commit.assert_not_called()
+
+
+def test_update_conversation_session_returns_404_for_unknown_or_deleted_session() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = update_conversation_session_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "CONVERSATION_SESSION_NOT_FOUND",
+        "message": "대화 세션을 찾을 수 없습니다.",
+    }
+    db.commit.assert_not_called()
+
+
+def test_update_conversation_session_rolls_back_when_commit_fails() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = session(
+        id=1001,
+        conversation_type=ConversationType.TEXT,
+        title="기존 제목",
+    )
+    db.scalars.return_value.all.return_value = []
+    db.commit.side_effect = RuntimeError("db failed")
+
+    response = update_conversation_session_request(db, raise_server_exceptions=False)
+
+    assert response.status_code == 500
+    db.rollback.assert_called_once()
+
+
+def test_update_conversation_session_swagger_contract() -> None:
+    operation = app.openapi()["paths"][
+        "/api/v1/users/me/conversation-sessions/{conversationSessionId}"
+    ]["patch"]
+
+    assert set(operation["responses"]) == {"204", "404"}
     assert "security" not in operation

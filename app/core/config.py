@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     azure_storage_avatar_interaction_picture_prefix: str = Field(
         default="avatar_interaction_picture"
     )
+    azure_storage_conversation_audio_prefix: str = Field(
+        default="conversation_audio"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

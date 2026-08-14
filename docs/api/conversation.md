@@ -468,3 +468,162 @@ Status Code : 404
 ```
 
 - `conversation_type = VOICE`인 세션에 속한 메시지 id로 요청한 경우 위 응답을 반환한다.
+
+
+
+
+## 대화 메시지 응답
+- http 메서드: post
+- 엔드포인트: api/v1/users/me/conversation-sessions/{conversationSessionId}/messages
+
+### API 설명
+
+사용자가 텍스트 또는 음성으로 아바타에게 말을 걸면 호출된다.
+
+백엔드에서 사용자 대화를 처리 GPT로 처리해서 응답과 그 시간을 반환한다.
+
+---
+
+### 요청 Query
+
+---
+
+### 요청 Path
+
+```json
+{
+	"conversationSessionId": 1
+}
+```
+
+요청 예시: api/v1/users/me/conversation-sessions/1/messages
+
+---
+
+### 요청 Body
+
+```json
+{
+	"content": "오늘 뭐 하고 있었어?"
+}
+```
+
+---
+
+### 정상 응답 데이터
+
+Status Code : 201
+
+```json
+{
+  "userMessage": {
+    "id": 5025,
+    "senderType": "USER",
+    "content": "오늘 뭐 하고 있었어?",
+    "sequenceNumber": 13,
+    "sentAt": "2026-07-29T18:25:02"
+  },
+  "avatarMessage": {
+    "id": 5005,
+    "senderType": "AVATAR",
+    "content": "오늘 연습하고 있었어! 너는 오늘 하루 어떻게 보냈어?",
+    "sequenceNumber": 14,
+    "sentAt": "2026-07-29T18:25:02"
+  }
+}
+```
+
+---
+
+### 오류 응답 데이터
+
+Status Code : 404
+
+```json
+{
+  "code": "CONVERSATION_SESSION_NOT_FOUND",
+  "message": "대화 세션을 찾을 수 없습니다."
+}
+```
+
+
+
+
+## 대화 세션 상태 저장
+- http 메서드: patch
+- 엔드포인트: api/v1/users/me/conversation-sessions/{conversationSessionId}
+
+### API 설명
+
+사용자가 대화를 진행하다가 뒤로 가기를 누르면 호출한다.
+
+conversation_title이 null일 때만 해당 세션의 첫 대화 메시지 2개를 GPT에 전달해 대화 제목을 생성하고 저장한다.
+
+호출할 때마다 ended_at을 현재 한국 시간으로 갱신하고, 세션 상태를 NOT_ACTIVE로 변경한다.
+
+음성 대화인 경우 프론트에서 전달한 실제 오디오 파일을 Azure Blob Storage에 저장하고, 생성된 Blob URL을 `avatar_conversation_session.audio_url`에 저장한다.
+
+오디오 파일 저장 경로는 `conversation_audio/{userId}/{conversationSessionId}/{UUID}.{확장자}` 형식을 사용한다.
+
+프론트에서 전달한 `audioDurationSeconds`는 `avatar_conversation_session.audio_duration_seconds`에 저장한다.
+
+---
+
+### 요청 Query
+
+---
+
+### 요청 Path
+
+```json
+{
+	"conversationSessionId": 1001
+}
+```
+
+요청 예시: api/v1/users/me/conversation-sessions/1001
+
+---
+
+### 요청 Body
+
+음성 대화 세션 종료 시에는 JSON이 아니라 `multipart/form-data` 형식으로 전송한다.
+
+```text
+audio: <오디오 파일>
+audioDurationSeconds: 300
+```
+
+- `audio`: 프론트가 녹음한 실제 음성 파일
+  - 허용 형식: M4A(`audio/mp4`, `audio/x-m4a`), MPEG/MP3(`audio/mpeg`), WAV(`audio/wav`), WebM(`audio/webm`)
+- `audioDurationSeconds`: 음성 파일의 전체 길이, 초 단위
+
+텍스트 대화 세션 종료 시에는 오디오 파일이 존재하지 않으므로 요청 body를 보내지 않는다.
+
+```json
+{
+}
+```
+
+텍스트 대화 세션 종료여서 오디오 파일이 존재하지 않을 때에는 요청 body를 `{}`로 보내거나 아예 전송하지 않는다.
+
+음성 대화 세션 종료인 경우 `audio`, `audioDurationSeconds`를 반드시 전송한다.
+
+---
+
+### 정상 응답 데이터
+
+Status Code : 204
+
+---
+
+### 오류 응답 데이터
+
+Status Code : 404
+
+```json
+{
+  "code": "CONVERSATION_SESSION_NOT_FOUND",
+  "message": "대화 세션을 찾을 수 없습니다."
+}
+```

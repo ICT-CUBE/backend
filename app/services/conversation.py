@@ -1,10 +1,13 @@
 """텍스트·음성 대화 목록 조회 로직."""
 
 from datetime import datetime, timedelta, timezone
+from typing import BinaryIO
 
+from openai import OpenAI
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.exceptions import ApiError
 from app.models.conversation import (
     AvatarConversationMessage,
@@ -14,6 +17,7 @@ from app.models.cube import CubeOwnership
 from app.models.enums import (
     AvatarConversationSessionStatus,
     ConversationMessageSenderType,
+    ConversationMessageStatus,
     ConversationType,
     OwnershipStatus,
 )
@@ -22,6 +26,9 @@ from app.schemas.conversation import (
     ConversationDetailResponse,
     ConversationDetailSessionResponse,
     ConversationLastMessageResponse,
+    ConversationMessageReplyItemResponse,
+    ConversationMessageReplyRequest,
+    ConversationMessageReplyResponse,
     ConversationMessageSaveItemResponse,
     ConversationMessageSaveResponse,
     ConversationPaginationResponse,
@@ -30,10 +37,26 @@ from app.schemas.conversation import (
     ConversationSessionResponse,
     ConversationSessionsResponse,
 )
+from app.services.blob_storage import (
+    normalize_audio_content_type,
+    upload_conversation_audio,
+)
 
 CURRENT_USER_ID = 1
 CONVERSATION_PAGE_SIZE = 20
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
+JENNIE_CONVERSATION_SYSTEM_PROMPT = """
+너는 아티스트 제니이고, 사용자와 1대1로 자연스럽게 대화하는 상황이다.
+친근하고 짧게 한국어로 답하되, 팬과 편하게 말하는 분위기를 유지한다.
+실제 사적인 일정, 확인되지 않은 사실, 민감한 개인정보는 지어내지 않는다.
+사용자 입력이 빈 문자열이거나 공백/줄바꿈뿐이면 당황하지 말고 자연스럽게
+"잘 못 들었어. 다시 한 번 말해줄래?" 같은 뉘앙스로 답한다.
+""".strip()
+CONVERSATION_TITLE_SYSTEM_PROMPT = """
+너는 대화 기록을 보고 목록에 표시할 짧은 제목을 만드는 역할이다.
+제목은 한국어로 20자 이내, 따옴표 없이 한 줄로만 답한다.
+대화의 핵심 상황이나 주제를 자연스럽게 요약한다.
+""".strip()
 
 
 def _kst_datetime(value: datetime) -> datetime:
@@ -296,6 +319,198 @@ def get_conversation_session_detail(
     )
 
 
+def reply_to_conversation_message(
+    *,
+    db: Session,
+    conversation_session_id: int,
+    body: ConversationMessageReplyRequest,
+) -> ConversationMessageReplyResponse:
+    """사용자 발화를 GPT로 처리하고 USER/AVATAR 메시지를 함께 저장합니다."""
+    conversation_session = db.scalar(
+        select(AvatarConversationSession)
+        .join(
+            CubeOwnership,
+            AvatarConversationSession.cube_ownership_id == CubeOwnership.id,
+        )
+        .where(
+            AvatarConversationSession.id == conversation_session_id,
+            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            AvatarConversationSession.deleted_at.is_(None),
+        )
+        .limit(1)
+    )
+    if conversation_session is None:
+        _raise_conversation_session_not_found()
+
+    avatar_reply = generate_avatar_reply(body.content)
+    now = datetime.now(KOREA_TIMEZONE).replace(tzinfo=None)
+    last_sequence_number = _last_conversation_sequence_number(
+        db=db,
+        conversation_session_id=conversation_session.id,
+    )
+
+    user_message = AvatarConversationMessage(
+        conversation_session_id=conversation_session.id,
+        sender_type=ConversationMessageSenderType.USER,
+        content=body.content,
+        sequence_number=last_sequence_number + 1,
+        is_text_saved=False,
+        status=ConversationMessageStatus.ALLOWED,
+        violation_type=None,
+        sent_at=now,
+    )
+    avatar_message = AvatarConversationMessage(
+        conversation_session_id=conversation_session.id,
+        sender_type=ConversationMessageSenderType.AVATAR,
+        content=avatar_reply,
+        sequence_number=last_sequence_number + 2,
+        is_text_saved=False,
+        status=ConversationMessageStatus.ALLOWED,
+        violation_type=None,
+        sent_at=now,
+    )
+
+    try:
+        db.add(user_message)
+        db.add(avatar_message)
+        db.flush()
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return ConversationMessageReplyResponse(
+        userMessage=_conversation_reply_message_response(user_message),
+        avatarMessage=_conversation_reply_message_response(avatar_message),
+    )
+
+
+def save_conversation_session(
+    *,
+    db: Session,
+    conversation_session_id: int,
+    audio_file: BinaryIO | None,
+    audio_content_type: str | None,
+    audio_duration_seconds: int | None,
+) -> None:
+    """대화 세션 종료 정보를 저장하고 필요하면 제목을 생성합니다."""
+    conversation_session = db.scalar(
+        select(AvatarConversationSession)
+        .join(
+            CubeOwnership,
+            AvatarConversationSession.cube_ownership_id == CubeOwnership.id,
+        )
+        .where(
+            AvatarConversationSession.id == conversation_session_id,
+            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            AvatarConversationSession.deleted_at.is_(None),
+        )
+        .limit(1)
+    )
+    if conversation_session is None:
+        _raise_conversation_session_not_found()
+
+    if conversation_session.conversation_type == ConversationType.VOICE and (
+        audio_file is None or audio_duration_seconds is None
+    ):
+        _raise_invalid_request()
+
+    audio_url = None
+    if conversation_session.conversation_type == ConversationType.VOICE:
+        normalized_content_type = normalize_audio_content_type(audio_content_type)
+        if normalized_content_type is None:
+            _raise_invalid_request()
+        try:
+            audio_url = upload_conversation_audio(
+                file=audio_file,
+                content_type=normalized_content_type,
+                user_id=CURRENT_USER_ID,
+                conversation_session_id=conversation_session.id,
+            )
+        except Exception as exc:
+            raise ApiError(
+                status_code=500,
+                code="INTERNAL_SERVER_ERROR",
+                message="서버 내부 오류가 발생했습니다.",
+            ) from exc
+
+    first_messages = db.scalars(
+        select(AvatarConversationMessage)
+        .where(
+            AvatarConversationMessage.conversation_session_id
+            == conversation_session.id
+        )
+        .order_by(AvatarConversationMessage.sequence_number.asc())
+        .limit(2)
+    ).all()
+
+    if conversation_session.conversation_title is None and first_messages:
+        conversation_session.conversation_title = generate_conversation_title(
+            first_messages
+        )
+
+    now = datetime.now(KOREA_TIMEZONE).replace(tzinfo=None)
+    conversation_session.ended_at = now
+    conversation_session.status = AvatarConversationSessionStatus.NOT_ACTIVE
+
+    if conversation_session.conversation_type == ConversationType.VOICE:
+        conversation_session.audio_url = audio_url
+        conversation_session.audio_duration_seconds = audio_duration_seconds
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def generate_avatar_reply(user_content: str) -> str:
+    """OpenAI GPT를 호출해 제니 페르소나의 응답 문장을 생성합니다."""
+    settings = get_settings()
+    client = OpenAI(api_key=settings.openai_api_key)
+    response = client.responses.create(
+        model=settings.openai_model,
+        input=[
+            {
+                "role": "system",
+                "content": JENNIE_CONVERSATION_SYSTEM_PROMPT,
+            },
+            {
+                "role": "user",
+                "content": user_content,
+            },
+        ],
+    )
+    return response.output_text.strip()
+
+
+def generate_conversation_title(
+    messages: list[AvatarConversationMessage],
+) -> str:
+    """첫 대화 2개를 바탕으로 대화 제목을 생성합니다."""
+    settings = get_settings()
+    client = OpenAI(api_key=settings.openai_api_key)
+    conversation_text = "\n".join(
+        f"{message.sender_type.value}: {message.content}" for message in messages
+    )
+    response = client.responses.create(
+        model=settings.openai_model,
+        input=[
+            {
+                "role": "system",
+                "content": CONVERSATION_TITLE_SYSTEM_PROMPT,
+            },
+            {
+                "role": "user",
+                "content": conversation_text,
+            },
+        ],
+    )
+    return response.output_text.strip()
+
+
 def _raise_conversation_session_not_found() -> None:
     raise ApiError(
         status_code=404,
@@ -320,6 +535,14 @@ def _raise_conversation_message_not_found() -> None:
     )
 
 
+def _raise_invalid_request() -> None:
+    raise ApiError(
+        status_code=400,
+        code="INVALID_REQUEST",
+        message="요청값이 올바르지 않습니다.",
+    )
+
+
 def _conversation_session_response(
     *,
     session: AvatarConversationSession,
@@ -341,4 +564,32 @@ def _conversation_session_response(
             content=content,
             sentAt=_kst_datetime(last_message.sent_at),
         ),
+    )
+
+
+def _last_conversation_sequence_number(
+    *,
+    db: Session,
+    conversation_session_id: int,
+) -> int:
+    return (
+        db.scalar(
+            select(func.max(AvatarConversationMessage.sequence_number)).where(
+                AvatarConversationMessage.conversation_session_id
+                == conversation_session_id
+            )
+        )
+        or 0
+    )
+
+
+def _conversation_reply_message_response(
+    message: AvatarConversationMessage,
+) -> ConversationMessageReplyItemResponse:
+    return ConversationMessageReplyItemResponse(
+        id=message.id,
+        senderType=message.sender_type.value,
+        content=message.content,
+        sequenceNumber=message.sequence_number,
+        sentAt=_kst_datetime(message.sent_at),
     )

@@ -70,3 +70,21 @@ class ConversationMessageSaveItemResponse(BaseModel):
 
 class ConversationMessageSaveResponse(BaseModel):
     conversationMessage: ConversationMessageSaveItemResponse
+
+
+class ConversationMessageReplyRequest(BaseModel):
+    content: str
+
+
+class ConversationMessageReplyItemResponse(BaseModel):
+    id: int
+    senderType: str
+    content: str
+    sequenceNumber: int
+    sentAt: datetime
+
+
+class ConversationMessageReplyResponse(BaseModel):
+    userMessage: ConversationMessageReplyItemResponse
+    avatarMessage: ConversationMessageReplyItemResponse
+
