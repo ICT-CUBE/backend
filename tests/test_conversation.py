@@ -802,6 +802,7 @@ def test_reply_conversation_message_saves_user_and_avatar_messages() -> None:
         "id": 5025,
         "senderType": "USER",
         "content": "오늘 뭐 하고 있었어?",
+        "imageUrls": [],
         "sequenceNumber": 13,
         "sentAt": body["userMessage"]["sentAt"],
     }
@@ -829,14 +830,14 @@ def test_reply_conversation_message_saves_user_and_avatar_messages() -> None:
     db.commit.assert_called_once()
 
 
-def test_reply_conversation_message_allows_not_active_session_and_blank_content() -> None:
+def test_reply_conversation_message_allows_not_active_session() -> None:
     db = Mock(spec=Session)
     conversation_session = session(
         id=1001,
-        conversation_type=ConversationType.VOICE,
+        conversation_type=ConversationType.TEXT,
     )
     conversation_session.status = AvatarConversationSessionStatus.NOT_ACTIVE
-    db.scalar.side_effect = [conversation_session, None]
+    db.scalar.side_effect = [conversation_session, 0]
     db.flush.side_effect = lambda: [
         setattr(call.args[0], "id", index)
         for index, call in enumerate(db.add.call_args_list, start=1)
@@ -849,15 +850,114 @@ def test_reply_conversation_message_allows_not_active_session_and_blank_content(
         response = reply_conversation_message_request(
             db,
             conversation_session_id=1001,
-            body={"content": "   \n"},
+            body={"content": "다시 이어서 얘기하자"},
         )
 
     assert response.status_code == 201
-    generate_reply.assert_called_once_with("   \n")
-    assert response.json()["userMessage"]["content"] == "   \n"
+    generate_reply.assert_called_once_with("다시 이어서 얘기하자", [])
+    assert response.json()["userMessage"]["content"] == "다시 이어서 얘기하자"
     assert response.json()["avatarMessage"]["content"] == (
         "잘 못 들었어. 다시 한 번 말해줄래?"
     )
+
+
+def test_reply_conversation_message_rejects_blank_content_with_common_400() -> None:
+    db = Mock(spec=Session)
+
+    response = reply_conversation_message_request(
+        db,
+        body={"content": "   \n"},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "code": "INVALID_REQUEST",
+        "message": "요청값이 올바르지 않습니다.",
+    }
+    db.scalar.assert_not_called()
+
+
+def test_reply_conversation_message_passes_image_urls_to_gpt() -> None:
+    db = Mock(spec=Session)
+    conversation_session = session(
+        id=1001,
+        conversation_type=ConversationType.TEXT,
+    )
+    db.scalar.side_effect = [conversation_session, None, None, None, 12]
+
+    def set_message_ids() -> None:
+        for index, inserted in enumerate(db.add.call_args_list, start=5025):
+            inserted.args[0].id = index
+
+    db.flush.side_effect = set_message_ids
+    image_urls = [
+        "https://haniumstorage.blob.core.windows.net/hanium/stage_capture/1/1/a.jpg",
+        "https://haniumstorage.blob.core.windows.net/hanium/track_capture/1/2/b.png",
+    ]
+
+    with patch(
+        "app.services.conversation.generate_avatar_reply",
+        return_value="사진까지 보니까 더 생생하다!",
+    ) as generate_reply:
+        response = reply_conversation_message_request(
+            db,
+            body={"content": "이 사진들 봐줘", "imageUrls": image_urls},
+        )
+
+    assert response.status_code == 201
+    generate_reply.assert_called_once_with("이 사진들 봐줘", image_urls)
+    body = response.json()
+    assert body["userMessage"]["imageUrls"] == image_urls
+    assert "imageUrls" not in body["avatarMessage"]
+    assert db.add.call_args_list[0].args[0].content == "이 사진들 봐줘"
+    db.commit.assert_called_once()
+
+
+def test_reply_conversation_message_rejects_more_than_five_images() -> None:
+    db = Mock(spec=Session)
+
+    response = reply_conversation_message_request(
+        db,
+        body={
+            "content": "사진이 많아",
+            "imageUrls": [f"https://example.com/{index}.jpg" for index in range(6)],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "code": "INVALID_REQUEST",
+        "message": "요청값이 올바르지 않습니다.",
+    }
+    db.scalar.assert_not_called()
+
+
+def test_reply_conversation_message_returns_404_for_deleted_image_url() -> None:
+    db = Mock(spec=Session)
+    db.scalar.side_effect = [
+        session(id=1001, conversation_type=ConversationType.TEXT),
+        3001,
+    ]
+
+    with patch("app.services.conversation.generate_avatar_reply") as generate_reply:
+        response = reply_conversation_message_request(
+            db,
+            body={
+                "content": "삭제된 사진이야?",
+                "imageUrls": [
+                    "https://haniumstorage.blob.core.windows.net/hanium/stage_capture/1/1/deleted.jpg"
+                ],
+            },
+        )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "CONVERSATION_IMAGE_NOT_FOUND",
+        "message": "전송할 이미지를 찾을 수 없습니다.",
+    }
+    generate_reply.assert_not_called()
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
 
 
 def test_reply_conversation_message_returns_404_for_unknown_or_deleted_session() -> None:

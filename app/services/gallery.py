@@ -11,8 +11,8 @@ from app.models.album import Album, AlbumImage
 from app.models.avatar import AvatarInteractionPicture, AvatarInteractionSession
 from app.models.cube import CubeOwnership
 from app.models.enums import AlbumImageType, OwnershipStatus
-from app.models.stage import Stage, StageCapture, StageSession
-from app.models.track import Track, TrackCapture, TrackSession
+from app.models.stage import StageCapture, StageSession
+from app.models.track import TrackCapture, TrackSession
 from app.schemas.gallery import (
     GalleryArExperienceItemResponse,
     GalleryArExperienceResponse,
@@ -46,17 +46,22 @@ def _date_value(value: Any) -> date:
 
 def _sort_datetime(value: Any) -> datetime:
     if isinstance(value, datetime):
-        return value
+        if value.tzinfo is None:
+            return value.replace(tzinfo=KOREA_TIMEZONE)
+        return value.astimezone(KOREA_TIMEZONE)
     if isinstance(value, date):
-        return datetime.combine(value, time.min)
+        return datetime.combine(value, time.min, tzinfo=KOREA_TIMEZONE)
     if isinstance(value, str):
-        return datetime.fromisoformat(value[:19])
+        parsed = datetime.fromisoformat(value[:19])
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=KOREA_TIMEZONE)
+        return parsed.astimezone(KOREA_TIMEZONE)
     raise TypeError(f"Unsupported sort date value: {value!r}")
 
 
 def _gallery_sort_key(row: Any) -> tuple[datetime, int]:
     if row["source_type"] == GallerySourceType.ALBUM_IMAGE.value:
-        return datetime.min, -int(row["sort_id"])
+        return datetime.min.replace(tzinfo=KOREA_TIMEZONE), -int(row["sort_id"])
     return _sort_datetime(row["sort_at"]), int(row["sort_id"])
 
 

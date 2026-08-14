@@ -115,11 +115,6 @@ INSERT INTO `avatar_conversation_message` (`id`, `conversation_session_id`, `sen
 (2, 1, 'AVATAR', '좋아! 오늘은 First Light를 들어볼까?', 2, TRUE, 'ALLOWED', NULL, '2026-08-07 12:00:12'),
 (3, 3, 'USER', '이 앨범 설명해줘.', 1, FALSE, 'BLOCKED', 'PROFANITY', '2026-08-07 12:20:10');
 
-INSERT INTO `avatar_conversation_image` (`id`, `conversation_session_id`, `sequence_number`, `sent_image_url`) VALUES
-(1, 1, 1, 'conversation_image_001'),
-(2, 2, 1, 'conversation_image_002'),
-(3, 3, 1, 'conversation_image_003');
-
 INSERT INTO `conversation_report` (`id`, `conversation_message_id`, `reason`, `detail_reason`) VALUES
 (1, 1, 'INCORRECT_PERSONA', '페르소나 응답이 부정확한 예시'),
 (2, 2, 'HALLUCINATION', '존재하지 않는 이벤트 언급'),

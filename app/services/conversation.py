@@ -1,14 +1,21 @@
 """텍스트·음성 대화 목록 조회 로직."""
 
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
-from typing import BinaryIO
+from typing import BinaryIO, NoReturn, cast
 
 from openai import OpenAI
+from openai.types.responses import (
+    EasyInputMessageParam,
+    ResponseInputContentParam,
+    ResponseInputParam,
+)
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.exceptions import ApiError
+from app.models.avatar import AvatarInteractionPicture
 from app.models.conversation import (
     AvatarConversationMessage,
     AvatarConversationSession,
@@ -21,6 +28,8 @@ from app.models.enums import (
     ConversationType,
     OwnershipStatus,
 )
+from app.models.stage import StageCapture
+from app.models.track import TrackCapture
 from app.schemas.conversation import (
     ConversationDetailMessageResponse,
     ConversationDetailResponse,
@@ -138,14 +147,17 @@ def create_conversation_session(
     conversation_type: ConversationType,
 ) -> ConversationSessionCreateResponse:
     """현재 사용자의 활성 큐브 소유권에 새 대화 세션을 생성합니다."""
-    ownership = db.scalar(
-        select(CubeOwnership)
-        .where(
-            CubeOwnership.user_id == CURRENT_USER_ID,
-            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
-            CubeOwnership.is_last_accessed.is_(True),
+    ownership = cast(
+        CubeOwnership,
+        db.scalar(
+            select(CubeOwnership)
+            .where(
+                CubeOwnership.user_id == CURRENT_USER_ID,
+                CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+                CubeOwnership.is_last_accessed.is_(True),
+            )
+            .limit(1)
         )
-        .limit(1)
     )
 
     conversation_session = AvatarConversationSession(
@@ -235,7 +247,10 @@ def toggle_conversation_message_save(
     if row is None:
         _raise_conversation_message_not_found()
 
-    conversation_message, conversation_session = row
+    conversation_message, conversation_session = cast(
+        tuple[AvatarConversationMessage, AvatarConversationSession],
+        row,
+    )
     if conversation_session.conversation_type == ConversationType.VOICE:
         raise ApiError(
             status_code=404,
@@ -270,7 +285,7 @@ def get_conversation_session_detail(
     conversation_session_id: int,
 ) -> ConversationDetailResponse:
     """텍스트 대화 세션의 전체 메시지를 sequenceNumber 내림차순으로 반환합니다."""
-    session = db.scalar(
+    conversation_session = db.scalar(
         select(AvatarConversationSession)
         .join(
             CubeOwnership,
@@ -284,10 +299,10 @@ def get_conversation_session_detail(
         )
         .limit(1)
     )
-    if session is None:
+    if conversation_session is None:
         _raise_conversation_session_not_found()
 
-    if session.conversation_type == ConversationType.VOICE:
+    if conversation_session.conversation_type == ConversationType.VOICE:
         raise ApiError(
             status_code=404,
             code="VOICE_CONVERSATION_DETAIL_NOT_AVAILABLE",
@@ -296,7 +311,10 @@ def get_conversation_session_detail(
 
     messages = db.scalars(
         select(AvatarConversationMessage)
-        .where(AvatarConversationMessage.conversation_session_id == session.id)
+        .where(
+            AvatarConversationMessage.conversation_session_id
+            == conversation_session.id
+        )
         .order_by(AvatarConversationMessage.sequence_number.desc())
     ).all()
     if not messages:
@@ -304,7 +322,7 @@ def get_conversation_session_detail(
 
     return ConversationDetailResponse(
         conversationSession=ConversationDetailSessionResponse(
-            id=session.id,
+            id=conversation_session.id,
             messages=[
                 ConversationDetailMessageResponse(
                     id=message.id,
@@ -343,7 +361,10 @@ def reply_to_conversation_message(
     if conversation_session is None:
         _raise_conversation_session_not_found()
 
-    avatar_reply = generate_avatar_reply(body.content)
+    if _has_deleted_conversation_image_url(db=db, image_urls=body.imageUrls):
+        _raise_conversation_image_not_found()
+
+    avatar_reply = generate_avatar_reply(body.content, body.imageUrls)
     now = datetime.now(KOREA_TIMEZONE).replace(tzinfo=None)
     last_sequence_number = _last_conversation_sequence_number(
         db=db,
@@ -381,7 +402,10 @@ def reply_to_conversation_message(
         raise
 
     return ConversationMessageReplyResponse(
-        userMessage=_conversation_reply_message_response(user_message),
+        userMessage=_conversation_reply_message_response(
+            user_message,
+            image_urls=body.imageUrls,
+        ),
         avatarMessage=_conversation_reply_message_response(avatar_message),
     )
 
@@ -412,29 +436,12 @@ def save_conversation_session(
     if conversation_session is None:
         _raise_conversation_session_not_found()
 
-    if conversation_session.conversation_type == ConversationType.VOICE and (
-        audio_file is None or audio_duration_seconds is None
-    ):
-        _raise_invalid_request()
-
-    audio_url = None
-    if conversation_session.conversation_type == ConversationType.VOICE:
-        normalized_content_type = normalize_audio_content_type(audio_content_type)
-        if normalized_content_type is None:
-            _raise_invalid_request()
-        try:
-            audio_url = upload_conversation_audio(
-                file=audio_file,
-                content_type=normalized_content_type,
-                user_id=CURRENT_USER_ID,
-                conversation_session_id=conversation_session.id,
-            )
-        except Exception as exc:
-            raise ApiError(
-                status_code=500,
-                code="INTERNAL_SERVER_ERROR",
-                message="서버 내부 오류가 발생했습니다.",
-            ) from exc
+    audio_url, stored_audio_duration_seconds = _conversation_audio_values(
+        conversation_session=conversation_session,
+        audio_file=audio_file,
+        audio_content_type=audio_content_type,
+        audio_duration_seconds=audio_duration_seconds,
+    )
 
     first_messages = db.scalars(
         select(AvatarConversationMessage)
@@ -455,9 +462,8 @@ def save_conversation_session(
     conversation_session.ended_at = now
     conversation_session.status = AvatarConversationSessionStatus.NOT_ACTIVE
 
-    if conversation_session.conversation_type == ConversationType.VOICE:
-        conversation_session.audio_url = audio_url
-        conversation_session.audio_duration_seconds = audio_duration_seconds
+    conversation_session.audio_url = audio_url
+    conversation_session.audio_duration_seconds = stored_audio_duration_seconds
 
     try:
         db.commit()
@@ -466,28 +472,57 @@ def save_conversation_session(
         raise
 
 
-def generate_avatar_reply(user_content: str) -> str:
+def generate_avatar_reply(user_content: str, image_urls: list[str] | None = None) -> str:
     """OpenAI GPT를 호출해 제니 페르소나의 응답 문장을 생성합니다."""
     settings = get_settings()
     client = OpenAI(api_key=settings.openai_api_key)
+    response_input = _avatar_reply_response_input(
+        user_content=user_content,
+        image_urls=image_urls or [],
+    )
     response = client.responses.create(
         model=settings.openai_model,
-        input=[
-            {
-                "role": "system",
-                "content": JENNIE_CONVERSATION_SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": user_content,
-            },
-        ],
+        input=response_input,
     )
     return response.output_text.strip()
 
 
+def _conversation_audio_values(
+    *,
+    conversation_session: AvatarConversationSession,
+    audio_file: BinaryIO | None,
+    audio_content_type: str | None,
+    audio_duration_seconds: int | None,
+) -> tuple[str | None, int | None]:
+    if conversation_session.conversation_type != ConversationType.VOICE:
+        return None, None
+
+    if audio_file is None or audio_duration_seconds is None:
+        _raise_invalid_request()
+
+    normalized_content_type = normalize_audio_content_type(audio_content_type)
+    if normalized_content_type is None:
+        _raise_invalid_request()
+
+    try:
+        audio_url = upload_conversation_audio(
+            file=audio_file,
+            content_type=normalized_content_type,
+            user_id=CURRENT_USER_ID,
+            conversation_session_id=conversation_session.id,
+        )
+    except Exception as exc:
+        raise ApiError(
+            status_code=500,
+            code="INTERNAL_SERVER_ERROR",
+            message="서버 내부 오류가 발생했습니다.",
+        ) from exc
+
+    return audio_url, audio_duration_seconds
+
+
 def generate_conversation_title(
-    messages: list[AvatarConversationMessage],
+    messages: Sequence[AvatarConversationMessage],
 ) -> str:
     """첫 대화 2개를 바탕으로 대화 제목을 생성합니다."""
     settings = get_settings()
@@ -511,7 +546,41 @@ def generate_conversation_title(
     return response.output_text.strip()
 
 
-def _raise_conversation_session_not_found() -> None:
+def _avatar_reply_response_input(
+    *,
+    user_content: str,
+    image_urls: list[str],
+) -> ResponseInputParam:
+    system_message: EasyInputMessageParam = {
+        "role": "system",
+        "content": JENNIE_CONVERSATION_SYSTEM_PROMPT,
+    }
+    if not image_urls:
+        user_message: EasyInputMessageParam = {
+            "role": "user",
+            "content": user_content,
+        }
+        return [system_message, user_message]
+
+    user_content_parts: list[ResponseInputContentParam] = [
+        {"type": "input_text", "text": user_content}
+    ]
+    user_content_parts.extend(
+        {
+            "type": "input_image",
+            "image_url": image_url,
+            "detail": "auto",
+        }
+        for image_url in image_urls
+    )
+    user_message = {
+        "role": "user",
+        "content": user_content_parts,
+    }
+    return [system_message, user_message]
+
+
+def _raise_conversation_session_not_found() -> NoReturn:
     raise ApiError(
         status_code=404,
         code="CONVERSATION_SESSION_NOT_FOUND",
@@ -519,7 +588,7 @@ def _raise_conversation_session_not_found() -> None:
     )
 
 
-def _raise_deletable_conversation_session_not_found() -> None:
+def _raise_deletable_conversation_session_not_found() -> NoReturn:
     raise ApiError(
         status_code=404,
         code="CONVERSATION_SESSION_NOT_FOUND",
@@ -527,7 +596,7 @@ def _raise_deletable_conversation_session_not_found() -> None:
     )
 
 
-def _raise_conversation_message_not_found() -> None:
+def _raise_conversation_message_not_found() -> NoReturn:
     raise ApiError(
         status_code=404,
         code="CONVERSATION_MESSAGE_NOT_FOUND",
@@ -535,7 +604,15 @@ def _raise_conversation_message_not_found() -> None:
     )
 
 
-def _raise_invalid_request() -> None:
+def _raise_conversation_image_not_found() -> NoReturn:
+    raise ApiError(
+        status_code=404,
+        code="CONVERSATION_IMAGE_NOT_FOUND",
+        message="전송할 이미지를 찾을 수 없습니다.",
+    )
+
+
+def _raise_invalid_request() -> NoReturn:
     raise ApiError(
         status_code=400,
         code="INVALID_REQUEST",
@@ -583,13 +660,54 @@ def _last_conversation_sequence_number(
     )
 
 
+def _has_deleted_conversation_image_url(
+    *,
+    db: Session,
+    image_urls: list[str],
+) -> bool:
+    if not image_urls:
+        return False
+    deleted_stage_capture_id = db.scalar(
+        select(StageCapture.id)
+        .where(
+            StageCapture.stage_capture_img_url.in_(image_urls),
+            StageCapture.deleted_at.is_not(None),
+        )
+        .limit(1)
+    )
+    if deleted_stage_capture_id is not None:
+        return True
+    deleted_track_capture_id = db.scalar(
+        select(TrackCapture.id)
+        .where(
+            TrackCapture.track_capture_img_url.in_(image_urls),
+            TrackCapture.deleted_at.is_not(None),
+        )
+        .limit(1)
+    )
+    if deleted_track_capture_id is not None:
+        return True
+    deleted_interaction_picture_id = db.scalar(
+        select(AvatarInteractionPicture.id)
+        .where(
+            AvatarInteractionPicture.picture_img_url.in_(image_urls),
+            AvatarInteractionPicture.deleted_at.is_not(None),
+        )
+        .limit(1)
+    )
+    return deleted_interaction_picture_id is not None
+
+
 def _conversation_reply_message_response(
     message: AvatarConversationMessage,
+    *,
+    image_urls: list[str] | None = None,
 ) -> ConversationMessageReplyItemResponse:
     return ConversationMessageReplyItemResponse(
         id=message.id,
         senderType=message.sender_type.value,
         content=message.content,
+        imageUrls=image_urls,
         sequenceNumber=message.sequence_number,
         sentAt=_kst_datetime(message.sent_at),
     )

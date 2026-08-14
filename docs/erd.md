@@ -294,15 +294,6 @@ erDiagram
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
     }
 
-    AVATAR_CONVERSATION_IMAGE {
-        bigint id PK
-        bigint conversation_session_id FK "NOT NULL"
-        int sequence_number "NOT NULL"
-        varchar_500 sent_image_url "NOT NULL"
-        datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-        datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-    }
-
     CONVERSATION_REPORT {
         bigint id PK
         bigint conversation_message_id FK "NOT NULL"
@@ -499,7 +490,6 @@ erDiagram
     TRACK_SESSION ||--o{ TRACK_CAPTURE : "contains"
     CUBE_OWNERSHIP ||--o{ AVATAR_CONVERSATION_SESSION : "creates"
     AVATAR_CONVERSATION_SESSION ||--|{ AVATAR_CONVERSATION_MESSAGE : "contains"
-    AVATAR_CONVERSATION_SESSION ||--o{ AVATAR_CONVERSATION_IMAGE : "contains"
     AVATAR_CONVERSATION_MESSAGE ||--o| CONVERSATION_REPORT : "reported_as"
     CUBE_OWNERSHIP ||--o{ AVATAR_INTERACTION_SESSION : "creates"
     AVATAR_INTERACTION_SESSION ||--o{ AVATAR_INTERACTION_PICTURE : "contains"

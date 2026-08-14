@@ -1,7 +1,7 @@
 """아바타 소환 세션 생성·저장 로직."""
 
 from datetime import datetime, timedelta, timezone
-from typing import BinaryIO
+from typing import BinaryIO, cast
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -35,14 +35,17 @@ def create_avatar_interaction_session(
     db: Session,
 ) -> AvatarInteractionSessionCreateResponse:
     """현재 사용자의 활성 큐브 소유권에 아바타 소환 세션을 생성합니다."""
-    ownership = db.scalar(
-        select(CubeOwnership)
-        .where(
-            CubeOwnership.user_id == CURRENT_USER_ID,
-            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
-            CubeOwnership.is_last_accessed.is_(True),
+    ownership = cast(
+        CubeOwnership,
+        db.scalar(
+            select(CubeOwnership)
+            .where(
+                CubeOwnership.user_id == CURRENT_USER_ID,
+                CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+                CubeOwnership.is_last_accessed.is_(True),
+            )
+            .limit(1)
         )
-        .limit(1)
     )
 
     interaction_session = AvatarInteractionSession(

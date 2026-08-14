@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends, File, Form, Path, Response, UploadFile, 
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.schemas.common import ErrorResponse
 from app.schemas.avatar import (
     AvatarInteractionSessionCreateResponse,
     YezulFramesResponse,
 )
+from app.schemas.common import ErrorResponse
 from app.services.avatar import (
     create_avatar_interaction_session,
     get_yezul_frames,

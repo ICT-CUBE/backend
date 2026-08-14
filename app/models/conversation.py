@@ -63,9 +63,6 @@ class AvatarConversationSession(Base):
     messages: Mapped[list["AvatarConversationMessage"]] = relationship(
         back_populates="conversation_session"
     )
-    images: Mapped[list["AvatarConversationImage"]] = relationship(
-        back_populates="conversation_session"
-    )
 
 
 class AvatarConversationMessage(Base):
@@ -105,25 +102,4 @@ class AvatarConversationMessage(Base):
 
     conversation_session: Mapped[AvatarConversationSession] = relationship(
         back_populates="messages"
-    )
-
-
-class AvatarConversationImage(Base):
-    __tablename__ = "avatar_conversation_image"
-
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    conversation_session_id: Mapped[int] = mapped_column(
-        ForeignKey("avatar_conversation_session.id")
-    )
-    sequence_number: Mapped[int] = mapped_column(Integer)
-    sent_image_url: Mapped[str] = mapped_column(String(500))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp()
-    )
-
-    conversation_session: Mapped[AvatarConversationSession] = relationship(
-        back_populates="images"
     )

@@ -3,7 +3,6 @@
 from app.models.album import Album, AlbumImage
 from app.models.avatar import AvatarInteractionPicture, AvatarInteractionSession
 from app.models.conversation import (
-    AvatarConversationImage,
     AvatarConversationMessage,
     AvatarConversationSession,
 )
@@ -16,7 +15,6 @@ __all__ = [
     "Affinity",
     "Album",
     "AlbumImage",
-    "AvatarConversationImage",
     "AvatarConversationMessage",
     "AvatarConversationSession",
     "AvatarInteractionPicture",

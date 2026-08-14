@@ -17,7 +17,6 @@ DROP TABLE IF EXISTS `board`;
 DROP TABLE IF EXISTS `avatar_interaction_picture`;
 DROP TABLE IF EXISTS `avatar_interaction_session`;
 DROP TABLE IF EXISTS `conversation_report`;
-DROP TABLE IF EXISTS `avatar_conversation_image`;
 DROP TABLE IF EXISTS `avatar_conversation_message`;
 DROP TABLE IF EXISTS `avatar_conversation_session`;
 DROP TABLE IF EXISTS `album_image`;
@@ -442,19 +441,6 @@ CREATE TABLE `avatar_conversation_message` (
     CONSTRAINT `ck_avatar_conversation_message_sender` CHECK (`sender_type` IN ('USER', 'AVATAR')),
     CONSTRAINT `ck_avatar_conversation_message_status` CHECK (`status` IN ('ALLOWED', 'BLOCKED')),
     CONSTRAINT `ck_avatar_conversation_message_violation` CHECK (`violation_type` IS NULL OR `violation_type` IN ('PROFANITY', 'SEXUAL', 'THREAT'))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE `avatar_conversation_image` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `conversation_session_id` BIGINT NOT NULL,
-    `sequence_number` INT NOT NULL,
-    `sent_image_url` VARCHAR(500) NOT NULL,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    KEY `idx_avatar_conversation_image_session_id` (`conversation_session_id`),
-    UNIQUE KEY `uk_avatar_conversation_image_sequence` (`conversation_session_id`, `sequence_number`),
-    CONSTRAINT `fk_avatar_conversation_image_session` FOREIGN KEY (`conversation_session_id`) REFERENCES `avatar_conversation_session` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `conversation_report` (

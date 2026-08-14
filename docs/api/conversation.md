@@ -188,11 +188,11 @@ Status Code : 200
     "id": 1001,
     "messages": [
       {
-        "id": 5001,
+        "id": 5003,
         "senderType": "AVATAR",
-        "content": "@@아! 지금 뭐하고 있어?",
-        "sequenceNumber": 1,
-        "sentAt": "2026-07-29T12:23:00+09:00"
+        "content": "헐!! 대박인데? 나도 거기 가보고 싶었는데!",
+        "sequenceNumber": 3,
+        "sentAt": "2026-07-29T12:25:00+09:00"
       },
       {
         "id": 5002,
@@ -202,11 +202,11 @@ Status Code : 200
         "sentAt": "2026-07-29T12:23:30+09:00"
       },
       {
-        "id": 5003,
+        "id": 5001,
         "senderType": "AVATAR",
-        "content": "헐!! 대박인데? 나도 거기 가보고 싶었는데!",
-        "sequenceNumber": 3,
-        "sentAt": "2026-07-29T12:25:00+09:00"
+        "content": "@@아! 지금 뭐하고 있어?",
+        "sequenceNumber": 1,
+        "sentAt": "2026-07-29T12:23:00+09:00"
       }
     ]
   }
@@ -480,7 +480,19 @@ Status Code : 404
 
 사용자가 텍스트 또는 음성으로 아바타에게 말을 걸면 호출된다.
 
-백엔드에서 사용자 대화를 처리 GPT로 처리해서 응답과 그 시간을 반환한다.
+백엔드에서 사용자 대화를 GPT로 처리해서 응답과 그 시간을 반환한다. 이때 사용자는 이미지도 같이 보낼 수 있는데 앱 내부 갤러리에 존재하는 사진에 한해서만 전송 가능하다. 갤러리 조회를 이용해서 사용자가 선택할 이미지를 조회할 수 있다.
+
+또한 사용자는 최대 5장의 사진까지 전송이 가능하다.
+
+- `content`는 필수이며 빈 문자열은 허용하지 않는다.
+- `imageUrls`는 선택값이며, 보내지 않으면 이미지가 없는 요청으로 처리한다.
+- `imageUrls`는 최대 5개까지 허용한다.
+- `content`가 빈 문자열이거나 `imageUrls`가 6개 이상이면 공통 `400 INVALID_REQUEST`를 반환한다.
+- 프론트는 갤러리 조회 API로 받은 Blob URL만 전송한다.
+- 백엔드는 이미지 URL의 갤러리 소유 여부를 별도로 검증하지 않는다.
+- 삭제된 갤러리 이미지 URL이 전송된 것으로 확인되면 404를 반환한다.
+- 전송된 이미지는 아바타 응답 생성을 위한 일회성 입력으로만 사용하며 DB에 보관하지 않는다.
+- 사용자가 보낸 이미지 URL은 아바타 응답 메시지에는 포함하지 않는다.
 
 ---
 
@@ -508,6 +520,25 @@ Status Code : 404
 }
 ```
 
+```json
+{
+  "content": "이 사진어때?",
+  "imageUrls": [
+    "https://haniumstorage.blob.core.windows.net/hanium/album_image_001.jpeg"
+  ]
+}
+```
+
+```json
+{
+  "content": "이 사진들 어때?",
+  "imageUrls": [
+    "https://haniumstorage.blob.core.windows.net/hanium/stage_capture/1/501/3f8a.jpg",
+    "https://haniumstorage.blob.core.windows.net/hanium/track_capture/1/601/a91b.jpg"
+  ]
+}
+```
+
 ---
 
 ### 정상 응답 데이터
@@ -520,6 +551,7 @@ Status Code : 201
     "id": 5025,
     "senderType": "USER",
     "content": "오늘 뭐 하고 있었어?",
+    "imageUrls": [],
     "sequenceNumber": 13,
     "sentAt": "2026-07-29T18:25:02"
   },
@@ -529,6 +561,29 @@ Status Code : 201
     "content": "오늘 연습하고 있었어! 너는 오늘 하루 어떻게 보냈어?",
     "sequenceNumber": 14,
     "sentAt": "2026-07-29T18:25:02"
+  }
+}
+```
+
+```json
+{
+  "userMessage": {
+    "id": 5026,
+    "senderType": "USER",
+    "content": "이 사진들 어때?",
+    "imageUrls": [
+      "https://haniumstorage.blob.core.windows.net/hanium/stage_capture/1/501/3f8a.jpg",
+      "https://haniumstorage.blob.core.windows.net/hanium/track_capture/1/601/a91b.jpg"
+    ],
+    "sequenceNumber": 15,
+    "sentAt": "2026-07-29T18:27:02"
+  },
+  "avatarMessage": {
+    "id": 5006,
+    "senderType": "AVATAR",
+    "content": "사진 분위기 진짜 좋다! 무대 조명 색감이 특히 예뻐.",
+    "sequenceNumber": 16,
+    "sentAt": "2026-07-29T18:27:02"
   }
 }
 ```
@@ -545,6 +600,15 @@ Status Code : 404
   "message": "대화 세션을 찾을 수 없습니다."
 }
 ```
+
+```json
+{
+  "code": "CONVERSATION_IMAGE_NOT_FOUND",
+  "message": "전송할 이미지를 찾을 수 없습니다."
+}
+```
+
+- 삭제된 갤러리 이미지 URL이 전송된 것으로 확인된 경우 위 응답을 반환한다.
 
 
 

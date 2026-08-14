@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.enums import ConversationType
 
@@ -74,12 +74,21 @@ class ConversationMessageSaveResponse(BaseModel):
 
 class ConversationMessageReplyRequest(BaseModel):
     content: str
+    imageUrls: list[str] = Field(default_factory=list, max_length=5)
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("content must not be blank")
+        return value
 
 
 class ConversationMessageReplyItemResponse(BaseModel):
     id: int
     senderType: str
     content: str
+    imageUrls: list[str] | None = None
     sequenceNumber: int
     sentAt: datetime
 
@@ -87,4 +96,3 @@ class ConversationMessageReplyItemResponse(BaseModel):
 class ConversationMessageReplyResponse(BaseModel):
     userMessage: ConversationMessageReplyItemResponse
     avatarMessage: ConversationMessageReplyItemResponse
-

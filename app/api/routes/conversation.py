@@ -237,6 +237,7 @@ def read_conversation_session_detail(
 @router.post(
     "/conversation-sessions/{conversationSessionId}/messages",
     response_model=ConversationMessageReplyResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_201_CREATED,
     summary="대화 메시지 응답",
     description=(
@@ -246,12 +247,22 @@ def read_conversation_session_detail(
     responses={
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "대화 세션이 없거나 현재 사용자의 세션이 아님",
+            "description": "대화 세션이 없거나 전송할 이미지를 찾을 수 없음",
             "content": {
                 "application/json": {
-                    "example": {
-                        "code": "CONVERSATION_SESSION_NOT_FOUND",
-                        "message": "대화 세션을 찾을 수 없습니다.",
+                    "examples": {
+                        "conversationSessionNotFound": {
+                            "value": {
+                                "code": "CONVERSATION_SESSION_NOT_FOUND",
+                                "message": "대화 세션을 찾을 수 없습니다.",
+                            }
+                        },
+                        "conversationImageNotFound": {
+                            "value": {
+                                "code": "CONVERSATION_IMAGE_NOT_FOUND",
+                                "message": "전송할 이미지를 찾을 수 없습니다.",
+                            }
+                        },
                     }
                 }
             },
