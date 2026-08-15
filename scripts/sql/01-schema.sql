@@ -1,10 +1,8 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS `shipment`;
-DROP TABLE IF EXISTS `escrow_payment`;
 DROP TABLE IF EXISTS `listing_media`;
-DROP TABLE IF EXISTS `trade_dispute`;
+DROP TABLE IF EXISTS `digital_certificate`;
 DROP TABLE IF EXISTS `trade`;
 DROP TABLE IF EXISTS `sell_listing`;
 DROP TABLE IF EXISTS `market_product`;
@@ -13,7 +11,6 @@ DROP TABLE IF EXISTS `post_like`;
 DROP TABLE IF EXISTS `comment`;
 DROP TABLE IF EXISTS `post_media`;
 DROP TABLE IF EXISTS `post`;
-DROP TABLE IF EXISTS `board`;
 DROP TABLE IF EXISTS `avatar_interaction_picture`;
 DROP TABLE IF EXISTS `avatar_interaction_session`;
 DROP TABLE IF EXISTS `conversation_report`;
@@ -483,23 +480,10 @@ CREATE TABLE `avatar_interaction_picture` (
     CONSTRAINT `fk_avatar_interaction_picture_session` FOREIGN KEY (`interaction_session_id`) REFERENCES `avatar_interaction_session` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `board` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `board_type` VARCHAR(30) NOT NULL,
-    `name` VARCHAR(50) NOT NULL,
-    `description` VARCHAR(255) NULL,
-    `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_board_type` (`board_type`),
-    CONSTRAINT `ck_board_type` CHECK (`board_type` IN ('FREE', 'CERTIFICATION', 'EVENT'))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE `post` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `board_id` BIGINT NOT NULL,
     `user_id` BIGINT NOT NULL,
+    `board_type` VARCHAR(30) NOT NULL,
     `title` VARCHAR(150) NOT NULL,
     `content` TEXT NOT NULL,
     `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
@@ -507,10 +491,10 @@ CREATE TABLE `post` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted_at` DATETIME NULL,
     PRIMARY KEY (`id`),
-    KEY `idx_post_board_id` (`board_id`),
+    KEY `idx_post_board_type` (`board_type`),
     KEY `idx_post_user_id` (`user_id`),
-    CONSTRAINT `fk_post_board` FOREIGN KEY (`board_id`) REFERENCES `board` (`id`),
     CONSTRAINT `fk_post_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`),
+    CONSTRAINT `ck_post_board_type` CHECK (`board_type` IN ('FREE', 'CERTIFICATION')),
     CONSTRAINT `ck_post_status` CHECK (`status` IN ('ACTIVE', 'DELETED', 'REPORTED'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -573,9 +557,7 @@ CREATE TABLE `comment_like` (
 CREATE TABLE `market_product` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `cube_id` BIGINT NOT NULL,
-    `name` VARCHAR(120) NOT NULL,
-    `artist_name` VARCHAR(100) NOT NULL,
-    `image_url` VARCHAR(500) NULL,
+    `product_image_url` VARCHAR(500) NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted_at` DATETIME NULL,
@@ -588,7 +570,9 @@ CREATE TABLE `sell_listing` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `market_product_id` BIGINT NOT NULL,
     `user_id` BIGINT NOT NULL,
-    `description` VARCHAR(50) NOT NULL,
+    `product_status` VARCHAR(30) NULL,
+    `title` VARCHAR(20) NOT NULL,
+    `description` VARCHAR(500) NOT NULL,
     `price` INT NOT NULL,
     `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -604,41 +588,25 @@ CREATE TABLE `sell_listing` (
 
 CREATE TABLE `trade` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `sell_listing_id` BIGINT NULL,
-    `seller_user_id` BIGINT NOT NULL,
+    `sell_listing_id` BIGINT NOT NULL,
     `buyer_user_id` BIGINT NOT NULL,
+    `buyer_phone_number` VARCHAR(20) NOT NULL,
+    `buyer_address` VARCHAR(100) NOT NULL,
     `total_price` INT NOT NULL,
+    `paid_time` DATETIME NULL,
+    `sent_time` DATETIME NULL,
+    `shipped_time` DATETIME NULL,
+    `delivered_time` DATETIME NULL,
+    `completed_time` DATETIME NULL,
     `status` VARCHAR(30) NOT NULL DEFAULT 'PAID',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_trade_sell_listing_id` (`sell_listing_id`),
-    KEY `idx_trade_seller_user_id` (`seller_user_id`),
     KEY `idx_trade_buyer_user_id` (`buyer_user_id`),
     CONSTRAINT `fk_trade_sell_listing` FOREIGN KEY (`sell_listing_id`) REFERENCES `sell_listing` (`id`),
-    CONSTRAINT `fk_trade_seller_user` FOREIGN KEY (`seller_user_id`) REFERENCES `user` (`id`),
     CONSTRAINT `fk_trade_buyer_user` FOREIGN KEY (`buyer_user_id`) REFERENCES `user` (`id`),
-    CONSTRAINT `ck_trade_status` CHECK (`status` IN ('PAID', 'SHIPPING', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'DISPUTED'))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE `trade_dispute` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `trade_id` BIGINT NOT NULL,
-    `reporter_user_id` BIGINT NOT NULL,
-    `reason_type` VARCHAR(30) NOT NULL,
-    `description` TEXT NULL,
-    `status` VARCHAR(30) NOT NULL DEFAULT 'OPEN',
-    `filed_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `resolved_at` DATETIME NULL,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    KEY `idx_trade_dispute_trade_id` (`trade_id`),
-    KEY `idx_trade_dispute_reporter_user_id` (`reporter_user_id`),
-    CONSTRAINT `fk_trade_dispute_trade` FOREIGN KEY (`trade_id`) REFERENCES `trade` (`id`),
-    CONSTRAINT `fk_trade_dispute_reporter_user` FOREIGN KEY (`reporter_user_id`) REFERENCES `user` (`id`),
-    CONSTRAINT `ck_trade_dispute_reason_type` CHECK (`reason_type` IN ('ITEM_NOT_RECEIVED', 'ITEM_DAMAGED', 'AUTHENTICATION_FAILED', 'OTHER')),
-    CONSTRAINT `ck_trade_dispute_status` CHECK (`status` IN ('OPEN', 'REVIEWING', 'RESOLVED', 'REJECTED'))
+    CONSTRAINT `ck_trade_status` CHECK (`status` IN ('PAID', 'SENT', 'SHIPPING', 'DELIVERED', 'COMPLETED'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `listing_media` (
@@ -653,36 +621,16 @@ CREATE TABLE `listing_media` (
     CONSTRAINT `fk_listing_media_sell_listing` FOREIGN KEY (`sell_listing_id`) REFERENCES `sell_listing` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `escrow_payment` (
+CREATE TABLE `digital_certificate` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `trade_id` BIGINT NOT NULL,
-    `payment_method` VARCHAR(30) NOT NULL,
-    `paid_amount` INT NOT NULL,
-    `escrow_status` VARCHAR(30) NOT NULL DEFAULT 'PAID',
-    `paid_at` DATETIME NULL,
-    `released_at` DATETIME NULL,
-    `refunded_at` DATETIME NULL,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `network` VARCHAR(200) NOT NULL,
+    `token_standard` VARCHAR(200) NOT NULL,
+    `token_id` VARCHAR(200) NOT NULL,
+    `contract_address` VARCHAR(200) NOT NULL,
+    `tx_hash` VARCHAR(200) NOT NULL,
+    `metadata_url` VARCHAR(200) NOT NULL,
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_escrow_payment_trade_id` (`trade_id`),
-    CONSTRAINT `fk_escrow_payment_trade` FOREIGN KEY (`trade_id`) REFERENCES `trade` (`id`),
-    CONSTRAINT `ck_escrow_payment_method` CHECK (`payment_method` IN ('CARD', 'BANK_TRANSFER', 'EASY_PAY')),
-    CONSTRAINT `ck_escrow_payment_status` CHECK (`escrow_status` IN ('PAID', 'RELEASED', 'REFUNDED'))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE `shipment` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `trade_id` BIGINT NOT NULL,
-    `carrier` VARCHAR(30) NULL,
-    `tracking_number` VARCHAR(100) NULL,
-    `shipment_status` VARCHAR(30) NOT NULL DEFAULT 'READY',
-    `shipped_at` DATETIME NULL,
-    `delivered_at` DATETIME NULL,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_shipment_trade_id` (`trade_id`),
-    CONSTRAINT `fk_shipment_trade` FOREIGN KEY (`trade_id`) REFERENCES `trade` (`id`),
-    CONSTRAINT `ck_shipment_status` CHECK (`shipment_status` IN ('READY', 'SHIPPING', 'DELIVERED', 'RETURNED'))
+    UNIQUE KEY `uk_digital_certificate_trade_id` (`trade_id`),
+    CONSTRAINT `fk_digital_certificate_trade` FOREIGN KEY (`trade_id`) REFERENCES `trade` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

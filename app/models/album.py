@@ -1,6 +1,9 @@
 """앨범과 앨범 이미지 테이블 ORM 매핑."""
 
+from __future__ import annotations
+
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
@@ -11,12 +14,17 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 from app.models.cube import enum_values
 from app.models.enums import AlbumImageType
+
+if TYPE_CHECKING:
+    from app.models.stage import Stage
+    from app.models.track import Track
 
 
 class Album(Base):
@@ -31,10 +39,16 @@ class Album(Base):
     description: Mapped[str | None] = mapped_column(Text)
     cover_image_url: Mapped[str] = mapped_column(String(500))
     release_date: Mapped[date] = mapped_column(Date)
-    created_at: Mapped[datetime] = mapped_column(DateTime)
-    updated_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
-    images: Mapped[list["AlbumImage"]] = relationship(back_populates="album")
+    images: Mapped[list[AlbumImage]] = relationship(back_populates="album")
+    stages: Mapped[list[Stage]] = relationship(back_populates="album")
+    tracks: Mapped[list[Track]] = relationship(back_populates="album")
 
 
 class AlbumImage(Base):
@@ -52,7 +66,11 @@ class AlbumImage(Base):
         )
     )
     album_contents_img_url: Mapped[str] = mapped_column(String(500))
-    created_at: Mapped[datetime] = mapped_column(DateTime)
-    updated_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
     album: Mapped[Album] = relationship(back_populates="images")

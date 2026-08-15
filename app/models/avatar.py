@@ -26,13 +26,15 @@ class AvatarInteractionSession(Base):
         )
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp()
+        DateTime, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp()
+        DateTime, server_default=func.now(), onupdate=func.now()
     )
 
-    cube_ownership: Mapped[CubeOwnership] = relationship()
+    cube_ownership: Mapped[CubeOwnership] = relationship(
+        back_populates="avatar_interaction_sessions"
+    )
     pictures: Mapped[list["AvatarInteractionPicture"]] = relationship(
         back_populates="interaction_session"
     )
@@ -45,13 +47,13 @@ class AvatarInteractionPicture(Base):
     interaction_session_id: Mapped[int] = mapped_column(
         ForeignKey("avatar_interaction_session.id")
     )
-    picture_img_url: Mapped[str | None] = mapped_column(String(500))
+    picture_img_url: Mapped[str] = mapped_column(String(500))
     pictured_at: Mapped[datetime] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp()
+        DateTime, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp()
+        DateTime, server_default=func.now(), onupdate=func.now()
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
 

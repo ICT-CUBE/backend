@@ -1,6 +1,9 @@
 """트랙과 트랙 재생 세션 테이블 ORM 매핑."""
 
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
@@ -18,12 +21,15 @@ from app.models.base import Base
 from app.models.cube import CubeOwnership, enum_values
 from app.models.enums import TrackPlayMode, TrackSessionStatus
 
+if TYPE_CHECKING:
+    from app.models.album import Album
+
 
 class Track(Base):
     __tablename__ = "track"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    album_id: Mapped[int] = mapped_column(BigInteger)
+    album_id: Mapped[int] = mapped_column(ForeignKey("album.id"))
     title: Mapped[str] = mapped_column(String(150))
     artist_name: Mapped[str] = mapped_column(String(100))
     audio_url: Mapped[str] = mapped_column(String(500))
@@ -32,13 +38,14 @@ class Track(Base):
     track_number: Mapped[int] = mapped_column(Integer)
     is_title_track: Mapped[bool] = mapped_column(Boolean)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp()
+        DateTime, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp()
+        DateTime, server_default=func.now(), onupdate=func.now()
     )
 
-    sessions: Mapped[list["TrackSession"]] = relationship(back_populates="track")
+    sessions: Mapped[list[TrackSession]] = relationship(back_populates="track")
+    album: Mapped[Album] = relationship(back_populates="tracks")
 
 
 class TrackSession(Base):
@@ -68,15 +75,17 @@ class TrackSession(Base):
         )
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp()
+        DateTime, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp()
+        DateTime, server_default=func.now(), onupdate=func.now()
     )
 
-    cube_ownership: Mapped[CubeOwnership] = relationship()
+    cube_ownership: Mapped[CubeOwnership] = relationship(
+        back_populates="track_sessions"
+    )
     track: Mapped[Track] = relationship(back_populates="sessions")
-    captures: Mapped[list["TrackCapture"]] = relationship(
+    captures: Mapped[list[TrackCapture]] = relationship(
         back_populates="track_session"
     )
 
@@ -92,10 +101,10 @@ class TrackCapture(Base):
     captured_position_seconds: Mapped[int | None] = mapped_column(Integer)
     captured_at: Mapped[datetime] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp()
+        DateTime, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp()
+        DateTime, server_default=func.now(), onupdate=func.now()
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
 

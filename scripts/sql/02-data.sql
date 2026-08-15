@@ -130,15 +130,10 @@ INSERT INTO `avatar_interaction_picture` (`id`, `interaction_session_id`, `pictu
 (2, 2, 'interaction_picture_002', '2026-08-07 13:12:00'),
 (3, 3, 'interaction_picture_003', '2026-08-07 13:21:00');
 
-INSERT INTO `board` (`id`, `board_type`, `name`, `description`, `is_active`) VALUES
-(1, 'FREE', '자유게시판', '자유롭게 이야기하는 게시판', TRUE),
-(2, 'CERTIFICATION', '인증게시판', '큐브 인증 게시판', TRUE),
-(3, 'EVENT', '이벤트게시판', '목데이터용 이벤트 게시판', TRUE);
-
-INSERT INTO `post` (`id`, `board_id`, `user_id`, `title`, `content`, `status`) VALUES
-(1, 1, 1, '첫 큐브 등록했어요', 'arzone 큐브 등록 후기입니다.', 'ACTIVE'),
-(2, 2, 2, '인증 완료', '오늘 인증 성공했습니다.', 'ACTIVE'),
-(3, 1, 3, 'AR 모드 질문', 'AR 모드 사용 방법이 궁금합니다.', 'REPORTED');
+INSERT INTO `post` (`id`, `user_id`, `board_type`, `title`, `content`, `status`) VALUES
+(1, 1, 'FREE', '첫 큐브 등록했어요', 'arzone 큐브 등록 후기입니다.', 'ACTIVE'),
+(2, 2, 'CERTIFICATION', '인증 완료', '오늘 인증 성공했습니다.', 'ACTIVE'),
+(3, 3, 'FREE', 'AR 모드 질문', 'AR 모드 사용 방법이 궁금합니다.', 'REPORTED');
 
 INSERT INTO `post_media` (`id`, `post_id`, `post_image_url`) VALUES
 (1, 1, 'https://example.com/mock/post-001.jpg'),
@@ -160,37 +155,25 @@ INSERT INTO `comment_like` (`id`, `comment_id`, `user_id`, `is_liked`) VALUES
 (2, 2, 2, TRUE),
 (3, 3, 3, FALSE);
 
-INSERT INTO `market_product` (`id`, `cube_id`, `name`, `artist_name`, `image_url`) VALUES
-(1, 1, 'First Light Cube', 'ARZONE', 'market_product_001'),
-(2, 2, 'Virtual Stage Cube', 'ARZONE', 'market_product_002'),
-(3, 3, 'Memory Cube Package', 'ARZONE', 'market_product_003');
+INSERT INTO `market_product` (`id`, `cube_id`, `product_image_url`) VALUES
+(1, 1, 'https://example.com/mock/market-product-001.jpg'),
+(2, 2, 'https://example.com/mock/market-product-002.jpg'),
+(3, 3, 'https://example.com/mock/market-product-003.jpg');
 
-INSERT INTO `sell_listing` (`id`, `market_product_id`, `user_id`, `description`, `price`, `status`) VALUES
-(1, 1, 1, '상태 좋음', 35000, 'ACTIVE'),
-(2, 2, 2, '미개봉', 42000, 'SOLD'),
-(3, 3, 3, '구성품 포함', 39000, 'ACTIVE');
+INSERT INTO `sell_listing` (`id`, `market_product_id`, `user_id`, `product_status`, `title`, `description`, `price`, `status`) VALUES
+(1, 1, 1, '좋음', '퍼스트 큐브', '상태 좋은 큐브 판매합니다.', 35000, 'ACTIVE'),
+(2, 2, 2, '미개봉', '스테이지 큐브', '미개봉 상품입니다.', 42000, 'SOLD'),
+(3, 3, 3, '구성품 포함', '메모리 큐브', '구성품 모두 포함되어 있습니다.', 39000, 'ACTIVE');
 
-INSERT INTO `trade` (`id`, `sell_listing_id`, `seller_user_id`, `buyer_user_id`, `total_price`, `status`) VALUES
-(1, 1, 1, 2, 35000, 'PAID'),
-(2, 2, 2, 1, 42000, 'COMPLETED'),
-(3, 3, 3, 1, 39000, 'DISPUTED');
-
-INSERT INTO `trade_dispute` (`id`, `trade_id`, `reporter_user_id`, `reason_type`, `description`, `status`, `filed_at`, `resolved_at`) VALUES
-(1, 1, 2, 'ITEM_NOT_RECEIVED', '배송 조회가 되지 않습니다.', 'OPEN', '2026-08-07 14:00:00', NULL),
-(2, 2, 1, 'OTHER', '문의 후 해결된 분쟁 예시입니다.', 'RESOLVED', '2026-08-07 14:10:00', '2026-08-07 15:00:00'),
-(3, 3, 1, 'AUTHENTICATION_FAILED', '정품 인증 실패', 'REVIEWING', '2026-08-07 14:20:00', NULL);
+INSERT INTO `trade` (`id`, `sell_listing_id`, `buyer_user_id`, `buyer_phone_number`, `buyer_address`, `total_price`, `paid_time`, `sent_time`, `shipped_time`, `delivered_time`, `completed_time`, `status`) VALUES
+(1, 1, 2, '010-1111-2222', '서울특별시 강남구 테헤란로 1', 35000, '2026-08-07 14:30:00', NULL, NULL, NULL, NULL, 'PAID'),
+(2, 2, 1, '010-3333-4444', '서울특별시 마포구 월드컵로 2', 42000, '2026-08-07 14:35:00', '2026-08-07 15:00:00', '2026-08-07 15:30:00', '2026-08-07 18:00:00', '2026-08-07 19:00:00', 'COMPLETED'),
+(3, 3, 1, '010-5555-6666', '서울특별시 성동구 왕십리로 3', 39000, '2026-08-07 14:40:00', '2026-08-07 15:10:00', '2026-08-07 15:40:00', NULL, NULL, 'SHIPPING');
 
 INSERT INTO `listing_media` (`id`, `sell_listing_id`, `image_url`) VALUES
 (1, 1, 'https://example.com/mock/listing-001.jpg'),
 (2, 2, 'https://example.com/mock/listing-002.jpg'),
 (3, 3, 'https://example.com/mock/listing-003.jpg');
 
-INSERT INTO `escrow_payment` (`id`, `trade_id`, `payment_method`, `paid_amount`, `escrow_status`, `paid_at`, `released_at`, `refunded_at`) VALUES
-(1, 1, 'CARD', 35000, 'PAID', '2026-08-07 14:30:00', NULL, NULL),
-(2, 2, 'EASY_PAY', 42000, 'RELEASED', '2026-08-07 14:35:00', '2026-08-07 16:00:00', NULL),
-(3, 3, 'BANK_TRANSFER', 39000, 'PAID', '2026-08-07 14:40:00', NULL, NULL);
-
-INSERT INTO `shipment` (`id`, `trade_id`, `carrier`, `tracking_number`, `shipment_status`, `shipped_at`, `delivered_at`) VALUES
-(1, 1, 'CJ대한통운', 'CJ0000000001', 'READY', NULL, NULL),
-(2, 2, '우체국택배', 'POST000000002', 'DELIVERED', '2026-08-07 15:00:00', '2026-08-07 18:00:00'),
-(3, 3, '한진택배', 'HJ0000000003', 'SHIPPING', '2026-08-07 15:10:00', NULL);
+INSERT INTO `digital_certificate` (`id`, `trade_id`, `network`, `token_standard`, `token_id`, `contract_address`, `tx_hash`, `metadata_url`) VALUES
+(1, 2, 'Polygon Amoy', 'ERC-721', '1000002', '0x0000000000000000000000000000000000000002', '0xmocktxhash000000000000000000000000000000000000000000000000000000000002', 'https://example.com/mock/certificates/2.json');

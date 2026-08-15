@@ -323,20 +323,10 @@ erDiagram
         datetime deleted_at "NULL"
     }
 
-    BOARD {
-        bigint id PK
-        varchar_30 board_type "NOT NULL, UNIQUE, Enum: FREE | CERTIFICATION"
-        varchar_50 name "NOT NULL"
-        varchar_255 description "NULL"
-        boolean is_active "NOT NULL, DEFAULT: true"
-        datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-        datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-    }
-
     POST {
         bigint id PK
-        bigint board_id FK "NOT NULL"
         bigint user_id FK "NOT NULL"
+        bigint board_type FK "NOT NULL, Enum: FREE | CERTIFICATION"
         varchar_150 title "NOT NULL"
         text content "NOT NULL"
         varchar_20 status "NOT NULL, DEFAULT: ACTIVE, Enum: ACTIVE | DELETED | REPORTED"
@@ -386,7 +376,9 @@ erDiagram
         bigint id PK
         bigint market_product_id FK "NOT NULL"
         bigint user_id FK "NOT NULL"
-        varchar_50 description "NOT NULL"
+        varchar_30 product_status "NULL"
+        varchar_20 title "NOT NULL"
+        varchar_500 description "NOT NULL"
         int price "NOT NULL"
         varchar_20 status "NOT NULL, DEFAULT: ACTIVE, Enum: ACTIVE | SOLD | DELETED"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
@@ -396,34 +388,36 @@ erDiagram
 
     TRADE {
         bigint id PK
-        bigint sell_listing_id FK "NULL"
-        bigint seller_user_id FK "NOT NULL"
+        bigint sell_listing_id FK "NOT NULL"
         bigint buyer_user_id FK "NOT NULL"
+        varchar_20 buyer_phone_number "NOT NULL"
+        varchar_100 buyer_address "NOT NULL"
         int total_price "NOT NULL"
-        varchar_30 status "NOT NULL, DEFAULT: PAID, Enum: PAID | SHIPPING | DELIVERED | COMPLETED | CANCELLED | DISPUTED"
+        datetime paid_time "NULL"
+        datetime sent_time "NULL"
+        datetime shipped_time "NULL"
+        datetime delivered_time "NULL"
+        datetime completed_time "NULL"        
+        varchar_30 status "NOT NULL, DEFAULT: PAID, Enum: PAID | SENT | SHIPPING | DELIVERED | COMPLETED"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
     }
 
-    TRADE_DISPUTE {
+    DIGITAL_CERTIFICATE {
         bigint id PK
         bigint trade_id FK "NOT NULL"
-        bigint reporter_user_id FK "NOT NULL"
-        varchar_30 reason_type "NOT NULL, Enum: ITEM_NOT_RECEIVED | ITEM_DAMAGED | AUTHENTICATION_FAILED | OTHER"
-        text description "NULL"
-        varchar_30 status "NOT NULL, DEFAULT: OPEN, Enum: OPEN | REVIEWING | RESOLVED | REJECTED"
-        datetime filed_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-        datetime resolved_at "NULL"
-        datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-        datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
+        varchar_200 network "NOT NULL"
+        varchar_200 token_standard "NOT NULL"
+        varchar_200 token_id "NOT NULL"
+        varchar_200 contract_address "NOT NULL"
+        varchar_200 tx_hash "NOT NULL"
+        varchar_200 metadata_url "NOT NULL"
     }
 
     MARKET_PRODUCT {
         bigint id PK
         bigint cube_id FK "NOT NULL"
-        varchar_120 name "NOT NULL"
-        varchar_100 artist_name "NOT NULL"
-        varchar_500 image_url "NULL"
+        varchar_500 product_image_url "NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime deleted_at "NULL"
@@ -436,31 +430,6 @@ erDiagram
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime deleted_at "NULL"
-    }
-
-    ESCROW_PAYMENT {
-        bigint id PK
-        bigint trade_id FK "NOT NULL, UNIQUE"
-        varchar_30 payment_method "NOT NULL, Enum: CARD | BANK_TRANSFER | EASY_PAY"
-        int paid_amount "NOT NULL"
-        varchar_30 escrow_status "NOT NULL, DEFAULT: PAID, Enum: PAID | RELEASED | REFUNDED"
-        datetime paid_at "NULL"
-        datetime released_at "NULL"
-        datetime refunded_at "NULL"
-        datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-        datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-    }
-
-    SHIPMENT {
-        bigint id PK
-        bigint trade_id FK "NOT NULL, UNIQUE"
-        varchar_30 carrier "NULL"
-        varchar_100 tracking_number "NULL"
-        varchar_30 shipment_status "NOT NULL, DEFAULT: READY, Enum: READY | SHIPPING | DELIVERED | RETURNED"
-        datetime shipped_at "NULL"
-        datetime delivered_at "NULL"
-        datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-        datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
     }
 
 
@@ -493,7 +462,6 @@ erDiagram
     AVATAR_CONVERSATION_MESSAGE ||--o| CONVERSATION_REPORT : "reported_as"
     CUBE_OWNERSHIP ||--o{ AVATAR_INTERACTION_SESSION : "creates"
     AVATAR_INTERACTION_SESSION ||--o{ AVATAR_INTERACTION_PICTURE : "contains"
-    BOARD ||--o{ POST : "contains"
     USER ||--o{ POST : "writes"
     POST ||--o{ POST_MEDIA : "contains"
     POST ||--o{ COMMENT : "has"
@@ -503,9 +471,7 @@ erDiagram
     COMMENT ||--o{ COMMENT_LIKE : "receives"
     USER ||--o{ COMMENT_LIKE : "creates"
     SELL_LISTING ||--o| TRADE : "creates"
-    TRADE ||--o{ TRADE_DISPUTE : "disputed"
     CUBE ||--o{ MARKET_PRODUCT : "upload"
     SELL_LISTING ||--o{ LISTING_MEDIA : "contains"
-    TRADE ||--|| ESCROW_PAYMENT
-    TRADE ||--o| SHIPMENT
+    TRADE ||--o| DIGITAL_CERTIFICATE : "contains"
 ```

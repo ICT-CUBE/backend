@@ -88,7 +88,7 @@ class ConversationMessageReplyItemResponse(BaseModel):
     id: int
     senderType: str
     content: str
-    imageUrls: list[str] | None = None
+    imageUrls: list[str] | None = None      # 프론트에서 키 자체를 안보낼수도 있고 그러면 imageUrls = None임.
     sequenceNumber: int
     sentAt: datetime
 
