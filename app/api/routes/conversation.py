@@ -15,6 +15,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
+from app.core.auth import get_current_user_id
 from app.core.database import get_db
 from app.models.enums import ConversationType
 from app.schemas.common import ErrorResponse
@@ -46,12 +47,13 @@ router = APIRouter()
     response_model=ConversationSessionsResponse,
     summary="텍스트 및 음성 대화 조회",
     description=(
-        "고정 사용자 ID 1의 활성 큐브 소유권에 속한 텍스트 또는 음성 대화 "
+        "현재 사용자의 활성 큐브 소유권에 속한 텍스트 또는 음성 대화 "
         "세션 목록을 마지막 메시지 최신순으로 조회합니다."
     ),
 )
 def read_conversation_sessions(
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
     conversation_type: Annotated[
         ConversationType,
         Query(alias="conversationType"),
@@ -66,6 +68,7 @@ def read_conversation_sessions(
     _ = size
     return get_conversation_sessions(
         db=db,
+        current_user_id=current_user_id,
         conversation_type=conversation_type,
         page=page,
     )
@@ -77,18 +80,20 @@ def read_conversation_sessions(
     status_code=status.HTTP_201_CREATED,
     summary="대화 세션 생성",
     description=(
-        "고정 사용자 ID 1의 마지막 활성 큐브 소유권에 텍스트 또는 음성 대화 "
+        "현재 사용자의 마지막 활성 큐브 소유권에 텍스트 또는 음성 대화 "
         "세션을 생성합니다."
     ),
 )
 def create_new_conversation_session(
     body: ConversationSessionCreateRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
 ) -> ConversationSessionCreateResponse:
     """POST /api/v1/users/me/conversation-sessions"""
     return create_conversation_session(
         db=db,
-        conversation_type=body.conversationType,
+        current_user_id=current_user_id,
+        conversation_type=body.conversation_type,
     )
 
 
@@ -97,7 +102,7 @@ def create_new_conversation_session(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="대화 세션 삭제",
     description=(
-        "고정 사용자 ID 1의 활성 큐브 소유권에 속한 텍스트 또는 음성 "
+        "현재 사용자의 활성 큐브 소유권에 속한 텍스트 또는 음성 "
         "대화 세션을 deleted_at 저장 방식으로 소프트 딜리트합니다."
     ),
     responses={
@@ -117,6 +122,7 @@ def create_new_conversation_session(
 )
 def delete_existing_conversation_session(
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
     conversation_session_id: Annotated[
         int,
         Path(alias="conversationSessionId", ge=1),
@@ -125,6 +131,7 @@ def delete_existing_conversation_session(
     """DELETE /api/v1/users/me/conversation-sessions/{conversationSessionId}"""
     delete_conversation_session(
         db=db,
+        current_user_id=current_user_id,
         conversation_session_id=conversation_session_id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -135,7 +142,7 @@ def delete_existing_conversation_session(
     response_model=ConversationMessageSaveResponse,
     summary="대화 텍스트 보관",
     description=(
-        "고정 사용자 ID 1의 활성 큐브 소유권에 속한 아바타 텍스트 대화 "
+        "현재 사용자의 활성 큐브 소유권에 속한 아바타 텍스트 대화 "
         "메시지의 보관 여부를 토글합니다."
     ),
     responses={
@@ -175,6 +182,7 @@ def delete_existing_conversation_session(
 )
 def save_conversation_message(
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
     conversation_message_id: Annotated[
         int,
         Path(alias="conversationMessageId", ge=1),
@@ -183,6 +191,7 @@ def save_conversation_message(
     """PATCH /api/v1/users/me/conversation-messages/{conversationMessageId}/save"""
     return toggle_conversation_message_save(
         db=db,
+        current_user_id=current_user_id,
         conversation_message_id=conversation_message_id,
     )
 
@@ -192,7 +201,7 @@ def save_conversation_message(
     response_model=ConversationDetailResponse,
     summary="대화 세션 상세 조회",
     description=(
-        "고정 사용자 ID 1의 활성 큐브 소유권에 속한 텍스트 대화 세션의 "
+        "현재 사용자의 활성 큐브 소유권에 속한 텍스트 대화 세션의 "
         "전체 메시지를 sequenceNumber 내림차순으로 조회합니다."
     ),
     responses={
@@ -222,6 +231,7 @@ def save_conversation_message(
 )
 def read_conversation_session_detail(
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
     conversation_session_id: Annotated[
         int,
         Path(alias="conversationSessionId", ge=1),
@@ -230,6 +240,7 @@ def read_conversation_session_detail(
     """GET /api/v1/users/me/conversation-sessions/{conversationSessionId}"""
     return get_conversation_session_detail(
         db=db,
+        current_user_id=current_user_id,
         conversation_session_id=conversation_session_id,
     )
 
@@ -241,7 +252,7 @@ def read_conversation_session_detail(
     status_code=status.HTTP_201_CREATED,
     summary="대화 메시지 응답",
     description=(
-        "고정 사용자 ID 1의 대화 세션에 사용자 메시지를 받고, OpenAI GPT로 "
+        "현재 사용자의 대화 세션에 사용자 메시지를 받고, OpenAI GPT로 "
         "아바타 응답을 생성한 뒤 USER/AVATAR 메시지를 함께 저장해 반환합니다."
     ),
     responses={
@@ -271,6 +282,7 @@ def read_conversation_session_detail(
 )
 def create_conversation_message_reply(
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
     conversation_session_id: Annotated[
         int,
         Path(alias="conversationSessionId", ge=1),
@@ -280,6 +292,7 @@ def create_conversation_message_reply(
     """POST /api/v1/users/me/conversation-sessions/{conversationSessionId}/messages"""
     return reply_to_conversation_message(
         db=db,
+        current_user_id=current_user_id,
         conversation_session_id=conversation_session_id,
         body=body,
     )
@@ -290,7 +303,7 @@ def create_conversation_message_reply(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="대화 세션 상태 저장",
     description=(
-        "고정 사용자 ID 1의 대화 세션을 NOT_ACTIVE로 변경하고 종료 시각을 저장합니다. "
+        "현재 사용자의 대화 세션을 NOT_ACTIVE로 변경하고 종료 시각을 저장합니다. "
         "제목이 없고 메시지가 있으면 첫 메시지 2개로 GPT 제목을 생성합니다."
     ),
     responses={
@@ -310,6 +323,7 @@ def create_conversation_message_reply(
 )
 def update_conversation_session(
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
     conversation_session_id: Annotated[
         int,
         Path(alias="conversationSessionId", ge=1),
@@ -326,6 +340,7 @@ def update_conversation_session(
     """PATCH /api/v1/users/me/conversation-sessions/{conversationSessionId}"""
     save_conversation_session(
         db=db,
+        current_user_id=current_user_id,
         conversation_session_id=conversation_session_id,
         audio_file=audio.file if audio is not None else None,
         audio_content_type=audio.content_type if audio is not None else None,

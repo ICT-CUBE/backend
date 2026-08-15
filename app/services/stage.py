@@ -18,13 +18,13 @@ from app.schemas.stage import (
 )
 from app.services.blob_storage import normalize_image_content_type, upload_stage_capture
 
-CURRENT_USER_ID = 1
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
 
 
 def create_stage_session(
     *,
     db: Session,
+    current_user_id: int,
     stage_id: int,
     view_mode: StageViewMode,
 ) -> StageSessionCreateResponse:
@@ -43,7 +43,7 @@ def create_stage_session(
     ownership = db.scalar(
         select(CubeOwnership)
         .where(
-            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.user_id == current_user_id,
             CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
             CubeOwnership.is_last_accessed.is_(True),
         )
@@ -95,13 +95,14 @@ def create_stage_session(
         raise
 
     return StageSessionCreateResponse(
-        stageSession=StageSessionResponse(id=stage_session_id, viewMode=view_mode)
+        stage_session=StageSessionResponse(id=stage_session_id, view_mode=view_mode)
     )
 
 
 def save_stage_capture(
     *,
     db: Session,
+    current_user_id: int,
     stage_session_id: int,
     image_file: BinaryIO,
     image_content_type: str | None,
@@ -115,7 +116,7 @@ def save_stage_capture(
         .join(StageSession.cube_ownership)
         .where(
             StageSession.id == stage_session_id,
-            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.user_id == current_user_id,
         )
         .limit(1)
     )
@@ -139,7 +140,7 @@ def save_stage_capture(
         image_url = upload_stage_capture(
             file=image_file,
             content_type=normalized_content_type,
-            user_id=CURRENT_USER_ID,
+            user_id=current_user_id,
             stage_session_id=stage_session.id,
         )
     except Exception as exc:
@@ -149,12 +150,11 @@ def save_stage_capture(
             code="INTERNAL_SERVER_ERROR",
             message="서버 내부 오류가 발생했습니다.",
         ) from exc
-    captured_at_kst = captured_at.astimezone(KOREA_TIMEZONE).replace(tzinfo=None)
     capture = StageCapture(
         stage_session_id=stage_session.id,
         stage_capture_img_url=image_url,
         captured_position_seconds=captured_position_seconds,
-        captured_at=captured_at_kst,
+        captured_at=captured_at,
         deleted_at=None,
     )
     try:
@@ -168,6 +168,7 @@ def save_stage_capture(
 def save_stage_session(
     *,
     db: Session,
+    current_user_id: int,
     stage_session_id: int,
     end_status: StageSessionEndStatus,
     last_position_seconds: int,
@@ -179,7 +180,7 @@ def save_stage_session(
         .join(StageSession.cube_ownership)
         .where(
             StageSession.id == stage_session_id,
-            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.user_id == current_user_id,
         )
         .limit(1)
         .with_for_update()

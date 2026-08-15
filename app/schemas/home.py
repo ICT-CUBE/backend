@@ -2,50 +2,40 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.base import ApiSchema
 
 
-class HomeSchema(BaseModel):
-    """snake_case 필드로 생성하고 camelCase로 응답하기 위한 공통 설정."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class HomeUserResponse(HomeSchema):
+class HomeUserResponse(ApiSchema):
     id: int
-    profile_character_img_url: str | None = Field(
-        serialization_alias="profileCharacterImgUrl"
-    )
+    profile_character_img_url: str | None
 
 
-class HomeCubeOwnershipResponse(HomeSchema):
+class HomeCubeOwnershipResponse(ApiSchema):
     id: int
-    avatar_nickname: str | None = Field(serialization_alias="avatarNickname")
-    acquired_at: datetime = Field(serialization_alias="acquiredAt")
+    avatar_nickname: str | None
+    acquired_at: datetime
 
 
-class HomeCubeResponse(HomeSchema):
+class HomeCubeResponse(ApiSchema):
     id: int
-    artist_name: str = Field(serialization_alias="artistName")
+    artist_name: str
 
 
-class HomeLevelResponse(HomeSchema):
+class HomeLevelResponse(ApiSchema):
     id: int
     level: int
-    level_name: str = Field(serialization_alias="levelName")
-    level_xp: int = Field(serialization_alias="levelXp")
+    level_name: str
+    level_xp: int
 
 
-class HomeAffinityResponse(HomeSchema):
+class HomeAffinityResponse(ApiSchema):
     id: int
-    current_xp: int = Field(serialization_alias="currentXp")
+    current_xp: int
     level: HomeLevelResponse
 
 
-class HomeResponse(HomeSchema):
+class HomeResponse(ApiSchema):
     user: HomeUserResponse
-    cube_ownership: HomeCubeOwnershipResponse = Field(
-        serialization_alias="cubeOwnership"
-    )
+    cube_ownership: HomeCubeOwnershipResponse
     cube: HomeCubeResponse
     affinity: HomeAffinityResponse

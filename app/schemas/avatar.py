@@ -1,21 +1,21 @@
 """아바타 도메인 API 응답 스키마."""
 
-from pydantic import BaseModel
+from app.schemas.base import ApiSchema
 
 
-class AvatarInteractionSessionCreateItemResponse(BaseModel):
+class AvatarInteractionSessionCreateItemResponse(ApiSchema):
     id: int
 
 
-class AvatarInteractionSessionCreateResponse(BaseModel):
-    avatarInteractionSession: AvatarInteractionSessionCreateItemResponse
+class AvatarInteractionSessionCreateResponse(ApiSchema):
+    avatar_interaction_session: AvatarInteractionSessionCreateItemResponse
 
 
-class YezulFrameResponse(BaseModel):
+class YezulFrameResponse(ApiSchema):
     id: int
     title: str | None
-    imageUrl: str
+    image_url: str
 
 
-class YezulFramesResponse(BaseModel):
-    yezulFrames: list[YezulFrameResponse]
+class YezulFramesResponse(ApiSchema):
+    yezul_frames: list[YezulFrameResponse]

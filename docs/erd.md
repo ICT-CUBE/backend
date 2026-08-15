@@ -438,7 +438,7 @@ erDiagram
     CUBE ||--o{ CUBE_VERIFICATION : "is verified through"
     USER ||--o{ CUBE_OWNERSHIP : "owns"
     CUBE ||--o{ CUBE_OWNERSHIP : "has ownership records"
-    CUBE_OWNERSHIP ||--o| AFFINITY : "has"
+    CUBE_OWNERSHIP ||--|| AFFINITY : "has"
     LEVEL ||--o{ AFFINITY : "current level"
     REWARD_ITEM ||--o{ LEVEL : "level reward"
     REWARD_ITEM ||--o{ MISSION : "mission reward"

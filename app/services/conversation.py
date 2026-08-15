@@ -51,7 +51,6 @@ from app.services.blob_storage import (
     upload_conversation_audio,
 )
 
-CURRENT_USER_ID = 1
 CONVERSATION_PAGE_SIZE = 20
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
 JENNIE_CONVERSATION_SYSTEM_PROMPT = """
@@ -68,15 +67,10 @@ CONVERSATION_TITLE_SYSTEM_PROMPT = """
 """.strip()
 
 
-def _kst_datetime(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=KOREA_TIMEZONE)
-    return value.astimezone(KOREA_TIMEZONE)
-
-
 def get_conversation_sessions(
     *,
     db: Session,
+    current_user_id: int,
     conversation_type: ConversationType,
     page: int,
 ) -> ConversationSessionsResponse:
@@ -112,7 +106,7 @@ def get_conversation_sessions(
             ),
         )
         .where(
-            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.user_id == current_user_id,
             CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
             AvatarConversationSession.conversation_type == conversation_type,
             AvatarConversationSession.deleted_at.is_(None),
@@ -126,7 +120,7 @@ def get_conversation_sessions(
     has_next = len(rows) > CONVERSATION_PAGE_SIZE
 
     return ConversationSessionsResponse(
-        conversationSessions=[
+        conversation_sessions=[
             _conversation_session_response(
                 session=session,
                 last_message=last_message,
@@ -136,7 +130,7 @@ def get_conversation_sessions(
         pagination=ConversationPaginationResponse(
             page=page,
             size=CONVERSATION_PAGE_SIZE,
-            hasNext=has_next,
+            has_next=has_next,
         ),
     )
 
@@ -144,21 +138,25 @@ def get_conversation_sessions(
 def create_conversation_session(
     *,
     db: Session,
+    current_user_id: int,
     conversation_type: ConversationType,
 ) -> ConversationSessionCreateResponse:
     """현재 사용자의 활성 큐브 소유권에 새 대화 세션을 생성합니다."""
-    ownership = cast(
-        CubeOwnership,
-        db.scalar(
-            select(CubeOwnership)
-            .where(
-                CubeOwnership.user_id == CURRENT_USER_ID,
-                CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
-                CubeOwnership.is_last_accessed.is_(True),
-            )
-            .limit(1)
+    ownership = db.scalar(
+        select(CubeOwnership)
+        .where(
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
         )
+        .limit(1)
     )
+    if ownership is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_OWNERSHIP_NOT_FOUND",
+            message="큐브 소유권 정보를 찾을 수 없습니다.",
+        )
 
     conversation_session = AvatarConversationSession(
         cube_ownership_id=ownership.id,
@@ -181,9 +179,9 @@ def create_conversation_session(
         raise
 
     return ConversationSessionCreateResponse(
-        conversationSession=ConversationSessionCreateItemResponse(
+        conversation_session=ConversationSessionCreateItemResponse(
             id=conversation_session_id,
-            conversationType=conversation_type,
+            conversation_type=conversation_type,
         )
     )
 
@@ -191,6 +189,7 @@ def create_conversation_session(
 def delete_conversation_session(
     *,
     db: Session,
+    current_user_id: int,
     conversation_session_id: int,
 ) -> None:
     """대화 세션을 deleted_at 저장 방식으로 소프트 딜리트합니다."""
@@ -202,7 +201,7 @@ def delete_conversation_session(
         )
         .where(
             AvatarConversationSession.id == conversation_session_id,
-            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.user_id == current_user_id,
             CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
             AvatarConversationSession.deleted_at.is_(None),
         )
@@ -222,6 +221,7 @@ def delete_conversation_session(
 def toggle_conversation_message_save(
     *,
     db: Session,
+    current_user_id: int,
     conversation_message_id: int,
 ) -> ConversationMessageSaveResponse:
     """아바타 텍스트 대화 메시지의 보관 여부를 토글합니다."""
@@ -238,7 +238,7 @@ def toggle_conversation_message_save(
         )
         .where(
             AvatarConversationMessage.id == conversation_message_id,
-            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.user_id == current_user_id,
             CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
             AvatarConversationSession.deleted_at.is_(None),
         )
@@ -272,9 +272,9 @@ def toggle_conversation_message_save(
         raise
 
     return ConversationMessageSaveResponse(
-        conversationMessage=ConversationMessageSaveItemResponse(
+        conversation_message=ConversationMessageSaveItemResponse(
             id=conversation_message.id,
-            isTextSaved=conversation_message.is_text_saved,
+            is_text_saved=conversation_message.is_text_saved,
         )
     )
 
@@ -282,6 +282,7 @@ def toggle_conversation_message_save(
 def get_conversation_session_detail(
     *,
     db: Session,
+    current_user_id: int,
     conversation_session_id: int,
 ) -> ConversationDetailResponse:
     """텍스트 대화 세션의 전체 메시지를 sequenceNumber 내림차순으로 반환합니다."""
@@ -293,7 +294,7 @@ def get_conversation_session_detail(
         )
         .where(
             AvatarConversationSession.id == conversation_session_id,
-            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.user_id == current_user_id,
             CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
             AvatarConversationSession.deleted_at.is_(None),
         )
@@ -321,15 +322,15 @@ def get_conversation_session_detail(
         _raise_conversation_session_not_found()
 
     return ConversationDetailResponse(
-        conversationSession=ConversationDetailSessionResponse(
+        conversation_session=ConversationDetailSessionResponse(
             id=conversation_session.id,
             messages=[
                 ConversationDetailMessageResponse(
                     id=message.id,
-                    senderType=message.sender_type.value,
+                    sender_type=message.sender_type.value,
                     content=message.content,
-                    sequenceNumber=message.sequence_number,
-                    sentAt=_kst_datetime(message.sent_at),
+                    sequence_number=message.sequence_number,
+                    sent_at=message.sent_at,
                 )
                 for message in messages
             ],
@@ -340,6 +341,7 @@ def get_conversation_session_detail(
 def reply_to_conversation_message(
     *,
     db: Session,
+    current_user_id: int,
     conversation_session_id: int,
     body: ConversationMessageReplyRequest,
 ) -> ConversationMessageReplyResponse:
@@ -352,7 +354,7 @@ def reply_to_conversation_message(
         )
         .where(
             AvatarConversationSession.id == conversation_session_id,
-            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.user_id == current_user_id,
             CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
             AvatarConversationSession.deleted_at.is_(None),
         )
@@ -361,10 +363,10 @@ def reply_to_conversation_message(
     if conversation_session is None:
         _raise_conversation_session_not_found()
 
-    if _has_deleted_conversation_image_url(db=db, image_urls=body.imageUrls):
+    if _has_deleted_conversation_image_url(db=db, image_urls=body.image_urls):
         _raise_conversation_image_not_found()
 
-    avatar_reply = generate_avatar_reply(body.content, body.imageUrls)
+    avatar_reply = generate_avatar_reply(body.content, body.image_urls)
     now = datetime.now(KOREA_TIMEZONE).replace(tzinfo=None)
     last_sequence_number = _last_conversation_sequence_number(
         db=db,
@@ -402,17 +404,18 @@ def reply_to_conversation_message(
         raise
 
     return ConversationMessageReplyResponse(
-        userMessage=_conversation_reply_message_response(
+        user_message=_conversation_reply_message_response(
             user_message,
-            image_urls=body.imageUrls,
+            image_urls=body.image_urls,
         ),
-        avatarMessage=_conversation_reply_message_response(avatar_message),
+        avatar_message=_conversation_reply_message_response(avatar_message),
     )
 
 
 def save_conversation_session(
     *,
     db: Session,
+    current_user_id: int,
     conversation_session_id: int,
     audio_file: BinaryIO | None,
     audio_content_type: str | None,
@@ -427,7 +430,7 @@ def save_conversation_session(
         )
         .where(
             AvatarConversationSession.id == conversation_session_id,
-            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.user_id == current_user_id,
             CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
             AvatarConversationSession.deleted_at.is_(None),
         )
@@ -438,6 +441,7 @@ def save_conversation_session(
 
     audio_url, stored_audio_duration_seconds = _conversation_audio_values(
         conversation_session=conversation_session,
+        current_user_id=current_user_id,
         audio_file=audio_file,
         audio_content_type=audio_content_type,
         audio_duration_seconds=audio_duration_seconds,
@@ -490,6 +494,7 @@ def generate_avatar_reply(user_content: str, image_urls: list[str] | None = None
 def _conversation_audio_values(
     *,
     conversation_session: AvatarConversationSession,
+    current_user_id: int,
     audio_file: BinaryIO | None,
     audio_content_type: str | None,
     audio_duration_seconds: int | None,
@@ -508,7 +513,7 @@ def _conversation_audio_values(
         audio_url = upload_conversation_audio(
             file=audio_file,
             content_type=normalized_content_type,
-            user_id=CURRENT_USER_ID,
+            user_id=current_user_id,
             conversation_session_id=conversation_session.id,
         )
     except Exception as exc:
@@ -632,14 +637,14 @@ def _conversation_session_response(
     )
     return ConversationSessionResponse(
         id=session.id,
-        conversationType=session.conversation_type,
-        conversationTitle=session.conversation_title,
-        audioUrl=session.audio_url,
-        audioDurationSeconds=session.audio_duration_seconds,
-        lastMessage=ConversationLastMessageResponse(
+        conversation_type=session.conversation_type,
+        conversation_title=session.conversation_title,
+        audio_url=session.audio_url,
+        audio_duration_seconds=session.audio_duration_seconds,
+        last_message=ConversationLastMessageResponse(
             id=last_message.id,
             content=content,
-            sentAt=_kst_datetime(last_message.sent_at),
+            sent_at=last_message.sent_at,
         ),
     )
 
@@ -705,9 +710,9 @@ def _conversation_reply_message_response(
 ) -> ConversationMessageReplyItemResponse:
     return ConversationMessageReplyItemResponse(
         id=message.id,
-        senderType=message.sender_type.value,
+        sender_type=message.sender_type.value,
         content=message.content,
-        imageUrls=image_urls,
-        sequenceNumber=message.sequence_number,
-        sentAt=_kst_datetime(message.sent_at),
+        image_urls=image_urls,
+        sequence_number=message.sequence_number,
+        sent_at=message.sent_at,
     )

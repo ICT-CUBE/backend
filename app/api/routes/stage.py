@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, Path, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
+from app.core.auth import get_current_user_id
 from app.core.database import get_db
 from app.schemas.common import ErrorResponse
 from app.schemas.stage import (
@@ -29,7 +30,7 @@ stage_session_router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     summary="스테이지 재생 세션 생성",
     description=(
-        "활성 스테이지와 고정 사용자 ID 1의 마지막 활성 큐브 소유권을 기준으로 "
+        "활성 스테이지와 현재 사용자의 마지막 활성 큐브 소유권을 기준으로 "
         "재생 세션을 생성합니다."
     ),
     responses={
@@ -73,12 +74,14 @@ def create_playback_session(
     stage_id: Annotated[int, Path(alias="stageId")],
     body: StageSessionCreateRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
 ) -> StageSessionCreateResponse:
     """POST /api/v1/stages/{stageId}/sessions"""
     return create_stage_session(
         db=db,
+        current_user_id=current_user_id,
         stage_id=stage_id,
-        view_mode=body.viewMode,
+        view_mode=body.view_mode,
     )
 
 
@@ -87,7 +90,7 @@ def create_playback_session(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="스테이지 재생 세션 저장",
     description=(
-        "고정 사용자 ID 1의 PLAYING 세션에 최종 재생 위치, 실제 누적 시청 시간, "
+        "현재 사용자의 PLAYING 세션에 최종 재생 위치, 실제 누적 시청 시간, "
         "종료 상태와 한국시간 종료 시각을 저장합니다."
     ),
     responses={
@@ -121,14 +124,16 @@ def update_playback_session(
     stage_session_id: Annotated[int, Path(alias="stageSessionId")],
     body: StageSessionUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
 ) -> Response:
     """PATCH /api/v1/users/me/stage-sessions/{stageSessionId}"""
     save_stage_session(
         db=db,
+        current_user_id=current_user_id,
         stage_session_id=stage_session_id,
         end_status=body.status,
-        last_position_seconds=body.lastPositionSeconds,
-        viewed_seconds=body.viewedSeconds,
+        last_position_seconds=body.last_position_seconds,
+        viewed_seconds=body.viewed_seconds,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -138,7 +143,7 @@ def update_playback_session(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="스테이지 캡처 저장",
     description=(
-        "고정 사용자 ID 1의 스테이지 세션을 확인하고, 캡처 이미지를 Azure Blob "
+        "현재 사용자의 스테이지 세션을 확인하고, 캡처 이미지를 Azure Blob "
         "Storage에 업로드한 뒤 이미지 URL과 촬영 정보를 DB에 저장합니다."
     ),
     responses={
@@ -176,10 +181,12 @@ def create_stage_capture(
     ],
     captured_at: Annotated[datetime, Form(alias="capturedAt")],
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
 ) -> Response:
     """POST /api/v1/users/me/stage-sessions/{stageSessionId}/captures"""
     save_stage_capture(
         db=db,
+        current_user_id=current_user_id,
         stage_session_id=stage_session_id,
         image_file=image.file,
         image_content_type=image.content_type,

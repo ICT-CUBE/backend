@@ -89,7 +89,7 @@ def save_stage_capture_request(
                 if data is not None
                 else {
                     "capturedPositionSeconds": "74",
-                    "capturedAt": "2026-07-29T15:05:20+09:00",
+                    "capturedAt": "2026-07-29T15:05:20",
                 },
             )
     finally:

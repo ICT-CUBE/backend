@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, Path, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
+from app.core.auth import get_current_user_id
 from app.core.database import get_db
 from app.schemas.common import ErrorResponse
 from app.schemas.track import (
@@ -29,7 +30,7 @@ track_session_router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     summary="트랙 재생 세션 생성",
     description=(
-        "트랙과 고정 사용자 ID 1의 마지막 활성 큐브 소유권을 기준으로 "
+        "트랙과 현재 사용자의 마지막 활성 큐브 소유권을 기준으로 "
         "트랙 재생 세션을 생성합니다."
     ),
     responses={
@@ -73,12 +74,14 @@ def create_playback_session(
     track_id: Annotated[int, Path(alias="trackId")],
     body: TrackSessionCreateRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
 ) -> TrackSessionCreateResponse:
     """POST /api/v1/tracks/{trackId}/sessions"""
     return create_track_session(
         db=db,
+        current_user_id=current_user_id,
         track_id=track_id,
-        play_mode=body.playMode,
+        play_mode=body.play_mode,
     )
 
 
@@ -87,7 +90,7 @@ def create_playback_session(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="트랙 재생 세션 상태 저장",
     description=(
-        "고정 사용자 ID 1의 PLAYING 트랙 세션에 종료 상태, 최종 재생 위치, "
+        "현재 사용자의 PLAYING 트랙 세션에 종료 상태, 최종 재생 위치, "
         "실제 감상 시간과 한국시간 종료 시각을 저장합니다."
     ),
     responses={
@@ -121,14 +124,16 @@ def update_playback_session(
     track_session_id: Annotated[int, Path(alias="trackSessionId")],
     body: TrackSessionUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
 ) -> Response:
     """PATCH /api/v1/users/me/track-sessions/{trackSessionId}"""
     save_track_session(
         db=db,
+        current_user_id=current_user_id,
         track_session_id=track_session_id,
         end_status=body.status,
-        last_position_seconds=body.lastPositionSeconds,
-        viewed_seconds=body.viewedSeconds,
+        last_position_seconds=body.last_position_seconds,
+        viewed_seconds=body.viewed_seconds,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -138,7 +143,7 @@ def update_playback_session(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="트랙 재생 캡처 저장",
     description=(
-        "고정 사용자 ID 1의 트랙 세션을 확인하고, 캡처 이미지를 Azure Blob "
+        "현재 사용자의 트랙 세션을 확인하고, 캡처 이미지를 Azure Blob "
         "Storage에 업로드한 뒤 이미지 URL과 촬영 정보를 DB에 저장합니다."
     ),
     responses={
@@ -176,10 +181,12 @@ def create_track_capture(
     ],
     captured_at: Annotated[datetime, Form(alias="capturedAt")],
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
 ) -> Response:
     """POST /api/v1/users/me/track-sessions/{trackSessionId}/captures"""
     save_track_capture(
         db=db,
+        current_user_id=current_user_id,
         track_session_id=track_session_id,
         image_file=image.file,
         image_content_type=image.content_type,

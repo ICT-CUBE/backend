@@ -63,7 +63,7 @@ def test_home_returns_orm_values_in_korea_time() -> None:
         "cubeOwnership": {
             "id": 1,
             "avatarNickname": "루미",
-            "acquiredAt": "2026-08-07T09:20:00+09:00",
+            "acquiredAt": "2026-08-07T09:20:00",
         },
         "cube": {"id": 1, "artistName": "ARZONE"},
         "affinity": {
@@ -91,6 +91,21 @@ def test_home_returns_404_when_ownership_does_not_exist() -> None:
     assert response.json() == {
         "code": "CUBE_OWNERSHIP_NOT_FOUND",
         "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+    }
+
+
+def test_home_returns_404_when_affinity_does_not_exist() -> None:
+    db = Mock(spec=Session)
+    ownership = make_ownership(OwnershipStatus.ACTIVE)
+    ownership.affinity = None
+    db.scalars.return_value.first.return_value = ownership
+
+    response = request_home(db)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "CUBE_AFFINITY_NOT_FOUND",
+        "message": "큐브 친밀도 정보를 찾을 수 없습니다.",
     }
 
 

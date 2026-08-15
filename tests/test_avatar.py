@@ -102,7 +102,7 @@ def save_avatar_interaction_picture_request(
                 files=files,
                 data=data
                 if data is not None
-                else {"picturedAt": "2026-07-29T15:05:20+09:00"},
+                else {"picturedAt": "2026-07-29T15:05:20"},
             )
     finally:
         app.dependency_overrides.clear()

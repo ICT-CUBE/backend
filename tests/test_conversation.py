@@ -237,7 +237,7 @@ def test_text_conversation_sessions_return_last_message_content() -> None:
                 "lastMessage": {
                     "id": 5003,
                     "content": "헐! 대박인데?",
-                    "sentAt": "2026-07-29T12:25:00+09:00",
+                    "sentAt": "2026-07-29T12:25:00",
                 },
             }
         ],
@@ -272,7 +272,7 @@ def test_voice_conversation_sessions_return_null_content_and_audio_fields() -> N
         "lastMessage": {
             "id": 5003,
             "content": None,
-            "sentAt": "2026-07-29T12:25:00+09:00",
+            "sentAt": "2026-07-29T12:25:00",
         },
     }
 
@@ -707,14 +707,14 @@ def test_conversation_session_detail_returns_messages_descending() -> None:
                     "senderType": "AVATAR",
                     "content": "헐!! 대박인데?",
                     "sequenceNumber": 3,
-                    "sentAt": "2026-07-29T12:25:00+09:00",
+                    "sentAt": "2026-07-29T12:25:00",
                 },
                 {
                     "id": 5002,
                     "senderType": "USER",
                     "content": "나 지금 카페에서 공부하고 있어.",
                     "sequenceNumber": 2,
-                    "sentAt": "2026-07-29T12:23:30+09:00",
+                    "sentAt": "2026-07-29T12:23:30",
                 },
             ],
         }

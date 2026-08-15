@@ -1,7 +1,5 @@
 """홈 화면에 필요한 사용자·큐브·친밀도 조회 로직."""
 
-from datetime import timedelta, timezone
-
 from sqlalchemy import case, select
 from sqlalchemy.orm import Session, joinedload
 
@@ -17,17 +15,14 @@ from app.schemas.home import (
     HomeUserResponse,
 )
 
-CURRENT_USER_ID = 1
-KOREA_TIMEZONE = timezone(timedelta(hours=9))
 
-
-def get_home(db: Session) -> HomeResponse:
-    """로그인 구현 전 고정 사용자 ID 1의 홈 정보를 ORM으로 조회합니다."""
+def get_home(*, db: Session, current_user_id: int) -> HomeResponse:
+    """현재 사용자의 홈 정보를 ORM으로 조회합니다."""
     # 홈 응답에 필요한 연관 객체를 한 번에 가져옵니다. ACTIVE 소유권이 있으면
     # 우선하고, 없으면 최근 비활성 소유권을 반환해 403과 404를 구분합니다.
     ownership = db.scalars(
         select(CubeOwnership)
-        .where(CubeOwnership.user_id == CURRENT_USER_ID)
+        .where(CubeOwnership.user_id == current_user_id)
         .options(
             joinedload(CubeOwnership.user),
             joinedload(CubeOwnership.cube),
@@ -60,13 +55,13 @@ def get_home(db: Session) -> HomeResponse:
     user = ownership.user
     cube = ownership.cube
     affinity = ownership.affinity
+    if affinity is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_AFFINITY_NOT_FOUND",
+            message="큐브 친밀도 정보를 찾을 수 없습니다.",
+        )
     level = affinity.level_info
-
-    acquired_at = ownership.acquired_at
-    if acquired_at.tzinfo is None:
-        acquired_at = acquired_at.replace(tzinfo=KOREA_TIMEZONE)
-    else:
-        acquired_at = acquired_at.astimezone(KOREA_TIMEZONE)
 
     return HomeResponse(
         user=HomeUserResponse(
@@ -76,7 +71,7 @@ def get_home(db: Session) -> HomeResponse:
         cube_ownership=HomeCubeOwnershipResponse(
             id=ownership.id,
             avatar_nickname=ownership.avatar_nickname,
-            acquired_at=acquired_at,
+            acquired_at=ownership.acquired_at,
         ),
         cube=HomeCubeResponse(id=cube.id, artist_name=cube.artist_name),
         affinity=HomeAffinityResponse(

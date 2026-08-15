@@ -12,8 +12,8 @@
 
 한 번의 호출당 20개의 사진으로 페이징해서 전송한다. `size`는 20으로 고정한다.
 
-- 로그인 구현 전이므로 고정 사용자 ID 1을 사용한다.
-- 캡처 이미지는 고정 사용자 ID 1의 `ACTIVE` 큐브 소유권에 연결된 항목만 반환한다.
+- 로그인 구현 전에는 mock 현재 사용자 ID 1을 사용한다.
+- 캡처 이미지는 현재 사용자의 `ACTIVE` 큐브 소유권에 연결된 항목만 반환한다.
 - 앨범 이미지는 사용자 소유권과 무관하게 전체 앨범 이미지를 반환한다.
 - `ALBUM` 카테고리는 `album_image.image_type = ALBUM_IMAGE`인 항목만 의미한다.
 - `CONCERT_STILLCUT` 카테고리는 `album_image.image_type = CONCERT_STILLCUT`인 항목만 의미한다.
@@ -132,7 +132,7 @@ Status Code : 200
 
 - `sourceType`은 `STAGE_CAPTURE`, `TRACK_CAPTURE`만 허용한다.
 - `INTERACTION_CAPTURE`, `ALBUM_IMAGE` 등 지원하지 않는 `sourceType`은 공통 400 `INVALID_REQUEST`를 반환한다.
-- 고정 사용자 ID 1의 `ACTIVE` 큐브 소유권에 속한 캡처만 조회할 수 있다.
+- 현재 사용자의 `ACTIVE` 큐브 소유권에 속한 캡처만 조회할 수 있다.
 - 삭제된 캡처(`deleted_at`이 null이 아닌 항목)는 조회하지 않는다.
 - 스테이지의 `requiredMode`는 항상 `AR`이다.
 - 트랙의 `requiredMode`는 항상 `SPECIAL`이다.
@@ -234,7 +234,7 @@ Status Code : 404
 
 - 삭제 가능 항목은 `STAGE_CAPTURE`, `TRACK_CAPTURE`, `INTERACTION_CAPTURE`뿐이다.
 - `ALBUM_IMAGE` 등 사용자가 직접 저장한 캡처가 아닌 항목은 삭제할 수 없다.
-- 고정 사용자 ID 1의 `ACTIVE` 큐브 소유권에 속한 캡처만 삭제할 수 있다.
+- 현재 사용자의 `ACTIVE` 큐브 소유권에 속한 캡처만 삭제할 수 있다.
 - 이미 삭제된 항목(`deleted_at`이 null이 아닌 항목)은 찾을 수 없는 항목으로 처리한다.
 - Azure Blob Storage의 실제 이미지 파일은 삭제하지 않는다.
 - 삭제 시각은 한국 시간 기준으로 `deleted_at`에 저장한다.

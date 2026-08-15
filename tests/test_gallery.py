@@ -102,7 +102,7 @@ def test_gallery_returns_merged_items_sorted_by_date_and_id() -> None:
             category="CAPTURE",
             image_url="stage_capture_001",
             display_date=date(2026, 8, 7),
-            sort_at=datetime(2026, 8, 7, 10, 30),
+            sort_at=datetime(2026, 8, 7, 10, 30),  # noqa: DTZ001
         ),
         make_row(
             id=2,
@@ -110,7 +110,7 @@ def test_gallery_returns_merged_items_sorted_by_date_and_id() -> None:
             category="CAPTURE",
             image_url="track_capture_002",
             display_date=date(2026, 8, 7),
-            sort_at=datetime(2026, 8, 7, 11, 10),
+            sort_at=datetime(2026, 8, 7, 11, 10),  # noqa: DTZ001
         ),
         make_row(
             id=3,

@@ -2,9 +2,8 @@
 
 from enum import StrEnum
 
-from pydantic import BaseModel
-
 from app.models.enums import StageViewMode
+from app.schemas.base import ApiSchema
 
 
 class StageSessionEndStatus(StrEnum):
@@ -14,21 +13,20 @@ class StageSessionEndStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
-class StageSessionCreateRequest(BaseModel):
-    # API 명세의 JSON 키를 그대로 필드명으로 사용해 별도 alias 변환을 없앴습니다.
-    viewMode: StageViewMode
+class StageSessionCreateRequest(ApiSchema):
+    view_mode: StageViewMode
 
 
-class StageSessionResponse(BaseModel):
+class StageSessionResponse(ApiSchema):
     id: int
-    viewMode: StageViewMode
+    view_mode: StageViewMode
 
 
-class StageSessionCreateResponse(BaseModel):
-    stageSession: StageSessionResponse
+class StageSessionCreateResponse(ApiSchema):
+    stage_session: StageSessionResponse
 
 
-class StageSessionUpdateRequest(BaseModel):
+class StageSessionUpdateRequest(ApiSchema):
     status: StageSessionEndStatus
-    lastPositionSeconds: int
-    viewedSeconds: int
+    last_position_seconds: int
+    viewed_seconds: int

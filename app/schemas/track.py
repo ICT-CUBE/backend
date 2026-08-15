@@ -2,22 +2,21 @@
 
 from enum import StrEnum
 
-from pydantic import BaseModel
-
 from app.models.enums import TrackPlayMode
+from app.schemas.base import ApiSchema
 
 
-class TrackSessionCreateRequest(BaseModel):
-    playMode: TrackPlayMode
+class TrackSessionCreateRequest(ApiSchema):
+    play_mode: TrackPlayMode
 
 
-class TrackSessionResponse(BaseModel):
+class TrackSessionResponse(ApiSchema):
     id: int
-    playMode: TrackPlayMode
+    play_mode: TrackPlayMode
 
 
-class TrackSessionCreateResponse(BaseModel):
-    trackSession: TrackSessionResponse
+class TrackSessionCreateResponse(ApiSchema):
+    track_session: TrackSessionResponse
 
 
 class TrackSessionEndStatus(StrEnum):
@@ -25,8 +24,8 @@ class TrackSessionEndStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
-class TrackSessionUpdateRequest(BaseModel):
+class TrackSessionUpdateRequest(ApiSchema):
     # 숫자 범위는 검증하지 않고 세 필드가 전달됐는지만 확인합니다.
     status: TrackSessionEndStatus
-    lastPositionSeconds: int
-    viewedSeconds: int
+    last_position_seconds: int
+    viewed_seconds: int

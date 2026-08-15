@@ -2,79 +2,80 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
 from app.models.enums import ConversationType
+from app.schemas.base import ApiSchema
 
 
-class ConversationLastMessageResponse(BaseModel):
+class ConversationLastMessageResponse(ApiSchema):
     id: int
     content: str | None
-    sentAt: datetime
+    sent_at: datetime
 
 
-class ConversationSessionResponse(BaseModel):
+class ConversationSessionResponse(ApiSchema):
     id: int
-    conversationType: ConversationType
-    conversationTitle: str | None
-    audioUrl: str | None
-    audioDurationSeconds: int | None
-    lastMessage: ConversationLastMessageResponse
+    conversation_type: ConversationType
+    conversation_title: str | None
+    audio_url: str | None
+    audio_duration_seconds: int | None
+    last_message: ConversationLastMessageResponse
 
 
-class ConversationPaginationResponse(BaseModel):
+class ConversationPaginationResponse(ApiSchema):
     page: int
     size: int
-    hasNext: bool
+    has_next: bool
 
 
-class ConversationSessionsResponse(BaseModel):
-    conversationSessions: list[ConversationSessionResponse]
+class ConversationSessionsResponse(ApiSchema):
+    conversation_sessions: list[ConversationSessionResponse]
     pagination: ConversationPaginationResponse
 
 
-class ConversationSessionCreateRequest(BaseModel):
-    conversationType: ConversationType
+class ConversationSessionCreateRequest(ApiSchema):
+    conversation_type: ConversationType
 
 
-class ConversationSessionCreateItemResponse(BaseModel):
+class ConversationSessionCreateItemResponse(ApiSchema):
     id: int
-    conversationType: ConversationType
+    conversation_type: ConversationType
 
 
-class ConversationSessionCreateResponse(BaseModel):
-    conversationSession: ConversationSessionCreateItemResponse
+class ConversationSessionCreateResponse(ApiSchema):
+    conversation_session: ConversationSessionCreateItemResponse
 
 
-class ConversationDetailMessageResponse(BaseModel):
+class ConversationDetailMessageResponse(ApiSchema):
     id: int
-    senderType: str
+    sender_type: str
     content: str
-    sequenceNumber: int
-    sentAt: datetime
+    sequence_number: int
+    sent_at: datetime
 
 
-class ConversationDetailSessionResponse(BaseModel):
+class ConversationDetailSessionResponse(ApiSchema):
     id: int
     messages: list[ConversationDetailMessageResponse]
 
 
-class ConversationDetailResponse(BaseModel):
-    conversationSession: ConversationDetailSessionResponse
+class ConversationDetailResponse(ApiSchema):
+    conversation_session: ConversationDetailSessionResponse
 
 
-class ConversationMessageSaveItemResponse(BaseModel):
+class ConversationMessageSaveItemResponse(ApiSchema):
     id: int
-    isTextSaved: bool
+    is_text_saved: bool
 
 
-class ConversationMessageSaveResponse(BaseModel):
-    conversationMessage: ConversationMessageSaveItemResponse
+class ConversationMessageSaveResponse(ApiSchema):
+    conversation_message: ConversationMessageSaveItemResponse
 
 
-class ConversationMessageReplyRequest(BaseModel):
+class ConversationMessageReplyRequest(ApiSchema):
     content: str
-    imageUrls: list[str] = Field(default_factory=list, max_length=5)
+    image_urls: list[str] = Field(default_factory=list, max_length=5)
 
     @field_validator("content")
     @classmethod
@@ -84,15 +85,15 @@ class ConversationMessageReplyRequest(BaseModel):
         return value
 
 
-class ConversationMessageReplyItemResponse(BaseModel):
+class ConversationMessageReplyItemResponse(ApiSchema):
     id: int
-    senderType: str
+    sender_type: str
     content: str
-    imageUrls: list[str] | None = None      # 프론트에서 키 자체를 안보낼수도 있고 그러면 imageUrls = None임.
-    sequenceNumber: int
-    sentAt: datetime
+    image_urls: list[str] | None = None
+    sequence_number: int
+    sent_at: datetime
 
 
-class ConversationMessageReplyResponse(BaseModel):
-    userMessage: ConversationMessageReplyItemResponse
-    avatarMessage: ConversationMessageReplyItemResponse
+class ConversationMessageReplyResponse(ApiSchema):
+    user_message: ConversationMessageReplyItemResponse
+    avatar_message: ConversationMessageReplyItemResponse

@@ -1,7 +1,7 @@
 """아바타 소환 세션 생성·저장 로직."""
 
 from datetime import datetime, timedelta, timezone
-from typing import BinaryIO, cast
+from typing import BinaryIO
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -26,27 +26,30 @@ from app.services.blob_storage import (
     upload_avatar_interaction_picture,
 )
 
-CURRENT_USER_ID = 1
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
 
 
 def create_avatar_interaction_session(
     *,
     db: Session,
+    current_user_id: int,
 ) -> AvatarInteractionSessionCreateResponse:
     """현재 사용자의 활성 큐브 소유권에 아바타 소환 세션을 생성합니다."""
-    ownership = cast(
-        CubeOwnership,
-        db.scalar(
-            select(CubeOwnership)
-            .where(
-                CubeOwnership.user_id == CURRENT_USER_ID,
-                CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
-                CubeOwnership.is_last_accessed.is_(True),
-            )
-            .limit(1)
+    ownership = db.scalar(
+        select(CubeOwnership)
+        .where(
+                CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
         )
+        .limit(1)
     )
+    if ownership is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_OWNERSHIP_NOT_FOUND",
+            message="큐브 소유권 정보를 찾을 수 없습니다.",
+        )
 
     interaction_session = AvatarInteractionSession(
         cube_ownership_id=ownership.id,
@@ -64,7 +67,7 @@ def create_avatar_interaction_session(
         raise
 
     return AvatarInteractionSessionCreateResponse(
-        avatarInteractionSession=AvatarInteractionSessionCreateItemResponse(
+        avatar_interaction_session=AvatarInteractionSessionCreateItemResponse(
             id=interaction_session_id,
         )
     )
@@ -79,11 +82,11 @@ def get_yezul_frames(*, db: Session) -> YezulFramesResponse:
     ).all()
 
     return YezulFramesResponse(
-        yezulFrames=[
+        yezul_frames=[
             YezulFrameResponse(
                 id=frame.id,
                 title=frame.title,
-                imageUrl=frame.album_contents_img_url,
+                image_url=frame.album_contents_img_url,
             )
             for frame in frames
         ]
@@ -93,6 +96,7 @@ def get_yezul_frames(*, db: Session) -> YezulFramesResponse:
 def save_avatar_interaction_session(
     *,
     db: Session,
+    current_user_id: int,
     avatar_interaction_session_id: int,
 ) -> None:
     """아바타 소환 세션을 종료 상태로 저장합니다."""
@@ -101,7 +105,7 @@ def save_avatar_interaction_session(
         .join(AvatarInteractionSession.cube_ownership)
         .where(
             AvatarInteractionSession.id == avatar_interaction_session_id,
-            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.user_id == current_user_id,
             CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
         )
         .limit(1)
@@ -135,6 +139,7 @@ def save_avatar_interaction_session(
 def save_avatar_interaction_picture(
     *,
     db: Session,
+    current_user_id: int,
     avatar_interaction_session_id: int,
     image_file: BinaryIO,
     image_content_type: str | None,
@@ -147,7 +152,7 @@ def save_avatar_interaction_picture(
         .join(AvatarInteractionSession.cube_ownership)
         .where(
             AvatarInteractionSession.id == avatar_interaction_session_id,
-            CubeOwnership.user_id == CURRENT_USER_ID,
+            CubeOwnership.user_id == current_user_id,
             CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
         )
         .limit(1)
@@ -171,7 +176,7 @@ def save_avatar_interaction_picture(
         image_url = upload_avatar_interaction_picture(
             file=image_file,
             content_type=normalized_content_type,
-            user_id=CURRENT_USER_ID,
+            user_id=current_user_id,
             avatar_interaction_session_id=interaction_session.id,
         )
     except Exception as exc:
@@ -181,11 +186,10 @@ def save_avatar_interaction_picture(
             message="서버 내부 오류가 발생했습니다.",
         ) from exc
 
-    pictured_at_kst = pictured_at.astimezone(KOREA_TIMEZONE).replace(tzinfo=None)
     picture = AvatarInteractionPicture(
         interaction_session_id=interaction_session.id,
         picture_img_url=image_url,
-        pictured_at=pictured_at_kst,
+        pictured_at=pictured_at,
         deleted_at=None,
     )
     try:

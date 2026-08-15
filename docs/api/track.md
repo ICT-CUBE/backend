@@ -194,7 +194,7 @@ Status Code : 409
 ```json
 image: <이미지 파일>
 capturedPositionSeconds: 74
-capturedAt: 2026-07-29T15:05:20+09:00
+capturedAt: 2026-07-29T15:05:20
 ```
 
 - `image`: 프론트 임시 저장소에 있는 실제 이미지 파일
@@ -204,7 +204,7 @@ capturedAt: 2026-07-29T15:05:20+09:00
     반환
 - `capturedPositionSeconds`: 이미지를 촬영했을 때의 영상 재생 위치
 - `capturedAt`: 실제 이미지를 촬영한 시각
-    - KST 오프셋(+09:00) 포함 문자열로 보내줘야 한다. (한국 시간 사용)
+    - 한국시간 기준 offset 없는 문자열로 보내줘야 한다.
 
 `capturedAt`은 Gallery 저장 버튼을 누른 시각이 아니라 원래 사진을 촬영한 시각이다.
 

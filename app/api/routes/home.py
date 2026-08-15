@@ -1,10 +1,11 @@
-"""홈 도메인 API 라우터."""
+"""홈 화면 API 라우터."""
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from app.core.auth import get_current_user_id
 from app.core.database import get_db
 from app.schemas.common import ErrorResponse
 from app.schemas.home import HomeResponse
@@ -17,8 +18,8 @@ router = APIRouter()
     "/home",
     response_model=HomeResponse,
     summary="홈 정보 조회",
-    description="로그인 구현 전 고정 사용자 ID 1의 홈 화면 정보를 조회합니다.",
-    responses={     ## Swagger 문서에 “이 API가 이런 오류 응답도 줄 수 있다”라고 표시해주는 설정.
+    description="현재 사용자의 홈 화면 정보를 조회합니다.",
+    responses={
         status.HTTP_403_FORBIDDEN: {
             "model": ErrorResponse,
             "description": "소유권은 존재하지만 ACTIVE 상태가 아님",
@@ -33,18 +34,33 @@ router = APIRouter()
         },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "사용자의 큐브 소유권이 존재하지 않음",
+            "description": "큐브 소유권 또는 친밀도 정보가 존재하지 않음",
             "content": {
                 "application/json": {
-                    "example": {
-                        "code": "CUBE_OWNERSHIP_NOT_FOUND",
-                        "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+                    "examples": {
+                        "cubeOwnershipNotFound": {
+                            "summary": "큐브 소유권 없음",
+                            "value": {
+                                "code": "CUBE_OWNERSHIP_NOT_FOUND",
+                                "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+                            },
+                        },
+                        "cubeAffinityNotFound": {
+                            "summary": "큐브 친밀도 없음",
+                            "value": {
+                                "code": "CUBE_AFFINITY_NOT_FOUND",
+                                "message": "큐브 친밀도 정보를 찾을 수 없습니다.",
+                            },
+                        },
                     }
                 }
             },
         },
     },
 )
-def read_home(db: Annotated[Session, Depends(get_db)]) -> HomeResponse:
+def read_home(
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> HomeResponse:
     """GET /api/v1/users/me/home"""
-    return get_home(db)
+    return get_home(db=db, current_user_id=current_user_id)

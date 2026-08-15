@@ -29,7 +29,6 @@ from app.schemas.gallery import (
     GalleryTrackResponse,
 )
 
-CURRENT_USER_ID = 1
 GALLERY_PAGE_SIZE = 20
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
 
@@ -46,28 +45,24 @@ def _date_value(value: Any) -> date:
 
 def _sort_datetime(value: Any) -> datetime:
     if isinstance(value, datetime):
-        if value.tzinfo is None:
-            return value.replace(tzinfo=KOREA_TIMEZONE)
-        return value.astimezone(KOREA_TIMEZONE)
+        return value
     if isinstance(value, date):
-        return datetime.combine(value, time.min, tzinfo=KOREA_TIMEZONE)
+        return datetime.combine(value, time.min)
     if isinstance(value, str):
-        parsed = datetime.fromisoformat(value[:19])
-        if parsed.tzinfo is None:
-            return parsed.replace(tzinfo=KOREA_TIMEZONE)
-        return parsed.astimezone(KOREA_TIMEZONE)
+        return datetime.fromisoformat(value[:19])
     raise TypeError(f"Unsupported sort date value: {value!r}")
 
 
 def _gallery_sort_key(row: Any) -> tuple[datetime, int]:
     if row["source_type"] == GallerySourceType.ALBUM_IMAGE.value:
-        return datetime.min.replace(tzinfo=KOREA_TIMEZONE), -int(row["sort_id"])
+        return datetime.min, -int(row["sort_id"])  # noqa: DTZ901
     return _sort_datetime(row["sort_at"]), int(row["sort_id"])
 
 
 def get_gallery(
     *,
     db: Session,
+    current_user_id: int,
     category: GalleryCategory,
     page: int,
 ) -> GalleryResponse:
@@ -77,9 +72,9 @@ def get_gallery(
     if category in (GalleryCategory.ALL, GalleryCategory.CAPTURE):
         statements.extend(
             [
-                _stage_capture_query(),
-                _track_capture_query(),
-                _interaction_capture_query(),
+                _stage_capture_query(current_user_id),
+                _track_capture_query(current_user_id),
+                _interaction_capture_query(current_user_id),
             ]
         )
 
@@ -101,11 +96,11 @@ def get_gallery(
 
     if not statements:
         return GalleryResponse(
-            galleryItems=[],
+            gallery_items=[],
             pagination=GalleryPaginationResponse(
                 page=page,
                 size=GALLERY_PAGE_SIZE,
-                hasNext=False,
+                has_next=False,
             ),
         )
 
@@ -123,20 +118,20 @@ def get_gallery(
     has_next = len(page_rows) > GALLERY_PAGE_SIZE
 
     return GalleryResponse(
-        galleryItems=[
+        gallery_items=[
             GalleryItemResponse(
                 id=row["id"],
-                sourceType=GallerySourceType(row["source_type"]),
+                source_type=GallerySourceType(row["source_type"]),
                 category=GalleryCategory(row["category"]),
-                imageUrl=row["image_url"],
-                displayDate=_date_value(row["display_date"]),
+                image_url=row["image_url"],
+                display_date=_date_value(row["display_date"]),
             )
             for row in page_rows[:GALLERY_PAGE_SIZE]
         ],
         pagination=GalleryPaginationResponse(
             page=page,
             size=GALLERY_PAGE_SIZE,
-            hasNext=has_next,
+            has_next=has_next,
         ),
     )
 
@@ -144,6 +139,7 @@ def get_gallery(
 def get_gallery_ar_experience(
     *,
     db: Session,
+    current_user_id: int,
     source_type: GalleryArExperienceSourceType,
     gallery_item_id: int,
 ) -> GalleryArExperienceResponse:
@@ -151,11 +147,13 @@ def get_gallery_ar_experience(
     if source_type == GalleryArExperienceSourceType.STAGE_CAPTURE:
         return _get_stage_ar_experience(
             db=db,
+            current_user_id=current_user_id,
             gallery_item_id=gallery_item_id,
         )
     if source_type == GalleryArExperienceSourceType.TRACK_CAPTURE:
         return _get_track_ar_experience(
             db=db,
+            current_user_id=current_user_id,
             gallery_item_id=gallery_item_id,
         )
 
@@ -169,16 +167,19 @@ def get_gallery_ar_experience(
 def delete_gallery_item(
     *,
     db: Session,
+    current_user_id: int,
     source_type: GalleryDeletableSourceType,
     gallery_item_id: int,
 ) -> None:
     """사용자 캡처 갤러리 항목을 소프트 딜리트합니다."""
     if source_type == GalleryDeletableSourceType.STAGE_CAPTURE:
-        capture = _get_deletable_stage_capture(db, gallery_item_id)
+        capture = _get_deletable_stage_capture(db, current_user_id, gallery_item_id)
     elif source_type == GalleryDeletableSourceType.TRACK_CAPTURE:
-        capture = _get_deletable_track_capture(db, gallery_item_id)
+        capture = _get_deletable_track_capture(db, current_user_id, gallery_item_id)
     elif source_type == GalleryDeletableSourceType.INTERACTION_CAPTURE:
-        capture = _get_deletable_interaction_picture(db, gallery_item_id)
+        capture = _get_deletable_interaction_picture(
+            db, current_user_id, gallery_item_id
+        )
     else:
         raise ApiError(
             status_code=400,
@@ -201,15 +202,16 @@ def delete_gallery_item(
         raise
 
 
-def _active_ownership_conditions() -> tuple[Any, ...]:
+def _active_ownership_conditions(current_user_id: int) -> tuple[Any, ...]:
     return (
-        CubeOwnership.user_id == CURRENT_USER_ID,
+        CubeOwnership.user_id == current_user_id,
         CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
     )
 
 
 def _get_deletable_stage_capture(
     db: Session,
+    current_user_id: int,
     gallery_item_id: int,
 ) -> StageCapture | None:
     return db.scalar(
@@ -218,7 +220,7 @@ def _get_deletable_stage_capture(
         .join(StageSession.cube_ownership)
         .where(
             StageCapture.id == gallery_item_id,
-            *_active_ownership_conditions(),
+            *_active_ownership_conditions(current_user_id),
             StageCapture.deleted_at.is_(None),
         )
         .limit(1)
@@ -228,6 +230,7 @@ def _get_deletable_stage_capture(
 
 def _get_deletable_track_capture(
     db: Session,
+    current_user_id: int,
     gallery_item_id: int,
 ) -> TrackCapture | None:
     return db.scalar(
@@ -236,7 +239,7 @@ def _get_deletable_track_capture(
         .join(TrackSession.cube_ownership)
         .where(
             TrackCapture.id == gallery_item_id,
-            *_active_ownership_conditions(),
+            *_active_ownership_conditions(current_user_id),
             TrackCapture.deleted_at.is_(None),
         )
         .limit(1)
@@ -246,6 +249,7 @@ def _get_deletable_track_capture(
 
 def _get_deletable_interaction_picture(
     db: Session,
+    current_user_id: int,
     gallery_item_id: int,
 ) -> AvatarInteractionPicture | None:
     return db.scalar(
@@ -254,7 +258,7 @@ def _get_deletable_interaction_picture(
         .join(AvatarInteractionSession.cube_ownership)
         .where(
             AvatarInteractionPicture.id == gallery_item_id,
-            *_active_ownership_conditions(),
+            *_active_ownership_conditions(current_user_id),
             AvatarInteractionPicture.deleted_at.is_(None),
         )
         .limit(1)
@@ -265,6 +269,7 @@ def _get_deletable_interaction_picture(
 def _get_stage_ar_experience(
     *,
     db: Session,
+    current_user_id: int,
     gallery_item_id: int,
 ) -> GalleryArExperienceResponse:
     capture = db.scalar(
@@ -273,7 +278,7 @@ def _get_stage_ar_experience(
         .join(StageSession.cube_ownership)
         .where(
             StageCapture.id == gallery_item_id,
-            *_active_ownership_conditions(),
+            *_active_ownership_conditions(current_user_id),
             StageCapture.deleted_at.is_(None),
         )
         .options(joinedload(StageCapture.stage_session).joinedload(StageSession.stage))
@@ -288,15 +293,15 @@ def _get_stage_ar_experience(
 
     stage = capture.stage_session.stage
     return GalleryArExperienceResponse(
-        galleryItem=GalleryArExperienceItemResponse(
-            contentType=GalleryContentType.STAGE,
-            requiredMode=GalleryRequiredMode.AR,
-            startPositionSeconds=capture.captured_position_seconds,
+        gallery_item=GalleryArExperienceItemResponse(
+            content_type=GalleryContentType.STAGE,
+            required_mode=GalleryRequiredMode.AR,
+            start_position_seconds=capture.captured_position_seconds,
             stage=GalleryStageResponse(
                 id=stage.id,
                 title=stage.title,
-                videoUrl=stage.video_url,
-                durationSeconds=stage.duration_seconds,
+                video_url=stage.video_url,
+                duration_seconds=stage.duration_seconds,
             ),
         )
     )
@@ -305,6 +310,7 @@ def _get_stage_ar_experience(
 def _get_track_ar_experience(
     *,
     db: Session,
+    current_user_id: int,
     gallery_item_id: int,
 ) -> GalleryArExperienceResponse:
     capture = db.scalar(
@@ -313,7 +319,7 @@ def _get_track_ar_experience(
         .join(TrackSession.cube_ownership)
         .where(
             TrackCapture.id == gallery_item_id,
-            *_active_ownership_conditions(),
+            *_active_ownership_conditions(current_user_id),
             TrackCapture.deleted_at.is_(None),
         )
         .options(joinedload(TrackCapture.track_session).joinedload(TrackSession.track))
@@ -328,21 +334,21 @@ def _get_track_ar_experience(
 
     track = capture.track_session.track
     return GalleryArExperienceResponse(
-        galleryItem=GalleryArExperienceItemResponse(
-            contentType=GalleryContentType.TRACK,
-            requiredMode=GalleryRequiredMode.SPECIAL,
-            startPositionSeconds=capture.captured_position_seconds,
+        gallery_item=GalleryArExperienceItemResponse(
+            content_type=GalleryContentType.TRACK,
+            required_mode=GalleryRequiredMode.SPECIAL,
+            start_position_seconds=capture.captured_position_seconds,
             track=GalleryTrackResponse(
                 id=track.id,
                 title=track.title,
-                audioUrl=track.audio_url,
-                durationSeconds=track.duration_seconds,
+                audio_url=track.audio_url,
+                duration_seconds=track.duration_seconds,
             ),
         )
     )
 
 
-def _stage_capture_query():
+def _stage_capture_query(current_user_id: int):
     return (
         select(
             StageCapture.id.label("id"),
@@ -356,13 +362,13 @@ def _stage_capture_query():
         .join(StageSession, StageCapture.stage_session_id == StageSession.id)
         .join(CubeOwnership, StageSession.cube_ownership_id == CubeOwnership.id)
         .where(
-            *_active_ownership_conditions(),
+            *_active_ownership_conditions(current_user_id),
             StageCapture.deleted_at.is_(None),
         )
     )
 
 
-def _track_capture_query():
+def _track_capture_query(current_user_id: int):
     return (
         select(
             TrackCapture.id.label("id"),
@@ -376,13 +382,13 @@ def _track_capture_query():
         .join(TrackSession, TrackCapture.track_session_id == TrackSession.id)
         .join(CubeOwnership, TrackSession.cube_ownership_id == CubeOwnership.id)
         .where(
-            *_active_ownership_conditions(),
+            *_active_ownership_conditions(current_user_id),
             TrackCapture.deleted_at.is_(None),
         )
     )
 
 
-def _interaction_capture_query():
+def _interaction_capture_query(current_user_id: int):
     return (
         select(
             AvatarInteractionPicture.id.label("id"),
@@ -403,7 +409,7 @@ def _interaction_capture_query():
             AvatarInteractionSession.cube_ownership_id == CubeOwnership.id,
         )
         .where(
-            *_active_ownership_conditions(),
+            *_active_ownership_conditions(current_user_id),
             AvatarInteractionPicture.picture_img_url.is_not(None),
             AvatarInteractionPicture.deleted_at.is_(None),
         )
