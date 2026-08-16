@@ -121,7 +121,7 @@ def playing_session() -> StageSession:
 
 def test_create_stage_session_adds_orm_model_with_initial_values() -> None:
     db = Mock(spec=Session)
-    db.scalar.side_effect = [active_stage(), active_ownership(), None]
+    db.scalar.side_effect = [active_stage(), active_ownership()]
 
     def assign_generated_id() -> None:
         db.add.call_args.args[0].id = 501
@@ -169,18 +169,6 @@ def test_create_stage_session_returns_404_without_last_active_ownership() -> Non
     }
 
 
-def test_create_stage_session_returns_409_when_already_playing() -> None:
-    db = Mock(spec=Session)
-    db.scalar.side_effect = [active_stage(), active_ownership(), 77]
-
-    response = request_stage_session(db)
-
-    assert response.status_code == 409
-    assert response.json()["code"] == "STAGE_SESSION_ALREADY_PLAYING"
-    db.rollback.assert_called_once()
-    db.add.assert_not_called()
-
-
 def test_create_stage_session_returns_400_for_invalid_view_mode() -> None:
     response = request_stage_session(Mock(spec=Session), body={"viewMode": "INVALID"})
 
@@ -201,7 +189,7 @@ def test_create_stage_session_does_not_apply_positive_path_validation() -> None:
 def test_stage_session_swagger_responses() -> None:
     operation = app.openapi()["paths"]["/api/v1/stages/{stageId}/sessions"]["post"]
 
-    assert set(operation["responses"]) == {"201", "404", "409"}
+    assert set(operation["responses"]) == {"201", "404"}
     assert "security" not in operation
 
 

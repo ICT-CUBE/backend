@@ -154,7 +154,7 @@ def test_gallery_returns_merged_items_sorted_by_date_and_id() -> None:
     db.execute.assert_called_once()
 
 
-def test_gallery_uses_fixed_size_and_has_next() -> None:
+def test_gallery_uses_requested_size_and_has_next() -> None:
     db = Mock(spec=Session)
     db.execute.return_value = gallery_rows(
         *[
@@ -170,12 +170,36 @@ def test_gallery_uses_fixed_size_and_has_next() -> None:
         ]
     )
 
-    response = request_gallery(db, "?category=ALBUM&page=0&size=20")
+    response = request_gallery(db, "?category=ALBUM&page=0&size=10")
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body["galleryItems"]) == 20
-    assert body["pagination"] == {"page": 0, "size": 20, "hasNext": True}
+    assert len(body["galleryItems"]) == 10
+    assert body["pagination"] == {"page": 0, "size": 10, "hasNext": True}
+
+
+def test_gallery_requested_size_changes_page_offset() -> None:
+    db = Mock(spec=Session)
+    db.execute.return_value = gallery_rows(
+        *[
+            make_row(
+                id=index,
+                source_type="ALBUM_IMAGE",
+                category="ALBUM",
+                image_url=f"album_image_{index}",
+                display_date=date(2026, 8, 1),
+                sort_at=date(2026, 8, 1),
+            )
+            for index in range(1, 22)
+        ]
+    )
+
+    response = request_gallery(db, "?category=ALBUM&page=1&size=10")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["id"] for item in body["galleryItems"]] == list(range(11, 21))
+    assert body["pagination"] == {"page": 1, "size": 10, "hasNext": True}
 
 
 def test_gallery_sorts_album_images_by_id_ascending() -> None:
@@ -205,10 +229,10 @@ def test_gallery_sorts_album_images_by_id_ascending() -> None:
     assert [item["id"] for item in response.json()["galleryItems"]] == [1, 3]
 
 
-def test_gallery_rejects_non_fixed_size_with_common_400() -> None:
+def test_gallery_rejects_size_less_than_one_with_common_400() -> None:
     db = Mock(spec=Session)
 
-    response = request_gallery(db, "?size=10")
+    response = request_gallery(db, "?size=0")
 
     assert response.status_code == 400
     assert response.json() == {

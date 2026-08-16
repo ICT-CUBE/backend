@@ -57,23 +57,6 @@ def create_stage_session(
             message="큐브 소유권 정보를 찾을 수 없습니다.",
         )
 
-    playing_session_id = db.scalar(
-        select(StageSession.id)
-        .where(
-            StageSession.cube_ownership_id == ownership.id,
-            StageSession.stage_id == stage.id,
-            StageSession.status == StageSessionStatus.PLAYING,
-        )
-        .limit(1)
-    )
-    if playing_session_id is not None:
-        db.rollback()
-        raise ApiError(
-            status_code=409,
-            code="STAGE_SESSION_ALREADY_PLAYING",
-            message="이미 재생 중인 스테이지 세션이 있습니다.",
-        )
-
     stage_session = StageSession(
         cube_ownership_id=ownership.id,
         stage_id=stage.id,

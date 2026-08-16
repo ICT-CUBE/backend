@@ -277,7 +277,7 @@ def test_voice_conversation_sessions_return_null_content_and_audio_fields() -> N
     }
 
 
-def test_conversation_sessions_use_fixed_size_and_has_next() -> None:
+def test_conversation_sessions_use_requested_size_and_has_next() -> None:
     db = Mock(spec=Session)
     db.execute.return_value = conversation_result(
         *[
@@ -289,12 +289,35 @@ def test_conversation_sessions_use_fixed_size_and_has_next() -> None:
         ]
     )
 
-    response = request_conversation_sessions(db)
+    response = request_conversation_sessions(db, "?conversationType=TEXT&size=10")
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body["conversationSessions"]) == 20
-    assert body["pagination"] == {"page": 0, "size": 20, "hasNext": True}
+    assert len(body["conversationSessions"]) == 10
+    assert body["pagination"] == {"page": 0, "size": 10, "hasNext": True}
+
+
+def test_conversation_sessions_requested_size_changes_page_offset() -> None:
+    db = Mock(spec=Session)
+    db.execute.return_value = conversation_result(
+        *[
+            (
+                session(id=index, conversation_type=ConversationType.TEXT),
+                message(id=index),
+            )
+            for index in range(11, 22)
+        ]
+    )
+
+    response = request_conversation_sessions(
+        db,
+        "?conversationType=TEXT&page=1&size=10",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["id"] for item in body["conversationSessions"]] == list(range(11, 21))
+    assert body["pagination"] == {"page": 1, "size": 10, "hasNext": True}
 
 
 def test_conversation_sessions_return_empty_list() -> None:
@@ -310,10 +333,10 @@ def test_conversation_sessions_return_empty_list() -> None:
     }
 
 
-def test_conversation_sessions_reject_invalid_query_with_common_400() -> None:
+def test_conversation_sessions_reject_size_less_than_one_with_common_400() -> None:
     db = Mock(spec=Session)
 
-    response = request_conversation_sessions(db, "?conversationType=TEXT&size=10")
+    response = request_conversation_sessions(db, "?conversationType=TEXT&size=0")
 
     assert response.status_code == 400
     assert response.json() == {

@@ -73,6 +73,7 @@ def get_conversation_sessions(
     current_user_id: int,
     conversation_type: ConversationType,
     page: int,
+    size: int,
 ) -> ConversationSessionsResponse:
     """마지막 메시지가 있는 대화 세션 목록을 최신순으로 반환합니다."""
     last_sequence = (
@@ -112,12 +113,12 @@ def get_conversation_sessions(
             AvatarConversationSession.deleted_at.is_(None),
         )
         .order_by(AvatarConversationMessage.sent_at.desc())
-        .offset(page * CONVERSATION_PAGE_SIZE)
-        .limit(CONVERSATION_PAGE_SIZE + 1)
+        .offset(page * size)
+        .limit(size + 1)
     ).all()
 
-    page_rows = rows[:CONVERSATION_PAGE_SIZE]
-    has_next = len(rows) > CONVERSATION_PAGE_SIZE
+    page_rows = rows[:size]
+    has_next = len(rows) > size
 
     return ConversationSessionsResponse(
         conversation_sessions=[
@@ -129,7 +130,7 @@ def get_conversation_sessions(
         ],
         pagination=ConversationPaginationResponse(
             page=page,
-            size=CONVERSATION_PAGE_SIZE,
+            size=size,
             has_next=has_next,
         ),
     )

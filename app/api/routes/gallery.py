@@ -31,7 +31,7 @@ router = APIRouter()
     summary="갤러리 조회",
     description=(
         "앨범 이미지 전체와 현재 사용자의 활성 소유권에 속한 캡처 이미지를 "
-        "20개 단위로 조회합니다."
+        "요청한 size 단위로 조회합니다."
     ),
 )
 def read_gallery(
@@ -39,17 +39,15 @@ def read_gallery(
     current_user_id: Annotated[int, Depends(get_current_user_id)],
     category: Annotated[GalleryCategory, Query()] = GalleryCategory.ALL,
     page: Annotated[int, Query(ge=0)] = 0,
-    size: Annotated[int, Query(ge=GALLERY_PAGE_SIZE, le=GALLERY_PAGE_SIZE)] = (
-        GALLERY_PAGE_SIZE
-    ),
+    size: Annotated[int, Query(ge=1)] = GALLERY_PAGE_SIZE,
 ) -> GalleryResponse:
     """GET /api/v1/users/me/gallery"""
-    _ = size
     return get_gallery(
         db=db,
         current_user_id=current_user_id,
         category=category,
         page=page,
+        size=size,
     )
 
 

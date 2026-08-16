@@ -126,7 +126,7 @@ def playing_track_session() -> TrackSession:
 def test_create_track_session_adds_orm_model_with_initial_values() -> None:
     db = Mock(spec=Session)
     db.get.return_value = track()
-    db.scalar.side_effect = [ownership(), None]
+    db.scalar.return_value = ownership()
 
     def assign_generated_id() -> None:
         db.add.call_args.args[0].id = 601
@@ -182,22 +182,6 @@ def test_create_track_session_returns_404_without_active_ownership() -> None:
     }
 
 
-def test_create_track_session_returns_409_for_same_playing_track() -> None:
-    db = Mock(spec=Session)
-    db.get.return_value = track()
-    db.scalar.side_effect = [ownership(), 77]
-
-    response = request_track_session(db, body={"playMode": "SPECIAL"})
-
-    assert response.status_code == 409
-    assert response.json() == {
-        "code": "TRACK_SESSION_ALREADY_PLAYING",
-        "message": "이미 재생 중인 트랙 세션이 있습니다.",
-    }
-    db.rollback.assert_called_once()
-    db.add.assert_not_called()
-
-
 def test_create_track_session_returns_common_400_when_body_is_missing() -> None:
     db = Mock(spec=Session)
 
@@ -211,7 +195,7 @@ def test_create_track_session_returns_common_400_when_body_is_missing() -> None:
 def test_track_session_swagger_responses() -> None:
     operation = app.openapi()["paths"]["/api/v1/tracks/{trackId}/sessions"]["post"]
 
-    assert set(operation["responses"]) == {"201", "404", "409"}
+    assert set(operation["responses"]) == {"201", "404"}
     assert "security" not in operation
 
 

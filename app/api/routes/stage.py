@@ -56,18 +56,6 @@ stage_session_router = APIRouter()
                 }
             },
         },
-        status.HTTP_409_CONFLICT: {
-            "model": ErrorResponse,
-            "description": "동일 스테이지에 이미 PLAYING 세션이 있음",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "code": "STAGE_SESSION_ALREADY_PLAYING",
-                        "message": "이미 재생 중인 스테이지 세션이 있습니다.",
-                    }
-                }
-            },
-        },
     },
 )
 def create_playback_session(
@@ -175,7 +163,7 @@ def update_playback_session(
 )
 def create_stage_capture(
     stage_session_id: Annotated[int, Path(alias="stageSessionId", ge=1)],
-    image: Annotated[UploadFile, File(description="JPEG, PNG 또는 WebP 이미지")],
+    image: Annotated[UploadFile, File(description="JPG, JPEG, PNG 또는 WebP 이미지")],
     captured_position_seconds: Annotated[
         int, Form(alias="capturedPositionSeconds")
     ],

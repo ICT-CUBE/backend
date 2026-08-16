@@ -48,7 +48,7 @@ router = APIRouter()
     summary="텍스트 및 음성 대화 조회",
     description=(
         "현재 사용자의 활성 큐브 소유권에 속한 텍스트 또는 음성 대화 "
-        "세션 목록을 마지막 메시지 최신순으로 조회합니다."
+        "세션 목록을 요청한 size 단위로 마지막 메시지 최신순 조회합니다."
     ),
 )
 def read_conversation_sessions(
@@ -59,18 +59,15 @@ def read_conversation_sessions(
         Query(alias="conversationType"),
     ],
     page: Annotated[int, Query(ge=0)] = 0,
-    size: Annotated[
-        int,
-        Query(ge=CONVERSATION_PAGE_SIZE, le=CONVERSATION_PAGE_SIZE),
-    ] = CONVERSATION_PAGE_SIZE,
+    size: Annotated[int, Query(ge=1)] = CONVERSATION_PAGE_SIZE,
 ) -> ConversationSessionsResponse:
     """GET /api/v1/users/me/conversation-sessions"""
-    _ = size
     return get_conversation_sessions(
         db=db,
         current_user_id=current_user_id,
         conversation_type=conversation_type,
         page=page,
+        size=size,
     )
 
 

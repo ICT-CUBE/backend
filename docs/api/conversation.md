@@ -1,52 +1,79 @@
 ## 텍스트 및 음성 대화 조회
-- http 메서드: get
-- 엔드포인트: api/v1/users/me/conversation-sessions
+- http 메서드: GET
+- 엔드포인트: `/api/v1/users/me/conversation-sessions`
+- 도메인: conversation
 
 ### API 설명
 
 사용자가 텍스트 대화 혹은 음성 대화를 들어가면 호출된다.
 
-텍스트  대화, 음성 대화에 맞는 대화 세션 정보를 반환한다.
+텍스트 대화 또는 음성 대화에 맞는 대화 세션 목록을 반환한다.
 
 이때 대화가 한번도 이루어지지 않은 세션은 조회하지 않는다.
 
 ---
 
+### 처리 정책
+
+- 로그인 구현 전에는 현재 사용자를 항상 id=1로 간주한다.
+- `conversationType`은 `TEXT`, `VOICE` 중 하나다.
+- `page`를 보내지 않으면 기본값은 0이다.
+- `size`를 보내지 않으면 기본값은 20이다.
+- `size`는 1 이상의 숫자를 허용한다.
+- 프론트가 전달한 `size` 값을 기준으로 페이징해서 반환한다.
+- 현재 사용자의 `ACTIVE` 큐브 소유권에 속한 대화 세션만 조회한다.
+- 삭제된 대화 세션(`deleted_at`이 null이 아닌 항목)은 반환하지 않는다.
+- 대화가 한 번도 이루어지지 않아 메시지가 없는 세션은 반환하지 않는다.
+- 세션의 마지막 메시지 기준 최신순으로 정렬한다.
+- 텍스트 대화 조회에서는 마지막 메시지의 `content`를 반환한다.
+- 음성 대화 조회에서는 마지막 메시지의 `content`를 `null`로 반환한다.
+- 음성 대화 조회에서는 세션의 `audioUrl`, `audioDurationSeconds`를 함께 반환한다.
+- 조회 결과가 없으면 빈 배열과 페이지 정보를 200으로 반환한다.
+
+---
+
 ### 요청 Query
 
-```json
-{
-	"conversationType": "TEXT",
-	"page": 0,
-	"size": 20
-}
-```
+| 필드 | 타입 | 필수 | 설명 |
+|---|---:|:---:|---|
+| `conversationType` | string | O | 조회할 대화 타입. `TEXT`, `VOICE` 중 하나 |
+| `page` | number | X | 조회할 페이지 번호. 0부터 시작 |
+| `size` | number | X | 페이지 크기. 1 이상의 숫자 |
 
-```json
-{
-  "conversationType": "VOICE",
-  "page": 0,
-  "size": 20
-}
-```
-
-요청 예시: api/v1/users/me/conversation-sessions?conversationType=TEXT&page=0&size=20
+요청 예시: /api/v1/users/me/conversation-sessions?conversationType=TEXT&page=0&size=20
 
 ---
 
 ### 요청 Path
 
+없음
+
 ---
 
 ### 요청 Body
 
+없음
+
 ---
 
 ### 정상 응답 데이터
-
 Status Code : 200
 
-- conversationType=TEXT
+| 필드 | 타입 | 설명 |
+|---|---:|---|
+| `conversationSessions[].id` | number | 대화 세션 id |
+| `conversationSessions[].conversationType` | string | 대화 타입 |
+| `conversationSessions[].conversationTitle` | string \| null | 대화 목록에 표시할 제목 |
+| `conversationSessions[].audioUrl` | string \| null | 음성 대화 녹음 파일 URL |
+| `conversationSessions[].audioDurationSeconds` | number \| null | 음성 대화 녹음 파일 길이 |
+| `conversationSessions[].lastMessage.id` | number | 마지막 메시지 id |
+| `conversationSessions[].lastMessage.content` | string \| null | 마지막 메시지 내용 |
+| `conversationSessions[].lastMessage.sentAt` | string(date-time) | 마지막 메시지 전송 시각 |
+| `pagination.page` | number | 현재 페이지 번호 |
+| `pagination.size` | number | 페이지 크기 |
+| `pagination.hasNext` | boolean | 다음 페이지 존재 여부 |
+
+`conversationType = TEXT`인 경우
 
 ```json
 {
@@ -66,7 +93,7 @@ Status Code : 200
     {
       "id": 1002,
       "conversationType": "TEXT",
-      "conversationTitle": "오늘 무대 어땠어?",
+      "conversationTitle": "오늘 의상 이야기",
       "audioUrl": null,
       "audioDurationSeconds": null,
       "lastMessage": {
@@ -84,7 +111,7 @@ Status Code : 200
 }
 ```
 
-- conversationType=VOICE
+`conversationType = VOICE`인 경우
 
 ```json
 {
@@ -122,6 +149,8 @@ Status Code : 200
 }
 ```
 
+조회 결과가 없는 경우
+
 ```json
 {
   "conversationSessions": [],
@@ -136,6 +165,7 @@ Status Code : 200
 ---
 
 ### 오류 응답 데이터
+
 
 
 

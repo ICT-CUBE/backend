@@ -56,18 +56,6 @@ track_session_router = APIRouter()
                 }
             },
         },
-        status.HTTP_409_CONFLICT: {
-            "model": ErrorResponse,
-            "description": "동일 트랙에 이미 PLAYING 세션이 있음",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "code": "TRACK_SESSION_ALREADY_PLAYING",
-                        "message": "이미 재생 중인 트랙 세션이 있습니다.",
-                    }
-                }
-            },
-        },
     },
 )
 def create_playback_session(

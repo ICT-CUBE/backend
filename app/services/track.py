@@ -58,24 +58,6 @@ def create_track_session(
             message="큐브 소유권을 찾을 수 없습니다.",
         )
 
-    # 다른 트랙의 PLAYING 세션은 검사하지 않고 같은 트랙의 중복만 막습니다.
-    playing_session_id = db.scalar(
-        select(TrackSession.id)
-        .where(
-            TrackSession.cube_ownership_id == ownership.id,
-            TrackSession.track_id == track.id,
-            TrackSession.status == TrackSessionStatus.PLAYING,
-        )
-        .limit(1)
-    )
-    if playing_session_id is not None:
-        db.rollback()
-        raise ApiError(
-            status_code=409,
-            code="TRACK_SESSION_ALREADY_PLAYING",
-            message="이미 재생 중인 트랙 세션이 있습니다.",
-        )
-
     track_session = TrackSession(
         cube_ownership_id=ownership.id,
         track_id=track.id,

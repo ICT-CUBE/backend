@@ -65,6 +65,7 @@ def get_gallery(
     current_user_id: int,
     category: GalleryCategory,
     page: int,
+    size: int,
 ) -> GalleryResponse:
     """여러 이미지 출처를 하나의 갤러리 응답으로 합쳐 반환합니다."""
     statements = []
@@ -99,7 +100,7 @@ def get_gallery(
             gallery_items=[],
             pagination=GalleryPaginationResponse(
                 page=page,
-                size=GALLERY_PAGE_SIZE,
+                size=size,
                 has_next=False,
             ),
         )
@@ -112,10 +113,10 @@ def get_gallery(
         reverse=True,
     )
 
-    start = page * GALLERY_PAGE_SIZE
-    end = start + GALLERY_PAGE_SIZE
+    start = page * size
+    end = start + size
     page_rows = sorted_rows[start : end + 1]
-    has_next = len(page_rows) > GALLERY_PAGE_SIZE
+    has_next = len(page_rows) > size
 
     return GalleryResponse(
         gallery_items=[
@@ -126,11 +127,11 @@ def get_gallery(
                 image_url=row["image_url"],
                 display_date=_date_value(row["display_date"]),
             )
-            for row in page_rows[:GALLERY_PAGE_SIZE]
+            for row in page_rows[:size]
         ],
         pagination=GalleryPaginationResponse(
             page=page,
-            size=GALLERY_PAGE_SIZE,
+            size=size,
             has_next=has_next,
         ),
     )
