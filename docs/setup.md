@@ -80,10 +80,10 @@ az webapp restart --resource-group hanium-rg --name hanium
 
 ## 자동 배포
 
-자동 배포는 `dev-v2` 브랜치 기준입니다.
+자동 배포는 `be/dev-v2` 브랜치 기준입니다.
 
 ```text
-dev-v2 push
+be/dev-v2 push
 -> GitHub Actions
 -> Docker build
 -> ACR push

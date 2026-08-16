@@ -38,7 +38,7 @@ docker compose -f docker-compose.dev.yml up --build
 
 ## 자동 배포
 
-GitHub Actions CI/CD는 `dev-v2` 브랜치 push를 기준으로 실행됩니다.
+GitHub Actions CI/CD는 `be/dev-v2` 브랜치 push를 기준으로 실행됩니다.
 
 ```text
 git push
