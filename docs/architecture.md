@@ -103,8 +103,8 @@ OPENAI_MODEL=gpt-4.1-mini
 
 ```text
 infra-init-v2 -> 인프라 초기화 작업 브랜치
-dev-v2        -> 개발 서버 자동 배포 브랜치
+be/dev-v2     -> 개발 서버 자동 배포 브랜치
 main          -> 건드리지 않음
 ```
 
-`dev-v2` 브랜치에 push되면 GitHub Actions가 Docker 이미지를 빌드하고 Azure App Service에 배포합니다.
+`be/dev-v2` 브랜치에 push되면 GitHub Actions가 Docker 이미지를 빌드하고 Azure App Service에 배포합니다.
