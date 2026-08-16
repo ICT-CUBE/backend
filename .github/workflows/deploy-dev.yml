@@ -3,7 +3,7 @@ name: Deploy Dev API
 on:
   push:
     branches:
-      - dev-v2
+      - be/dev-v2
   workflow_dispatch:
 
 env:
