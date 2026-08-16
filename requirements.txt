@@ -1,8 +1,14 @@
-fastapi==0.116.1
+fastapi==0.141.1
 uvicorn[standard]==0.35.0
-pydantic-settings==2.10.1
+pydantic==2.13.4
+pydantic-settings==2.15.0
 SQLAlchemy==2.0.42
 PyMySQL==1.1.1
 cryptography==45.0.5
 alembic==1.16.4
 gunicorn==23.0.0
+pytest==8.3.4
+httpx==0.28.1
+azure-storage-blob==12.30.0
+python-multipart==0.0.32
+openai==1.109.1

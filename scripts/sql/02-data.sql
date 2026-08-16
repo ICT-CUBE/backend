@@ -1,6 +1,6 @@
 SET NAMES utf8mb4;
 
-INSERT INTO `user` (`id`, `email`, `password_hash`, `login_provider`, `provider_user_id`, `nickname`, `profile_character_img_code`, `chat_violation_count`, `status`) VALUES
+INSERT INTO `user` (`id`, `email`, `password_hash`, `login_provider`, `provider_user_id`, `nickname`, `profile_character_img_url`, `chat_violation_count`, `status`) VALUES
 (1, 'mina@arzone.local', '$2b$12$mockhashmina', 'EMAIL', NULL, '미나', 'CHAR_MINA', 0, 'ACTIVE'),
 (2, 'jun@arzone.local', NULL, 'GOOGLE', 'google-jun-001', '준', 'CHAR_JUN', 0, 'ACTIVE'),
 (3, 'seo@arzone.local', NULL, 'APPLE', 'apple-seo-001', '서아', 'CHAR_SEO', 1, 'ACTIVE');
@@ -65,13 +65,13 @@ INSERT INTO `user_setting` (`id`, `user_id`, `push_enabled`, `new_conversation_e
 (2, 2, TRUE, TRUE, FALSE, TRUE, TRUE, FALSE, TRUE),
 (3, 3, FALSE, TRUE, TRUE, TRUE, FALSE, TRUE, FALSE);
 
-INSERT INTO `album` (`id`, `title`, `artist_name`, `artist_company`, `track_count`, `track_total_second`, `description`, `cover_image_code`, `release_date`) VALUES
+INSERT INTO `album` (`id`, `title`, `artist_name`, `artist_company`, `track_count`, `track_total_second`, `description`, `cover_image_url`, `release_date`) VALUES
 (1, 'ARZONE First Light', 'ARZONE', 'AR Studio', 3, 620, 'arzone 데뷔 앨범 목데이터', 'cover_first_light', '2026-07-01'),
 (2, 'Virtual Stage', 'ARZONE', 'AR Studio', 3, 690, 'AR 공연 중심 앨범', 'cover_virtual_stage', '2026-08-01'),
 (3, 'Memory Cube', 'ARZONE', 'AR Studio', 3, 600, '큐브와 추억을 담은 앨범', 'cover_memory_cube', '2026-09-01');
 
-INSERT INTO `stage` (`id`, `album_id`, `title`, `description`, `video_code`, `video_type`, `thumbnail_code`, `duration_seconds`, `recorded_at`, `is_active`, `is_title_video`) VALUES
-(1, 1, 'First Light MV', '타이틀 뮤직비디오', 'video_first_light_mv', 'MUSIC_VIDEO', 'thumb_first_light', 210, '2026-07-01 18:00:00', TRUE, TRUE),
+INSERT INTO `stage` (`id`, `album_id`, `title`, `description`, `video_url`, `video_type`, `thumbnail_url`, `duration_seconds`, `recorded_at`, `is_active`, `is_title_video`) VALUES
+(1, 1, 'First Light MV', '타이틀 뮤직비디오', 'www.video_1.com', 'MUSIC_VIDEO', 'thumb_first_light', 210, '2026-07-01 18:00:00', TRUE, TRUE),
 (2, 2, 'Virtual Stage Concert', 'AR 콘서트 영상', 'video_virtual_concert', 'CONCERT_VIDEO', 'thumb_virtual_concert', 540, '2026-08-01 20:00:00', TRUE, FALSE),
 (3, 3, 'Memory Cube MV', '큐브 테마 뮤직비디오', 'video_memory_cube_mv', 'MUSIC_VIDEO', 'thumb_memory_cube', 230, '2026-09-01 18:00:00', TRUE, TRUE);
 
@@ -80,12 +80,12 @@ INSERT INTO `stage_session` (`id`, `cube_ownership_id`, `stage_id`, `started_at`
 (2, 2, 2, '2026-08-07 10:40:00', NULL, 120, 120, 'NORMAL', 'PLAYING'),
 (3, 3, 3, '2026-08-07 10:50:00', '2026-08-07 10:51:00', 60, 60, 'AR', 'CANCELLED');
 
-INSERT INTO `stage_capture` (`id`, `stage_session_id`, `stage_capture_img_code`, `captured_position_seconds`, `captured_at`) VALUES
+INSERT INTO `stage_capture` (`id`, `stage_session_id`, `stage_capture_img_url`, `captured_position_seconds`, `captured_at`) VALUES
 (1, 1, 'stage_capture_001', 45, '2026-08-07 10:30:45'),
 (2, 2, 'stage_capture_002', 90, '2026-08-07 10:41:30'),
 (3, 3, 'stage_capture_003', 30, '2026-08-07 10:50:30');
 
-INSERT INTO `track` (`id`, `album_id`, `title`, `artist_name`, `audio_code`, `duration_seconds`, `lyrics`, `track_number`, `is_title_track`) VALUES
+INSERT INTO `track` (`id`, `album_id`, `title`, `artist_name`, `audio_url`, `duration_seconds`, `lyrics`, `track_number`, `is_title_track`) VALUES
 (1, 1, 'First Light', 'ARZONE', 'audio_first_light', 210, 'Mock lyrics for First Light', 1, TRUE),
 (2, 2, 'Virtual Beat', 'ARZONE', 'audio_virtual_beat', 230, 'Mock lyrics for Virtual Beat', 1, TRUE),
 (3, 3, 'Memory Cube', 'ARZONE', 'audio_memory_cube', 200, 'Mock lyrics for Memory Cube', 1, TRUE);
@@ -95,17 +95,17 @@ INSERT INTO `track_session` (`id`, `cube_ownership_id`, `track_id`, `started_at`
 (2, 2, 2, '2026-08-07 11:10:00', NULL, 80, 80, 'NORMAL', 'PLAYING'),
 (3, 3, 3, '2026-08-07 11:20:00', '2026-08-07 11:21:00', 60, 60, 'NORMAL', 'CANCELLED');
 
-INSERT INTO `track_capture` (`id`, `track_session_id`, `track_capture_img_code`, `captured_position_seconds`, `captured_at`) VALUES
+INSERT INTO `track_capture` (`id`, `track_session_id`, `track_capture_img_url`, `captured_position_seconds`, `captured_at`) VALUES
 (1, 1, 'track_capture_001', 30, '2026-08-07 11:00:30'),
 (2, 2, 'track_capture_002', 70, '2026-08-07 11:11:10'),
 (3, 3, 'track_capture_003', 45, '2026-08-07 11:20:45');
 
-INSERT INTO `album_image` (`id`, `album_id`, `title`, `image_type`, `album_contents_img_code`) VALUES
+INSERT INTO `album_image` (`id`, `album_id`, `title`, `image_type`, `album_contents_img_url`) VALUES
 (1, 1, 'First Light 포토', 'ALBUM_IMAGE', 'album_image_first_light_001'),
 (2, 2, '콘서트 스틸컷', 'CONCERT_STILLCUT', 'album_image_virtual_stage_001'),
 (3, 3, '예줄 프레임', 'YEZUL_FRAME', 'album_image_memory_cube_001');
 
-INSERT INTO `avatar_conversation_session` (`id`, `cube_ownership_id`, `conversation_type`, `started_at`, `ended_at`, `audio_code`, `audio_duration_seconds`, `conversation_title`, `status`) VALUES
+INSERT INTO `avatar_conversation_session` (`id`, `cube_ownership_id`, `conversation_type`, `started_at`, `ended_at`, `audio_url`, `audio_duration_seconds`, `conversation_title`, `status`) VALUES
 (1, 1, 'TEXT', '2026-08-07 12:00:00', NULL, NULL, NULL, '오늘의 인사', 'ACTIVE'),
 (2, 2, 'VOICE', '2026-08-07 12:10:00', '2026-08-07 12:12:00', 'voice_conversation_002', 120, '음성 대화', 'NOT_ACTIVE'),
 (3, 3, 'TEXT', '2026-08-07 12:20:00', NULL, NULL, NULL, '앨범 이야기', 'ACTIVE');
@@ -114,11 +114,6 @@ INSERT INTO `avatar_conversation_message` (`id`, `conversation_session_id`, `sen
 (1, 1, 'USER', '안녕, 오늘 기분 어때?', 1, TRUE, 'ALLOWED', NULL, '2026-08-07 12:00:10'),
 (2, 1, 'AVATAR', '좋아! 오늘은 First Light를 들어볼까?', 2, TRUE, 'ALLOWED', NULL, '2026-08-07 12:00:12'),
 (3, 3, 'USER', '이 앨범 설명해줘.', 1, FALSE, 'BLOCKED', 'PROFANITY', '2026-08-07 12:20:10');
-
-INSERT INTO `avatar_conversation_image` (`id`, `conversation_session_id`, `sequence_number`, `sent_image_code`) VALUES
-(1, 1, 1, 'conversation_image_001'),
-(2, 2, 1, 'conversation_image_002'),
-(3, 3, 1, 'conversation_image_003');
 
 INSERT INTO `conversation_report` (`id`, `conversation_message_id`, `reason`, `detail_reason`) VALUES
 (1, 1, 'INCORRECT_PERSONA', '페르소나 응답이 부정확한 예시'),
@@ -130,20 +125,15 @@ INSERT INTO `avatar_interaction_session` (`id`, `cube_ownership_id`, `started_at
 (2, 2, '2026-08-07 13:10:00', '2026-08-07 13:15:00', 'COMPLETED'),
 (3, 3, '2026-08-07 13:20:00', NULL, 'ACTIVE');
 
-INSERT INTO `avatar_interaction_picture` (`id`, `interaction_session_id`, `picture_img_code`, `pictured_at`) VALUES
+INSERT INTO `avatar_interaction_picture` (`id`, `interaction_session_id`, `picture_img_url`, `pictured_at`) VALUES
 (1, 1, 'interaction_picture_001', '2026-08-07 13:01:00'),
 (2, 2, 'interaction_picture_002', '2026-08-07 13:12:00'),
 (3, 3, 'interaction_picture_003', '2026-08-07 13:21:00');
 
-INSERT INTO `board` (`id`, `board_type`, `name`, `description`, `is_active`) VALUES
-(1, 'FREE', '자유게시판', '자유롭게 이야기하는 게시판', TRUE),
-(2, 'CERTIFICATION', '인증게시판', '큐브 인증 게시판', TRUE),
-(3, 'EVENT', '이벤트게시판', '목데이터용 이벤트 게시판', TRUE);
-
-INSERT INTO `post` (`id`, `board_id`, `user_id`, `title`, `content`, `status`) VALUES
-(1, 1, 1, '첫 큐브 등록했어요', 'arzone 큐브 등록 후기입니다.', 'ACTIVE'),
-(2, 2, 2, '인증 완료', '오늘 인증 성공했습니다.', 'ACTIVE'),
-(3, 1, 3, 'AR 모드 질문', 'AR 모드 사용 방법이 궁금합니다.', 'REPORTED');
+INSERT INTO `post` (`id`, `user_id`, `board_type`, `title`, `content`, `status`) VALUES
+(1, 1, 'FREE', '첫 큐브 등록했어요', 'arzone 큐브 등록 후기입니다.', 'ACTIVE'),
+(2, 2, 'CERTIFICATION', '인증 완료', '오늘 인증 성공했습니다.', 'ACTIVE'),
+(3, 3, 'FREE', 'AR 모드 질문', 'AR 모드 사용 방법이 궁금합니다.', 'REPORTED');
 
 INSERT INTO `post_media` (`id`, `post_id`, `post_image_url`) VALUES
 (1, 1, 'https://example.com/mock/post-001.jpg'),
@@ -165,37 +155,25 @@ INSERT INTO `comment_like` (`id`, `comment_id`, `user_id`, `is_liked`) VALUES
 (2, 2, 2, TRUE),
 (3, 3, 3, FALSE);
 
-INSERT INTO `market_product` (`id`, `cube_id`, `name`, `artist_name`, `image_code`) VALUES
-(1, 1, 'First Light Cube', 'ARZONE', 'market_product_001'),
-(2, 2, 'Virtual Stage Cube', 'ARZONE', 'market_product_002'),
-(3, 3, 'Memory Cube Package', 'ARZONE', 'market_product_003');
+INSERT INTO `market_product` (`id`, `cube_id`, `product_image_url`) VALUES
+(1, 1, 'https://example.com/mock/market-product-001.jpg'),
+(2, 2, 'https://example.com/mock/market-product-002.jpg'),
+(3, 3, 'https://example.com/mock/market-product-003.jpg');
 
-INSERT INTO `sell_listing` (`id`, `market_product_id`, `user_id`, `description`, `price`, `status`) VALUES
-(1, 1, 1, '상태 좋음', 35000, 'ACTIVE'),
-(2, 2, 2, '미개봉', 42000, 'SOLD'),
-(3, 3, 3, '구성품 포함', 39000, 'ACTIVE');
+INSERT INTO `sell_listing` (`id`, `market_product_id`, `user_id`, `product_status`, `title`, `description`, `price`, `status`) VALUES
+(1, 1, 1, '좋음', '퍼스트 큐브', '상태 좋은 큐브 판매합니다.', 35000, 'ACTIVE'),
+(2, 2, 2, '미개봉', '스테이지 큐브', '미개봉 상품입니다.', 42000, 'SOLD'),
+(3, 3, 3, '구성품 포함', '메모리 큐브', '구성품 모두 포함되어 있습니다.', 39000, 'ACTIVE');
 
-INSERT INTO `trade` (`id`, `sell_listing_id`, `seller_user_id`, `buyer_user_id`, `total_price`, `status`) VALUES
-(1, 1, 1, 2, 35000, 'PAID'),
-(2, 2, 2, 1, 42000, 'COMPLETED'),
-(3, 3, 3, 1, 39000, 'DISPUTED');
-
-INSERT INTO `trade_dispute` (`id`, `trade_id`, `reporter_user_id`, `reason_type`, `description`, `status`, `filed_at`, `resolved_at`) VALUES
-(1, 1, 2, 'ITEM_NOT_RECEIVED', '배송 조회가 되지 않습니다.', 'OPEN', '2026-08-07 14:00:00', NULL),
-(2, 2, 1, 'OTHER', '문의 후 해결된 분쟁 예시입니다.', 'RESOLVED', '2026-08-07 14:10:00', '2026-08-07 15:00:00'),
-(3, 3, 1, 'AUTHENTICATION_FAILED', '정품 인증 실패', 'REVIEWING', '2026-08-07 14:20:00', NULL);
+INSERT INTO `trade` (`id`, `sell_listing_id`, `buyer_user_id`, `buyer_phone_number`, `buyer_address`, `total_price`, `paid_time`, `sent_time`, `shipped_time`, `delivered_time`, `completed_time`, `status`) VALUES
+(1, 1, 2, '010-1111-2222', '서울특별시 강남구 테헤란로 1', 35000, '2026-08-07 14:30:00', NULL, NULL, NULL, NULL, 'PAID'),
+(2, 2, 1, '010-3333-4444', '서울특별시 마포구 월드컵로 2', 42000, '2026-08-07 14:35:00', '2026-08-07 15:00:00', '2026-08-07 15:30:00', '2026-08-07 18:00:00', '2026-08-07 19:00:00', 'COMPLETED'),
+(3, 3, 1, '010-5555-6666', '서울특별시 성동구 왕십리로 3', 39000, '2026-08-07 14:40:00', '2026-08-07 15:10:00', '2026-08-07 15:40:00', NULL, NULL, 'SHIPPING');
 
 INSERT INTO `listing_media` (`id`, `sell_listing_id`, `image_url`) VALUES
 (1, 1, 'https://example.com/mock/listing-001.jpg'),
 (2, 2, 'https://example.com/mock/listing-002.jpg'),
 (3, 3, 'https://example.com/mock/listing-003.jpg');
 
-INSERT INTO `escrow_payment` (`id`, `trade_id`, `payment_method`, `paid_amount`, `escrow_status`, `paid_at`, `released_at`, `refunded_at`) VALUES
-(1, 1, 'CARD', 35000, 'PAID', '2026-08-07 14:30:00', NULL, NULL),
-(2, 2, 'EASY_PAY', 42000, 'RELEASED', '2026-08-07 14:35:00', '2026-08-07 16:00:00', NULL),
-(3, 3, 'BANK_TRANSFER', 39000, 'PAID', '2026-08-07 14:40:00', NULL, NULL);
-
-INSERT INTO `shipment` (`id`, `trade_id`, `carrier`, `tracking_number`, `shipment_status`, `shipped_at`, `delivered_at`) VALUES
-(1, 1, 'CJ대한통운', 'CJ0000000001', 'READY', NULL, NULL),
-(2, 2, '우체국택배', 'POST000000002', 'DELIVERED', '2026-08-07 15:00:00', '2026-08-07 18:00:00'),
-(3, 3, '한진택배', 'HJ0000000003', 'SHIPPING', '2026-08-07 15:10:00', NULL);
+INSERT INTO `digital_certificate` (`id`, `trade_id`, `network`, `token_standard`, `token_id`, `contract_address`, `tx_hash`, `metadata_url`) VALUES
+(1, 2, 'Polygon Amoy', 'ERC-721', '1000002', '0x0000000000000000000000000000000000000002', '0xmocktxhash000000000000000000000000000000000000000000000000000000000002', 'https://example.com/mock/certificates/2.json');
