@@ -860,6 +860,7 @@ def test_reply_conversation_message_allows_not_active_session() -> None:
         conversation_type=ConversationType.TEXT,
     )
     conversation_session.status = AvatarConversationSessionStatus.NOT_ACTIVE
+    conversation_session.ended_at = datetime(2026, 7, 29, 18, 0, 0)  # noqa: DTZ001
     db.scalar.side_effect = [conversation_session, 0]
     db.flush.side_effect = lambda: [
         setattr(call.args[0], "id", index)
@@ -882,6 +883,30 @@ def test_reply_conversation_message_allows_not_active_session() -> None:
     assert response.json()["avatarMessage"]["content"] == (
         "잘 못 들었어. 다시 한 번 말해줄래?"
     )
+    assert conversation_session.status == AvatarConversationSessionStatus.ACTIVE
+    assert conversation_session.ended_at == datetime(  # noqa: DTZ001
+        2026, 7, 29, 18, 0, 0
+    )
+
+
+def test_reply_conversation_message_returns_404_for_voice_session() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = session(
+        id=1001,
+        conversation_type=ConversationType.VOICE,
+    )
+
+    with patch("app.services.conversation.generate_avatar_reply") as generate_reply:
+        response = reply_conversation_message_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "CONVERSATION_SESSION_NOT_FOUND",
+        "message": "대화 세션을 찾을 수 없습니다.",
+    }
+    generate_reply.assert_not_called()
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
 
 
 def test_reply_conversation_message_rejects_blank_content_with_common_400() -> None:

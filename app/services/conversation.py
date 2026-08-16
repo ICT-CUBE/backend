@@ -10,7 +10,7 @@ from openai.types.responses import (
     ResponseInputContentParam,
     ResponseInputParam,
 )
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -358,11 +358,26 @@ def reply_to_conversation_message(
             CubeOwnership.user_id == current_user_id,
             CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
             AvatarConversationSession.deleted_at.is_(None),
+            or_(
+                AvatarConversationSession.status
+                == AvatarConversationSessionStatus.ACTIVE,
+                and_(
+                    AvatarConversationSession.conversation_type == ConversationType.TEXT,
+                    AvatarConversationSession.status
+                    == AvatarConversationSessionStatus.NOT_ACTIVE,
+                ),
+            ),
         )
         .limit(1)
     )
     if conversation_session is None:
         _raise_conversation_session_not_found()
+
+    if conversation_session.conversation_type == ConversationType.VOICE:
+        _raise_conversation_session_not_found()
+
+    if conversation_session.status == AvatarConversationSessionStatus.NOT_ACTIVE:
+        conversation_session.status = AvatarConversationSessionStatus.ACTIVE
 
     if _has_deleted_conversation_image_url(db=db, image_urls=body.image_urls):
         _raise_conversation_image_not_found()
