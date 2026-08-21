@@ -86,10 +86,10 @@ erDiagram
 
     REWARD_ITEM {
         bigint id PK
-        varchar_100 name "NOT NULL, UNIQUE"
+        varchar_100 name "NOT NULL"
         varchar_30 reward_type "NOT NULL, Enum: AFFINITY_POINT | CONVERSATION_COUNT | COMMENT_TYPE | SPECIAL_COMMENT | AVATAR_FIRST_TALK | BADGE"
         varchar_255 description "NULL"
-        int reward_count "NOT NULL"
+        int reward_count "NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime deleted_at "NULL"
@@ -102,7 +102,7 @@ erDiagram
         varchar_100 title "NOT NULL"
         varchar_255 description "NULL"
         varchar_500 mission_info "NULL"
-        varchar_50 target_action "NOT NULL, Enum: HOME_VIEW | CONVERSATION | ALBUM_PLAY | OPEN_GALLERY | COMMUNITY_POST | ALBUM_CONVERSATION | PLAY_MUSIC_VIDEO"
+        varchar_50 target_action "NOT NULL, Enum: HOME_VIEW | CONVERSATION | ALBUM_PLAY | OPEN_GALLERY | COMMUNITY_POST | SUMMON_AVATAR | PLAY_MUSIC_VIDEO"
         int target_count "NOT NULL"
         datetime start_at "NULL"
         datetime end_at "NULL"

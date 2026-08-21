@@ -38,7 +38,7 @@ class RewardItem(Base):
         )
     )
     description: Mapped[str | None] = mapped_column(String(255))
-    reward_count: Mapped[int] = mapped_column(Integer)
+    reward_count: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )
