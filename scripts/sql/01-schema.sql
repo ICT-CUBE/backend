@@ -135,12 +135,11 @@ CREATE TABLE `reward_item` (
     `name` VARCHAR(100) NOT NULL,
     `reward_type` VARCHAR(30) NOT NULL,
     `description` VARCHAR(255) NULL,
-    `reward_count` INT NOT NULL,
+    `reward_count` INT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted_at` DATETIME NULL,
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_reward_item_name` (`name`),
     CONSTRAINT `ck_reward_item_type` CHECK (`reward_type` IN ('AFFINITY_POINT', 'CONVERSATION_COUNT', 'COMMENT_TYPE', 'SPECIAL_COMMENT', 'AVATAR_FIRST_TALK', 'BADGE'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -192,7 +191,7 @@ CREATE TABLE `mission` (
     KEY `idx_mission_reward_item_id` (`reward_item_id`),
     CONSTRAINT `fk_mission_reward_item` FOREIGN KEY (`reward_item_id`) REFERENCES `reward_item` (`id`),
     CONSTRAINT `ck_mission_type` CHECK (`mission_type` IN ('DAILY', 'EVENT')),
-    CONSTRAINT `ck_mission_target_action` CHECK (`target_action` IN ('HOME_VIEW', 'CONVERSATION', 'ALBUM_PLAY', 'OPEN_GALLERY', 'COMMUNITY_POST', 'ALBUM_CONVERSATION', 'PLAY_MUSIC_VIDEO'))
+    CONSTRAINT `ck_mission_target_action` CHECK (`target_action` IN ('HOME_VIEW', 'CONVERSATION', 'ALBUM_PLAY', 'OPEN_GALLERY', 'COMMUNITY_POST', 'SUMMON_AVATAR', 'PLAY_MUSIC_VIDEO'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `mission_progress` (
