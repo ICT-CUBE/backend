@@ -7,7 +7,7 @@ erDiagram
         varchar_20 login_provider "NOT NULL, Enum: EMAIL | GOOGLE | APPLE"
         varchar_255 provider_user_id "NULL"
         varchar_8 nickname "NULL"
-        varchar_50 profile_character_img_url "NULL"
+        varchar_500 profile_character_img_url "NULL"
         int chat_violation_count "NOT NULL, DEFAULT: 0"
         varchar_20 status "NOT NULL, Enum: ACTIVE | WITHDRAWN | SUSPENDED"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
@@ -127,8 +127,8 @@ erDiagram
 
     USER_REWARD {
         bigint id PK
-        bigint cube_ownership_id FK "NOT NULL, COMPOSITE UNIQUE: cube_ownership_id | reward_item_id"
-        bigint reward_item_id FK "NOT NULL, COMPOSITE UNIQUE: cube_ownership_id | reward_item_id"
+        bigint cube_ownership_id FK "NOT NULL"
+        bigint reward_item_id FK "NOT NULL"
         datetime acquired_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
@@ -442,7 +442,7 @@ erDiagram
     LEVEL ||--o{ AFFINITY : "current level"
     REWARD_ITEM ||--o{ LEVEL : "level reward"
     REWARD_ITEM ||--o{ MISSION : "mission reward"
-    MISSION ||--o{ MISSION_PROGRESS : "has progress"
+    MISSION ||--o| MISSION_PROGRESS : "has progress"
     CUBE_OWNERSHIP ||--o{ MISSION_PROGRESS : "performs"
     REWARD_ITEM ||--o{ USER_REWARD : "is acquired as"
     CUBE_OWNERSHIP ||--o{ USER_REWARD : "owns"

@@ -1,4 +1,4 @@
-"""트랙 재생 세션 생성 로직."""
+"""앨범 도메인 트랙 재생 세션 로직."""
 
 from datetime import datetime, timedelta, timezone
 from typing import BinaryIO
@@ -14,7 +14,7 @@ from app.models.enums import (
     TrackSessionStatus,
 )
 from app.models.track import Track, TrackCapture, TrackSession
-from app.schemas.track import (
+from app.schemas.album import (
     TrackSessionCreateResponse,
     TrackSessionEndStatus,
     TrackSessionResponse,

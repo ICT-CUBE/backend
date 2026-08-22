@@ -42,7 +42,7 @@ class User(Base):
     provider_user_id: Mapped[str | None] = mapped_column(String(255))
     nickname: Mapped[str | None] = mapped_column(String(8))
     # 프로필 캐릭터 이미지의 접근 URL입니다.
-    profile_character_img_url: Mapped[str | None] = mapped_column(String(50))
+    profile_character_img_url: Mapped[str | None] = mapped_column(String(500))
     chat_violation_count: Mapped[int] = mapped_column(Integer)
     status: Mapped[UserStatus] = mapped_column(
         Enum(

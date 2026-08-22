@@ -47,7 +47,7 @@ CREATE TABLE `user` (
     `login_provider` VARCHAR(20) NOT NULL,
     `provider_user_id` VARCHAR(255) NULL,
     `nickname` VARCHAR(8) NULL,
-    `profile_character_img_url` VARCHAR(50) NULL,
+    `profile_character_img_url` VARCHAR(500) NULL,
     `chat_violation_count` INT NOT NULL DEFAULT 0,
     `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -221,7 +221,7 @@ CREATE TABLE `user_reward` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_user_reward_ownership_reward` (`cube_ownership_id`, `reward_item_id`),
+    KEY `idx_user_reward_cube_ownership_id` (`cube_ownership_id`),
     KEY `idx_user_reward_reward_item_id` (`reward_item_id`),
     CONSTRAINT `fk_user_reward_cube_ownership` FOREIGN KEY (`cube_ownership_id`) REFERENCES `cube_ownership` (`id`),
     CONSTRAINT `fk_user_reward_reward_item` FOREIGN KEY (`reward_item_id`) REFERENCES `reward_item` (`id`)

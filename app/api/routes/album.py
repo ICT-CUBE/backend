@@ -1,4 +1,4 @@
-"""트랙 도메인 API 라우터."""
+"""앨범 도메인 API 라우터."""
 
 from datetime import datetime
 from typing import Annotated
@@ -8,13 +8,13 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_id
 from app.core.database import get_db
-from app.schemas.common import ErrorResponse
-from app.schemas.track import (
+from app.schemas.album import (
     TrackSessionCreateRequest,
     TrackSessionCreateResponse,
     TrackSessionUpdateRequest,
 )
-from app.services.track import (
+from app.schemas.common import ErrorResponse
+from app.services.album import (
     create_track_session,
     save_track_capture,
     save_track_session,

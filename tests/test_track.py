@@ -296,7 +296,7 @@ def test_save_track_capture_uploads_image_and_adds_orm_model() -> None:
     db.scalar.return_value = playing_track_session()
 
     with patch(
-        "app.services.track.upload_track_capture",
+        "app.services.album.upload_track_capture",
         return_value=(
             "https://haniumstorage.blob.core.windows.net/hanium/"
             "track_capture/1/601/test.jpg"
@@ -321,7 +321,7 @@ def test_save_track_capture_returns_404_for_unknown_or_other_user_session() -> N
     db = Mock(spec=Session)
     db.scalar.return_value = None
 
-    with patch("app.services.track.upload_track_capture") as upload:
+    with patch("app.services.album.upload_track_capture") as upload:
         response = save_track_capture_request(db)
 
     assert response.status_code == 404
@@ -334,7 +334,7 @@ def test_save_track_capture_returns_400_for_unsupported_content_type() -> None:
     db = Mock(spec=Session)
     db.scalar.return_value = playing_track_session()
 
-    with patch("app.services.track.upload_track_capture") as upload:
+    with patch("app.services.album.upload_track_capture") as upload:
         response = save_track_capture_request(db, content_type="image/gif")
 
     assert response.status_code == 400
@@ -347,7 +347,7 @@ def test_save_track_capture_accepts_image_jpg_content_type() -> None:
     db.scalar.return_value = playing_track_session()
 
     with patch(
-        "app.services.track.upload_track_capture",
+        "app.services.album.upload_track_capture",
         return_value="https://cdn.example.com/track_capture/test.jpg",
     ) as upload:
         response = save_track_capture_request(db, content_type="image/jpg")
@@ -361,7 +361,7 @@ def test_save_track_capture_accepts_uppercase_jpeg_content_type() -> None:
     db.scalar.return_value = playing_track_session()
 
     with patch(
-        "app.services.track.upload_track_capture",
+        "app.services.album.upload_track_capture",
         return_value="https://cdn.example.com/track_capture/test.jpg",
     ) as upload:
         response = save_track_capture_request(db, content_type="IMAGE/JPEG")
@@ -385,7 +385,7 @@ def test_save_track_capture_uses_common_500_when_azure_upload_fails() -> None:
     db.scalar.return_value = playing_track_session()
 
     with patch(
-        "app.services.track.upload_track_capture",
+        "app.services.album.upload_track_capture",
         side_effect=RuntimeError("storage unavailable"),
     ):
         response = save_track_capture_request(
