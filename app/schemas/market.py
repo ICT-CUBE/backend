@@ -2,13 +2,12 @@
 
 from datetime import datetime
 
-from pydantic import field_validator
-
 from app.schemas.base import ApiSchema
 
 
 class SellableCubeItemResponse(ApiSchema):
-    id: int
+    cube_id: int
+    market_product_id: int
     serial_number: str
     product_name: str
     artist_name: str
@@ -19,19 +18,24 @@ class SellableCubesResponse(ApiSchema):
     cubes: list[SellableCubeItemResponse]
 
 
+class SellListingCreateRequest(ApiSchema):
+    market_product_id: int
+    product_status: str | None = None
+    title: str
+    description: str
+    price: int
+
+
+class SellListingCreateResponse(ApiSchema):
+    sell_listing_id: int
+
+
 class TradeCreateRequest(ApiSchema):
     sell_listing_id: int
     buyer_address: str
     buyer_phone_number: str
     total_price: int
     paid_time: datetime
-
-    @field_validator("paid_time")
-    @classmethod
-    def validate_paid_time_is_naive(cls, value: datetime) -> datetime:
-        if value.tzinfo is not None:
-            raise ValueError("paid_time must be naive datetime")
-        return value
 
 
 class TradeDetailCubeResponse(ApiSchema):
