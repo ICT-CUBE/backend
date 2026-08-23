@@ -15,6 +15,18 @@ from app.models.market import DigitalCertificate, MarketProduct, SellListing, Tr
 from app.models.user import User
 
 
+def read_sellable_cubes_request(db: Mock):
+    def override_get_db() -> Iterator[Session]:
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            return client.get("/api/v1/users/me/sellable-cubes")
+    finally:
+        app.dependency_overrides.clear()
+
+
 def create_trade_request(
     db: Mock,
     *,
@@ -117,6 +129,88 @@ def complete_trade_row(*, status: TradeStatus = TradeStatus.DELIVERED):
     )
     buyer = User(id=1, nickname="홍길동")
     return trade, buyer
+
+
+def test_read_sellable_cubes_returns_active_unlisted_cubes() -> None:
+    db = Mock(spec=Session)
+    db.execute.return_value.all.return_value = [
+        (
+            Cube(
+                id=1,
+                serial_number="#012",
+                product_name="RUBY CUBE",
+                artist_name="JENNIE",
+            ),
+            MarketProduct(
+                id=1,
+                cube_id=1,
+                product_image_url="https://example.com/cube-001.png",
+            ),
+        ),
+        (
+            Cube(
+                id=3,
+                serial_number="#031",
+                product_name="SOLO CUBE",
+                artist_name="JENNIE",
+            ),
+            None,
+        ),
+    ]
+
+    response = read_sellable_cubes_request(db)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "cubes": [
+            {
+                "id": 1,
+                "serialNumber": "#012",
+                "productName": "RUBY CUBE",
+                "artistName": "JENNIE",
+                "productImageUrl": "https://example.com/cube-001.png",
+            },
+            {
+                "id": 3,
+                "serialNumber": "#031",
+                "productName": "SOLO CUBE",
+                "artistName": "JENNIE",
+                "productImageUrl": None,
+            },
+        ]
+    }
+
+    query = str(db.execute.call_args.args[0])
+    assert "cube_ownership.user_id" in query
+    assert "cube_ownership.ownership_status" in query
+    assert "cube.deleted_at IS NULL" in query
+    assert "market_product.deleted_at IS NULL" in query
+    assert "sell_listing.user_id" in query
+    assert "sell_listing.status" in query
+    assert "sell_listing.deleted_at IS NULL" in query
+    assert "NOT (EXISTS" in query
+    assert "ORDER BY cube.id ASC" in query
+    assert "is_last_accessed" not in query
+
+
+def test_read_sellable_cubes_returns_empty_list() -> None:
+    db = Mock(spec=Session)
+    db.execute.return_value.all.return_value = []
+
+    response = read_sellable_cubes_request(db)
+
+    assert response.status_code == 200
+    assert response.json() == {"cubes": []}
+
+
+def test_read_sellable_cubes_swagger_responses() -> None:
+    operation = app.openapi()["paths"][
+        "/api/v1/users/me/sellable-cubes"
+    ]["get"]
+
+    assert set(operation["responses"]) == {"200"}
+    assert operation["tags"] == ["market"]
+    assert "security" not in operation
 
 
 def test_create_trade_saves_trade_and_marks_sell_listing_sold() -> None:

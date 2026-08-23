@@ -7,6 +7,18 @@ from pydantic import field_validator
 from app.schemas.base import ApiSchema
 
 
+class SellableCubeItemResponse(ApiSchema):
+    id: int
+    serial_number: str
+    product_name: str
+    artist_name: str
+    product_image_url: str | None
+
+
+class SellableCubesResponse(ApiSchema):
+    cubes: list[SellableCubeItemResponse]
+
+
 class TradeCreateRequest(ApiSchema):
     sell_listing_id: int
     buyer_address: str

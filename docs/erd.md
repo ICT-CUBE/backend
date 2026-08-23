@@ -416,7 +416,7 @@ erDiagram
 
     MARKET_PRODUCT {
         bigint id PK
-        bigint cube_id FK "NOT NULL"
+        bigint cube_id FK "NOT NULL, UNIQUE"
         varchar_500 product_image_url "NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
@@ -471,7 +471,7 @@ erDiagram
     COMMENT ||--o{ COMMENT_LIKE : "receives"
     USER ||--o{ COMMENT_LIKE : "creates"
     SELL_LISTING ||--o| TRADE : "creates"
-    CUBE ||--o{ MARKET_PRODUCT : "upload"
+    CUBE ||--o| MARKET_PRODUCT : "has"
     SELL_LISTING ||--o{ LISTING_MEDIA : "contains"
     TRADE ||--o| DIGITAL_CERTIFICATE : "contains"
 ```

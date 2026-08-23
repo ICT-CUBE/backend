@@ -561,7 +561,7 @@ CREATE TABLE `market_product` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted_at` DATETIME NULL,
     PRIMARY KEY (`id`),
-    KEY `idx_market_product_cube_id` (`cube_id`),
+    UNIQUE KEY `uk_market_product_cube_id` (`cube_id`),
     CONSTRAINT `fk_market_product_cube` FOREIGN KEY (`cube_id`) REFERENCES `cube` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

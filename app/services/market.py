@@ -4,15 +4,17 @@ from datetime import datetime
 from typing import NoReturn
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, select
+from sqlalchemy.orm import Session, aliased
 
 from app.core.exceptions import ApiError
-from app.models.cube import Cube
-from app.models.enums import SellListingStatus, TradeStatus
+from app.models.cube import Cube, CubeOwnership
+from app.models.enums import OwnershipStatus, SellListingStatus, TradeStatus
 from app.models.market import DigitalCertificate, MarketProduct, SellListing, Trade
 from app.models.user import User
 from app.schemas.market import (
+    SellableCubeItemResponse,
+    SellableCubesResponse,
     TradeCompleteCertificateResponse,
     TradeCompleteResponse,
     TradeCreateRequest,
@@ -29,6 +31,66 @@ TRADE_TIMELINE_LABELS = {
     TradeStatus.DELIVERED: "배송 완료",
     TradeStatus.COMPLETED: "구매 확정",
 }
+
+
+def get_sellable_cubes(
+    *,
+    db: Session,
+    current_user_id: int,
+) -> SellableCubesResponse:
+    """현재 사용자가 새 판매글을 등록할 수 있는 활성 큐브를 반환합니다."""
+    listed_market_product = aliased(MarketProduct)
+    active_listing_exists = (
+        select(SellListing.id)
+        .join(
+            listed_market_product,
+            SellListing.market_product_id == listed_market_product.id,
+        )
+        .where(
+            listed_market_product.cube_id == Cube.id,
+            SellListing.user_id == current_user_id,
+            SellListing.status == SellListingStatus.ACTIVE,
+            SellListing.deleted_at.is_(None),
+        )
+        .exists()
+    )
+
+    rows = db.execute(
+        select(Cube, MarketProduct)
+        .join(CubeOwnership, CubeOwnership.cube_id == Cube.id)
+        .outerjoin(
+            MarketProduct,
+            and_(
+                MarketProduct.cube_id == Cube.id,
+                MarketProduct.deleted_at.is_(None),
+            ),
+        )
+        .where(
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            Cube.deleted_at.is_(None),
+            ~active_listing_exists,
+        )
+        .distinct()
+        .order_by(Cube.id.asc())
+    ).all()
+
+    return SellableCubesResponse(
+        cubes=[
+            SellableCubeItemResponse(
+                id=cube.id,
+                serial_number=cube.serial_number,
+                product_name=cube.product_name,
+                artist_name=cube.artist_name,
+                product_image_url=(
+                    market_product.product_image_url
+                    if market_product is not None
+                    else None
+                ),
+            )
+            for cube, market_product in rows
+        ]
+    )
 
 
 def create_trade(

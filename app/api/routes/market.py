@@ -9,13 +9,33 @@ from app.core.auth import get_current_user_id
 from app.core.database import get_db
 from app.schemas.common import ErrorResponse
 from app.schemas.market import (
+    SellableCubesResponse,
     TradeCompleteResponse,
     TradeCreateRequest,
     TradeDetailResponse,
 )
-from app.services.market import complete_trade, create_trade, get_trade_detail
+from app.services.market import (
+    complete_trade,
+    create_trade,
+    get_sellable_cubes,
+    get_trade_detail,
+)
 
 router = APIRouter()
+
+
+@router.get(
+    "/sellable-cubes",
+    response_model=SellableCubesResponse,
+    summary="판매 가능한 내 큐브 조회",
+    description="현재 사용자가 새 판매글을 등록할 수 있는 활성 큐브 목록을 조회합니다.",
+)
+def read_sellable_cubes(
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> SellableCubesResponse:
+    """GET /api/v1/users/me/sellable-cubes"""
+    return get_sellable_cubes(db=db, current_user_id=current_user_id)
 
 
 @router.post(

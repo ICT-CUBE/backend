@@ -33,6 +33,8 @@ from app.models.enums import (
 from app.models.stage import StageCapture
 from app.models.track import TrackCapture
 from app.schemas.conversation import (
+    ConversationArchiveItemResponse,
+    ConversationArchiveResponse,
     ConversationDetailMessageResponse,
     ConversationDetailResponse,
     ConversationDetailSessionResponse,
@@ -78,6 +80,22 @@ def get_conversation_sessions(
     size: int,
 ) -> ConversationSessionsResponse:
     """마지막 메시지가 있는 대화 세션 목록을 최신순으로 반환합니다."""
+    ownership = db.scalar(
+        select(CubeOwnership)
+        .where(
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
+        )
+        .limit(1)
+    )
+    if ownership is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_OWNERSHIP_NOT_FOUND",
+            message="큐브 소유권 정보를 찾을 수 없습니다.",
+        )
+
     last_sequence = (
         select(
             AvatarConversationMessage.conversation_session_id.label("session_id"),
@@ -89,10 +107,6 @@ def get_conversation_sessions(
 
     rows = db.execute(
         select(AvatarConversationSession, AvatarConversationMessage)
-        .join(
-            CubeOwnership,
-            AvatarConversationSession.cube_ownership_id == CubeOwnership.id,
-        )
         .join(
             last_sequence,
             last_sequence.c.session_id == AvatarConversationSession.id,
@@ -109,8 +123,7 @@ def get_conversation_sessions(
             ),
         )
         .where(
-            CubeOwnership.user_id == current_user_id,
-            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            AvatarConversationSession.cube_ownership_id == ownership.id,
             AvatarConversationSession.conversation_type == conversation_type,
             AvatarConversationSession.deleted_at.is_(None),
         )
@@ -136,6 +149,101 @@ def get_conversation_sessions(
             has_next=has_next,
         ),
     )
+
+
+def get_conversation_archive(
+    *,
+    db: Session,
+    current_user_id: int,
+) -> ConversationArchiveResponse:
+    """마지막 접근 활성 큐브에 보관된 아바타 텍스트를 최신순 반환합니다."""
+    ownership = db.scalar(
+        select(CubeOwnership)
+        .where(
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
+        )
+        .limit(1)
+    )
+    if ownership is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_OWNERSHIP_NOT_FOUND",
+            message="큐브 소유권 정보를 찾을 수 없습니다.",
+        )
+
+    saved_messages = db.scalars(
+        select(AvatarConversationMessage)
+        .join(
+            AvatarConversationSession,
+            AvatarConversationMessage.conversation_session_id
+            == AvatarConversationSession.id,
+        )
+        .where(
+            AvatarConversationSession.cube_ownership_id == ownership.id,
+            AvatarConversationSession.conversation_type == ConversationType.TEXT,
+            AvatarConversationSession.deleted_at.is_(None),
+            AvatarConversationMessage.sender_type
+            == ConversationMessageSenderType.AVATAR,
+            AvatarConversationMessage.is_text_saved.is_(True),
+        )
+        .order_by(
+            AvatarConversationMessage.sent_at.desc(),
+            AvatarConversationMessage.id.desc(),
+        )
+    ).all()
+
+    return ConversationArchiveResponse(
+        saved_texts=[
+            ConversationArchiveItemResponse(
+                id=message.id,
+                conversation_session_id=message.conversation_session_id,
+                content=message.content,
+                sequence_number=message.sequence_number,
+                sent_at=message.sent_at,
+            )
+            for message in saved_messages
+        ]
+    )
+
+
+def unsave_conversation_archive_message(
+    *,
+    db: Session,
+    current_user_id: int,
+    conversation_message_id: int,
+) -> None:
+    """마지막 접근 활성 큐브의 보관 메시지를 보관 해제합니다."""
+    conversation_message = db.scalar(
+        select(AvatarConversationMessage)
+        .join(
+            AvatarConversationSession,
+            AvatarConversationMessage.conversation_session_id
+            == AvatarConversationSession.id,
+        )
+        .join(
+            CubeOwnership,
+            AvatarConversationSession.cube_ownership_id == CubeOwnership.id,
+        )
+        .where(
+            AvatarConversationMessage.id == conversation_message_id,
+            AvatarConversationMessage.is_text_saved.is_(True),
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
+        )
+        .limit(1)
+    )
+    if conversation_message is None:
+        _raise_conversation_message_not_found()
+
+    conversation_message.is_text_saved = False
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def create_conversation_session(
@@ -345,6 +453,7 @@ def get_conversation_session_detail(
             AvatarConversationSession.id == conversation_session_id,
             CubeOwnership.user_id == current_user_id,
             CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
             AvatarConversationSession.deleted_at.is_(None),
         )
         .limit(1)

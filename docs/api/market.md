@@ -1,3 +1,90 @@
+## 판매 가능한 내 큐브 조회
+- http 메서드: GET
+- 엔드포인트: `/api/v1/users/me/sellable-cubes`
+- 도메인: market
+
+### API 설명
+
+판매글 작성 화면에서 사용자가 판매할 큐브를 선택할 때 호출한다.
+
+현재 사용자가 소유한 큐브 중 새 판매글을 등록할 수 있는 큐브 목록을 조회한다.
+
+---
+
+### 처리 정책
+
+- 현재 사용자의 큐브 소유권 중 `ownership_status = ACTIVE`인 소유권에 연결된 큐브를 모두 조회한다.
+- `is_last_accessed`는 조회 조건으로 사용하지 않는다.
+- 삭제되지 않은 큐브(`cube.deleted_at IS NULL`)만 반환한다.
+- 현재 사용자가 이미 등록한 판매글 중 `status = ACTIVE`이고 `deleted_at IS NULL`인 판매글에 연결된 큐브는 제외한다.
+- 판매 완료, 삭제 또는 소프트 딜리트된 판매글에 연결되었던 큐브는 현재 소유권이 `ACTIVE`라면 다시 판매 가능한 목록에 포함할 수 있다.
+- `market_product`는 큐브와 1:1 관계이며, 삭제되지 않은 마켓 상품(`market_product.deleted_at IS NULL`)의 `product_image_url`을 반환한다.
+- 연결된 마켓 상품이 없거나 마켓 상품이 삭제된 경우에도 큐브는 반환하고 `productImageUrl`은 `null`로 반환한다.
+- 결과는 `cube.id` 오름차순으로 정렬한다.
+- 페이지네이션 없이 판매 가능한 큐브 전체를 반환한다.
+- 판매 가능한 큐브가 없으면 `cubes`를 빈 배열로 반환한다.
+
+---
+
+### 요청 Query
+
+없음
+
+---
+
+### 요청 Path
+
+없음
+
+---
+
+### 요청 Body
+
+없음
+
+---
+
+### 정상 응답 데이터
+Status Code : 200
+
+| 필드 | 타입 | 설명 |
+|---|---:|---|
+| `cubes` | array | 판매 가능한 큐브 목록 |
+| `cubes[].id` | number | 큐브 id |
+| `cubes[].serialNumber` | string | 큐브 시리얼 번호 |
+| `cubes[].productName` | string | 큐브 제품명 |
+| `cubes[].artistName` | string | 아티스트 이름 |
+| `cubes[].productImageUrl` | string \| null | 큐브 마켓 이미지 URL. 마켓 상품 이미지가 없으면 null |
+
+```json
+{
+  "cubes": [
+    {
+      "id": 1,
+      "serialNumber": "#012",
+      "productName": "RUBY CUBE",
+      "artistName": "JENNIE",
+      "productImageUrl": "https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube-card-001.png"
+    },
+    {
+      "id": 3,
+      "serialNumber": "#031",
+      "productName": "SOLO CUBE",
+      "artistName": "JENNIE",
+      "productImageUrl": null
+    }
+  ]
+}
+```
+
+---
+
+### 오류 응답 데이터
+
+없음
+
+
+
 ## 거래 진행 정보 생성
 - http 메서드: POST
 - 엔드포인트: `/api/v1/users/me/trades`

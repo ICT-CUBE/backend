@@ -73,6 +73,18 @@ class ConversationMessageSaveResponse(ApiSchema):
     conversation_message: ConversationMessageSaveItemResponse
 
 
+class ConversationArchiveItemResponse(ApiSchema):
+    id: int
+    conversation_session_id: int
+    content: str
+    sequence_number: int
+    sent_at: datetime
+
+
+class ConversationArchiveResponse(ApiSchema):
+    saved_texts: list[ConversationArchiveItemResponse]
+
+
 class ConversationReportCreateRequest(ApiSchema):
     reason: ConversationReportReason
     detail_reason: str | None = Field(default=None, max_length=200)
