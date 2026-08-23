@@ -10,8 +10,46 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.main import app
 from app.models.cube import CubeOwnership
-from app.models.enums import OwnershipStatus, StageSessionStatus, StageViewMode
+from app.models.enums import (
+    OwnershipStatus,
+    StageSessionStatus,
+    StageVideoType,
+    StageViewMode,
+)
 from app.models.stage import Stage, StageCapture, StageSession
+
+
+def request_stage_list(
+    db: Mock,
+    *,
+    video_type: str | None = None,
+):
+    def override_get_db() -> Iterator[Session]:
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            params = {} if video_type is None else {"videoType": video_type}
+            return client.get("/api/v1/stages", params=params)
+    finally:
+        app.dependency_overrides.clear()
+
+
+def request_stage_video(
+    db: Mock,
+    *,
+    stage_id: int = 1,
+):
+    def override_get_db() -> Iterator[Session]:
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            return client.get(f"/api/v1/stages/{stage_id}")
+    finally:
+        app.dependency_overrides.clear()
 
 
 def request_stage_session(
@@ -100,6 +138,34 @@ def active_stage() -> Stage:
     return Stage(id=1, is_active=True, duration_seconds=222)
 
 
+def stage_list_item() -> Stage:
+    return Stage(
+        id=5,
+        title="like JENNIE MV",
+        description="like JENNIE 뮤직비디오",
+        video_type=StageVideoType.MUSIC_VIDEO,
+        thumbnail_url=(
+            "https://haniumstorage.blob.core.windows.net/hanium/"
+            "stage/stage_thumbnail/like_jennie_mv.jpg"
+        ),
+        recorded_at=datetime.fromisoformat("2025-03-07T13:00:00"),
+        is_active=True,
+        is_title_video=True,
+    )
+
+
+def stage_video() -> Stage:
+    return Stage(
+        id=1,
+        video_url=(
+            "https://haniumstorage.blob.core.windows.net/hanium/"
+            "stage/stage_music_video/mv_mantra.mp4"
+        ),
+        duration_seconds=136,
+        is_active=True,
+    )
+
+
 def active_ownership() -> CubeOwnership:
     return CubeOwnership(
         id=12,
@@ -117,6 +183,152 @@ def playing_session() -> StageSession:
         viewed_seconds=0,
         view_mode=StageViewMode.AR,
     )
+
+
+def test_read_stage_list_returns_music_videos_by_default() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = 12
+    db.scalars.return_value = [stage_list_item()]
+
+    response = request_stage_list(db)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "stages": [
+            {
+                "id": 5,
+                "title": "like JENNIE MV",
+                "description": "like JENNIE 뮤직비디오",
+                "thumbnailUrl": (
+                    "https://haniumstorage.blob.core.windows.net/hanium/"
+                    "stage/stage_thumbnail/like_jennie_mv.jpg"
+                ),
+                "recordedAt": "2025-03-07T13:00:00",
+                "isTitleVideo": True,
+            }
+        ]
+    }
+    db.scalar.assert_called_once()
+    db.scalars.assert_called_once()
+
+
+def test_read_stage_list_accepts_concert_video_query() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = 12
+    concert_stage = stage_list_item()
+    concert_stage.video_type = StageVideoType.CONCERT_VIDEO
+    db.scalars.return_value = [concert_stage]
+
+    response = request_stage_list(db, video_type="CONCERT_VIDEO")
+
+    assert response.status_code == 200
+    assert response.json()["stages"][0]["id"] == 5
+
+
+def test_read_stage_list_returns_empty_array_when_no_stage_matches() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = 12
+    db.scalars.return_value = []
+
+    response = request_stage_list(db)
+
+    assert response.status_code == 200
+    assert response.json() == {"stages": []}
+
+
+def test_read_stage_list_returns_404_without_last_active_ownership() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = request_stage_list(db)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "CUBE_OWNERSHIP_NOT_FOUND",
+        "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+    }
+    db.scalars.assert_not_called()
+
+
+def test_read_stage_list_returns_common_400_for_invalid_video_type() -> None:
+    db = Mock(spec=Session)
+
+    response = request_stage_list(db, video_type="INVALID")
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_REQUEST"
+    db.scalar.assert_not_called()
+
+
+def test_read_stage_list_swagger_responses() -> None:
+    operation = app.openapi()["paths"]["/api/v1/stages"]["get"]
+
+    assert set(operation["responses"]) == {"200", "404"}
+    assert operation["parameters"][0]["name"] == "videoType"
+    assert "security" not in operation
+
+
+def test_read_stage_video_returns_playback_fields_only() -> None:
+    db = Mock(spec=Session)
+    db.scalar.side_effect = [12, stage_video()]
+
+    response = request_stage_video(db)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "stage": {
+            "id": 1,
+            "videoUrl": (
+                "https://haniumstorage.blob.core.windows.net/hanium/"
+                "stage/stage_music_video/mv_mantra.mp4"
+            ),
+            "durationSeconds": 136,
+        }
+    }
+
+
+def test_read_stage_video_returns_404_without_last_active_ownership() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = request_stage_video(db)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "CUBE_OWNERSHIP_NOT_FOUND",
+        "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+    }
+    db.scalar.assert_called_once()
+
+
+def test_read_stage_video_returns_404_when_stage_does_not_exist() -> None:
+    db = Mock(spec=Session)
+    db.scalar.side_effect = [12, None]
+
+    response = request_stage_video(db, stage_id=999)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "STAGE_NOT_FOUND",
+        "message": "스테이지 영상을 찾을 수 없습니다.",
+    }
+
+
+def test_read_stage_video_does_not_apply_positive_path_validation() -> None:
+    db = Mock(spec=Session)
+    db.scalar.side_effect = [12, None]
+
+    response = request_stage_video(db, stage_id=0)
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "STAGE_NOT_FOUND"
+
+
+def test_read_stage_video_swagger_responses() -> None:
+    operation = app.openapi()["paths"]["/api/v1/stages/{stageId}"]["get"]
+
+    assert set(operation["responses"]) == {"200", "404"}
+    assert "security" not in operation
 
 
 def test_create_stage_session_adds_orm_model_with_initial_values() -> None:

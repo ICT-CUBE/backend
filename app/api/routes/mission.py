@@ -26,8 +26,8 @@ router = APIRouter()
             "content": {
                 "application/json": {
                     "example": {
-                        "code": "ACTIVE_CUBE_OWNERSHIP_NOT_FOUND",
-                        "message": "활성화된 큐브 소유권을 찾을 수 없습니다.",
+                        "code": "CUBE_OWNERSHIP_NOT_FOUND",
+                        "message": "큐브 소유권 정보를 찾을 수 없습니다.",
                     }
                 }
             },
