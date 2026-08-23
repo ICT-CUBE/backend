@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user_id
 from app.core.database import get_db
 from app.schemas.album import (
+    AlbumResponse,
+    AlbumTrackDetailGetResponse,
     TrackSessionCreateRequest,
     TrackSessionCreateResponse,
     TrackSessionUpdateRequest,
@@ -16,12 +18,88 @@ from app.schemas.album import (
 from app.schemas.common import ErrorResponse
 from app.services.album import (
     create_track_session,
+    get_album,
+    get_album_track,
     save_track_capture,
     save_track_session,
 )
 
+album_router = APIRouter()
 router = APIRouter()
 track_session_router = APIRouter()
+
+
+@album_router.get(
+    "",
+    response_model=AlbumResponse,
+    summary="앨범 조회",
+    description="현재 사용자의 앨범 화면 정보를 조회합니다.",
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "현재 사용자의 마지막 접근 ACTIVE 큐브 소유권이 존재하지 않음",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "CUBE_OWNERSHIP_NOT_FOUND",
+                        "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def read_album(
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> AlbumResponse:
+    """GET /api/v1/album"""
+    return get_album(db=db, current_user_id=current_user_id)
+
+
+@router.get(
+    "/{trackId}",
+    response_model=AlbumTrackDetailGetResponse,
+    summary="앨범 트랙 조회",
+    description="현재 사용자의 앨범 트랙 재생 정보를 조회합니다.",
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "트랙 또는 큐브 소유권 정보가 없음",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "cubeOwnershipNotFound": {
+                            "summary": "큐브 소유권 없음",
+                            "value": {
+                                "code": "CUBE_OWNERSHIP_NOT_FOUND",
+                                "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+                            },
+                        },
+                        "trackNotFound": {
+                            "summary": "앨범 트랙 없음",
+                            "value": {
+                                "code": "TRACK_NOT_FOUND",
+                                "message": "앨범 트랙을 찾을 수 없습니다.",
+                            },
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
+def read_album_track(
+    track_id: Annotated[int, Path(alias="trackId")],
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> AlbumTrackDetailGetResponse:
+    """GET /api/v1/tracks/{trackId}"""
+    return get_album_track(
+        db=db,
+        current_user_id=current_user_id,
+        track_id=track_id,
+    )
 
 
 @router.post(

@@ -297,7 +297,7 @@ erDiagram
     CONVERSATION_REPORT {
         bigint id PK
         bigint conversation_message_id FK "NOT NULL"
-        varchar_50 reason "NOT NULL, Enum: INCORRECT_PERSONA | HALLUCINATION | INAPPROPRIATE_EXPRESSION | IMPERSONATION_OR_PRIVATE"
+        varchar_50 reason "NOT NULL, Enum: INCORRECT_PERSONA | HALLUCINATION | INAPPROPRIATE_EXPRESSION"
         varchar_500 detail_reason "NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"

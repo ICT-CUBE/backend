@@ -449,7 +449,7 @@ CREATE TABLE `conversation_report` (
     PRIMARY KEY (`id`),
     KEY `idx_conversation_report_message_id` (`conversation_message_id`),
     CONSTRAINT `fk_conversation_report_message` FOREIGN KEY (`conversation_message_id`) REFERENCES `avatar_conversation_message` (`id`),
-    CONSTRAINT `ck_conversation_report_reason` CHECK (`reason` IN ('INCORRECT_PERSONA', 'HALLUCINATION', 'INAPPROPRIATE_EXPRESSION', 'IMPERSONATION_OR_PRIVATE'))
+    CONSTRAINT `ck_conversation_report_reason` CHECK (`reason` IN ('INCORRECT_PERSONA', 'HALLUCINATION', 'INAPPROPRIATE_EXPRESSION'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `avatar_interaction_session` (

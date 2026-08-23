@@ -1,9 +1,45 @@
 """앨범 도메인 트랙 재생 세션 API 요청·응답 스키마."""
 
+from datetime import date
 from enum import StrEnum
 
 from app.models.enums import TrackPlayMode
 from app.schemas.base import ApiSchema
+
+
+class AlbumTrackResponse(ApiSchema):
+    id: int
+    track_number: int
+    title: str
+    artist_name: str
+    duration_seconds: int
+    is_title_track: bool
+
+
+class AlbumInfoResponse(ApiSchema):
+    id: int
+    title: str
+    artist_name: str
+    track_count: int
+    track_total_seconds: int
+    cover_image_url: str
+    release_date: date
+    tracks: list[AlbumTrackResponse]
+
+
+class AlbumResponse(ApiSchema):
+    album: AlbumInfoResponse
+
+
+class AlbumTrackDetailResponse(ApiSchema):
+    id: int
+    audio_url: str
+    duration_seconds: int
+    lyrics: str
+
+
+class AlbumTrackDetailGetResponse(ApiSchema):
+    track: AlbumTrackDetailResponse
 
 
 class TrackSessionCreateRequest(ApiSchema):

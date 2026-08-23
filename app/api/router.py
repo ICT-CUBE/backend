@@ -21,6 +21,7 @@ api_router.include_router(market.router, prefix="/users/me", tags=["market"])
 api_router.include_router(mission.router, prefix="/users/me", tags=["mission"])
 api_router.include_router(cube.router, prefix="/cubes", tags=["cube"])
 api_router.include_router(stage.router, prefix="/stages", tags=["stage"])
+api_router.include_router(album.album_router, prefix="/album", tags=["album"])
 api_router.include_router(album.router, prefix="/tracks", tags=["album"])
 api_router.include_router(
     album.track_session_router,
