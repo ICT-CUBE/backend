@@ -19,12 +19,14 @@ from app.models.avatar import AvatarInteractionPicture
 from app.models.conversation import (
     AvatarConversationMessage,
     AvatarConversationSession,
+    ConversationReport,
 )
 from app.models.cube import CubeOwnership
 from app.models.enums import (
     AvatarConversationSessionStatus,
     ConversationMessageSenderType,
     ConversationMessageStatus,
+    ConversationReportReason,
     ConversationType,
     OwnershipStatus,
 )
@@ -278,6 +280,52 @@ def toggle_conversation_message_save(
             is_text_saved=conversation_message.is_text_saved,
         )
     )
+
+
+def create_conversation_report(
+    *,
+    db: Session,
+    current_user_id: int,
+    conversation_message_id: int,
+    reason: ConversationReportReason,
+    detail_reason: str | None,
+) -> None:
+    """현재 사용자의 아바타 대화 메시지에 대한 오류 신고를 저장합니다."""
+    conversation_message = db.scalar(
+        select(AvatarConversationMessage)
+        .join(
+            AvatarConversationSession,
+            AvatarConversationMessage.conversation_session_id
+            == AvatarConversationSession.id,
+        )
+        .join(
+            CubeOwnership,
+            AvatarConversationSession.cube_ownership_id == CubeOwnership.id,
+        )
+        .where(
+            AvatarConversationMessage.id == conversation_message_id,
+            AvatarConversationMessage.sender_type
+            == ConversationMessageSenderType.AVATAR,
+            CubeOwnership.user_id == current_user_id,
+            AvatarConversationSession.deleted_at.is_(None),
+        )
+        .limit(1)
+    )
+    if conversation_message is None:
+        _raise_conversation_message_not_found()
+
+    # 같은 메시지에 여러 번 신고할 수 있으므로 기존 신고는 조회하지 않습니다.
+    conversation_report = ConversationReport(
+        conversation_message_id=conversation_message.id,
+        reason=reason,
+        detail_reason=detail_reason,
+    )
+    try:
+        db.add(conversation_report)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def get_conversation_session_detail(

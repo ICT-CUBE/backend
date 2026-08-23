@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import Field, field_validator
 
-from app.models.enums import ConversationType
+from app.models.enums import ConversationReportReason, ConversationType
 from app.schemas.base import ApiSchema
 
 
@@ -71,6 +71,11 @@ class ConversationMessageSaveItemResponse(ApiSchema):
 
 class ConversationMessageSaveResponse(ApiSchema):
     conversation_message: ConversationMessageSaveItemResponse
+
+
+class ConversationReportCreateRequest(ApiSchema):
+    reason: ConversationReportReason
+    detail_reason: str | None = Field(default=None, max_length=200)
 
 
 class ConversationMessageReplyRequest(ApiSchema):

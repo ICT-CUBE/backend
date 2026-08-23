@@ -24,12 +24,14 @@ from app.schemas.conversation import (
     ConversationMessageReplyRequest,
     ConversationMessageReplyResponse,
     ConversationMessageSaveResponse,
+    ConversationReportCreateRequest,
     ConversationSessionCreateRequest,
     ConversationSessionCreateResponse,
     ConversationSessionsResponse,
 )
 from app.services.conversation import (
     CONVERSATION_PAGE_SIZE,
+    create_conversation_report,
     create_conversation_session,
     delete_conversation_session,
     get_conversation_session_detail,
@@ -191,6 +193,49 @@ def save_conversation_message(
         current_user_id=current_user_id,
         conversation_message_id=conversation_message_id,
     )
+
+
+@router.post(
+    "/conversation-messages/{conversationMessageId}/reports",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="텍스트 응답 오류 신고",
+    description="현재 사용자의 아바타 대화 메시지에 대한 오류 신고를 저장합니다.",
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": (
+                "대화 메시지가 없거나 현재 사용자의 메시지가 아니거나 "
+                "삭제된 세션 또는 USER 발신 메시지임"
+            ),
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "CONVERSATION_MESSAGE_NOT_FOUND",
+                        "message": "대화 메시지를 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def create_text_response_report(
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+    conversation_message_id: Annotated[
+        int,
+        Path(alias="conversationMessageId", ge=1),
+    ],
+    body: ConversationReportCreateRequest,
+) -> Response:
+    """POST /api/v1/users/me/conversation-messages/{conversationMessageId}/reports"""
+    create_conversation_report(
+        db=db,
+        current_user_id=current_user_id,
+        conversation_message_id=conversation_message_id,
+        reason=body.reason,
+        detail_reason=body.detail_reason,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
