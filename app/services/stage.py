@@ -8,17 +8,115 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ApiError
 from app.models.cube import CubeOwnership
-from app.models.enums import OwnershipStatus, StageSessionStatus
+from app.models.enums import OwnershipStatus, StageSessionStatus, StageVideoType
 from app.models.stage import Stage, StageCapture, StageSession
 from app.schemas.stage import (
+    StageListItemResponse,
+    StageListResponse,
     StageSessionCreateResponse,
     StageSessionEndStatus,
     StageSessionResponse,
+    StageVideoDetailResponse,
+    StageVideoResponse,
     StageViewMode,
 )
 from app.services.blob_storage import normalize_image_content_type, upload_stage_capture
 
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
+
+
+def get_stages(
+    *,
+    db: Session,
+    current_user_id: int,
+    video_type: StageVideoType,
+) -> StageListResponse:
+    """현재 사용자의 마지막 활성 소유권을 확인한 뒤 스테이지 목록을 조회합니다."""
+    ownership = db.scalar(
+        select(CubeOwnership.id)
+        .where(
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
+        )
+        .limit(1)
+    )
+    if ownership is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_OWNERSHIP_NOT_FOUND",
+            message="큐브 소유권 정보를 찾을 수 없습니다.",
+        )
+
+    stages = db.scalars(
+        select(Stage)
+        .where(
+            Stage.is_active.is_(True),
+            Stage.video_type == video_type,
+        )
+        .order_by(Stage.id.asc())
+    )
+
+    return StageListResponse(
+        stages=[
+            StageListItemResponse(
+                id=stage.id,
+                title=stage.title,
+                description=stage.description,
+                thumbnail_url=stage.thumbnail_url,
+                recorded_at=stage.recorded_at,
+                is_title_video=stage.is_title_video,
+            )
+            for stage in stages
+        ]
+    )
+
+
+def get_stage_video(
+    *,
+    db: Session,
+    current_user_id: int,
+    stage_id: int,
+) -> StageVideoDetailResponse:
+    """현재 사용자의 마지막 활성 소유권을 확인한 뒤 스테이지 영상을 조회합니다."""
+    ownership = db.scalar(
+        select(CubeOwnership.id)
+        .where(
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
+        )
+        .limit(1)
+    )
+    if ownership is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_OWNERSHIP_NOT_FOUND",
+            message="큐브 소유권 정보를 찾을 수 없습니다.",
+        )
+
+    stage = db.scalar(
+        select(Stage)
+        .where(
+            Stage.id == stage_id,
+            Stage.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    if stage is None:
+        raise ApiError(
+            status_code=404,
+            code="STAGE_NOT_FOUND",
+            message="스테이지 영상을 찾을 수 없습니다.",
+        )
+
+    return StageVideoDetailResponse(
+        stage=StageVideoResponse(
+            id=stage.id,
+            video_url=stage.video_url,
+            duration_seconds=stage.duration_seconds,
+        )
+    )
 
 
 def create_stage_session(

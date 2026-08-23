@@ -15,7 +15,7 @@ class MarketProduct(Base):
     __tablename__ = "market_product"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    cube_id: Mapped[int] = mapped_column(ForeignKey("cube.id"))
+    cube_id: Mapped[int] = mapped_column(ForeignKey("cube.id"), unique=True)
     product_image_url: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
@@ -25,7 +25,7 @@ class MarketProduct(Base):
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
 
-    cube: Mapped[Cube] = relationship(back_populates="market_products")
+    cube: Mapped[Cube] = relationship(back_populates="market_product")
     sell_listings: Mapped[list["SellListing"]] = relationship(
         back_populates="market_product"
     )

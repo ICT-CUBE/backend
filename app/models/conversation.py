@@ -114,8 +114,8 @@ class AvatarConversationMessage(Base):
     conversation_session: Mapped[AvatarConversationSession] = relationship(
         back_populates="messages"
     )
-    report: Mapped["ConversationReport"] = relationship(
-        back_populates="conversation_message", uselist=False
+    reports: Mapped[list["ConversationReport"]] = relationship(
+        back_populates="conversation_message"
     )
 
 
@@ -143,5 +143,5 @@ class ConversationReport(Base):
     )
 
     conversation_message: Mapped[AvatarConversationMessage] = relationship(
-        back_populates="report"
+        back_populates="reports"
     )

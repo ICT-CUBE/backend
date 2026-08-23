@@ -21,14 +21,15 @@
 - `size`를 보내지 않으면 기본값은 20이다.
 - `size`는 1 이상의 숫자를 허용한다.
 - 프론트가 전달한 `size` 값을 기준으로 페이징해서 반환한다.
-- 현재 사용자의 `ACTIVE` 큐브 소유권에 속한 대화 세션만 조회한다.
+- 현재 사용자의 `ACTIVE` 큐브 소유권 중 `is_last_accessed = true`인 소유권에 속한 대화 세션만 조회한다.
+- 조건에 맞는 큐브 소유권이 존재하지 않으면 404: CUBE_OWNERSHIP_NOT_FOUND를 반환한다.
 - 삭제된 대화 세션(`deleted_at`이 null이 아닌 항목)은 반환하지 않는다.
 - 대화가 한 번도 이루어지지 않아 메시지가 없는 세션은 반환하지 않는다.
 - 세션의 마지막 메시지 기준 최신순으로 정렬한다.
 - 텍스트 대화 조회에서는 마지막 메시지의 `content`를 반환한다.
 - 음성 대화 조회에서는 마지막 메시지의 `content`를 `null`로 반환한다.
 - 음성 대화 조회에서는 세션의 `audioUrl`, `audioDurationSeconds`를 함께 반환한다.
-- 조회 결과가 없으면 빈 배열과 페이지 정보를 200으로 반환한다.
+- 조건에 맞는 큐브 소유권은 있지만 조회할 대화 세션이 없으면 빈 배열과 페이지 정보를 200으로 반환한다.
 
 ---
 
@@ -166,6 +167,16 @@ Status Code : 200
 
 ### 오류 응답 데이터
 
+Status Code : 404
+
+현재 사용자의 마지막 접근 `ACTIVE` 큐브 소유권이 존재하지 않는 경우
+
+```json
+{
+  "code": "CUBE_OWNERSHIP_NOT_FOUND",
+  "message": "큐브 소유권 정보를 찾을 수 없습니다."
+}
+```
 
 
 
@@ -186,7 +197,7 @@ Status Code : 200
 ### 처리 정책
 
 - 텍스트 대화 세션만 상세 조회할 수 있다.
-- 현재 사용자의 `ACTIVE` 큐브 소유권에 속한 텍스트 대화 세션만 조회할 수 있다.
+- `conversationSessionId`에 해당하는 세션이 현재 사용자의 `ACTIVE`이면서 `is_last_accessed = true`인 큐브 소유권에 속한 경우에만 조회할 수 있다.
 - 삭제된 대화 세션(`deleted_at`이 null이 아닌 항목)은 조회하지 않는다.
 - `conversation_type = VOICE`인 세션 id로 요청하면 404: VOICE_CONVERSATION_DETAIL_NOT_AVAILABLE을 반환한다.
 - 대화가 한 번도 오가지 않은 텍스트 대화 세션은 상세 조회 대상에서 제외하며 404: CONVERSATION_SESSION_NOT_FOUND를 반환한다.
@@ -266,7 +277,7 @@ Status Code : 200
 ### 오류 응답 데이터
 Status Code : 404
 
-대화 세션이 존재하지 않거나, 현재 사용자의 활성 큐브 소유권에 속하지 않거나, 삭제된 세션이거나, 메시지가 하나도 없는 텍스트 세션인 경우
+대화 세션이 존재하지 않거나, 현재 사용자의 `ACTIVE`이면서 `is_last_accessed = true`인 큐브 소유권에 속하지 않거나, 삭제된 세션이거나, 메시지가 하나도 없는 텍스트 세션인 경우
 
 ```json
 {
@@ -275,7 +286,7 @@ Status Code : 404
 }
 ```
 
-현재 사용자의 활성 큐브 소유권에 속한 세션이지만 음성 대화 세션인 경우
+현재 사용자의 `ACTIVE`이면서 `is_last_accessed = true`인 큐브 소유권에 속한 세션이지만 음성 대화 세션인 경우
 
 ```json
 {
@@ -856,5 +867,170 @@ Status Code : 404
 {
   "code": "CONVERSATION_SESSION_NOT_FOUND",
   "message": "대화 세션을 찾을 수 없습니다."
+}
+```
+
+
+
+
+## 대화 보관함 조회
+- http 메서드: GET
+- 엔드포인트: `/api/v1/users/me/conversation-archive`
+- 도메인: conversation
+
+### API 설명
+
+대화 보관함 화면에 진입했을 때 호출한다.
+
+현재 사용자가 마지막으로 접근한 활성 큐브에서 보관한 아바타 텍스트 대화 메시지를 조회한다.
+
+---
+
+### 처리 정책
+
+- 현재 사용자의 `ACTIVE` 큐브 소유권 중 `is_last_accessed = true`인 소유권에 속한 대화 메시지만 조회한다.
+- 조건에 맞는 큐브 소유권이 존재하지 않으면 404: CUBE_OWNERSHIP_NOT_FOUND를 반환한다.
+- `avatar_conversation_message.sender_type = AVATAR`이고 `is_text_saved = true`인 텍스트 대화 메시지만 반환한다.
+- 음성 대화 메시지와 사용자가 보낸 메시지는 반환하지 않는다.
+- 삭제되지 않은 대화 세션(`deleted_at IS NULL`)에 속한 메시지만 반환한다.
+- 대화 세션의 `status`가 `ACTIVE` 또는 `NOT_ACTIVE`인지와 관계없이 반환한다.
+- 대화 메시지의 차단 상태는 조회 조건으로 사용하지 않는다.
+- 보관한 메시지는 `sent_at` 내림차순으로 정렬하고, 같은 시각이면 메시지 `id` 내림차순으로 정렬한다.
+- 페이지네이션 없이 전체 보관 메시지를 반환한다.
+- 보관한 메시지가 없으면 `savedTexts`를 빈 배열로 반환한다.
+- 날짜/시간 값은 한국시간 기준 offset 없는 ISO 8601 형식으로 반환한다.
+
+---
+
+### 요청 Query
+
+없음
+
+---
+
+### 요청 Path
+
+없음
+
+---
+
+### 요청 Body
+
+없음
+
+---
+
+### 정상 응답 데이터
+Status Code : 200
+
+| 필드 | 타입 | 설명 |
+|---|---:|---|
+| `savedTexts` | array | 보관한 대화 메시지 목록 |
+| `savedTexts[].id` | number | 대화 메시지 id |
+| `savedTexts[].conversationSessionId` | number | 메시지가 속한 대화 세션 id |
+| `savedTexts[].content` | string | 보관한 아바타 대화 내용 |
+| `savedTexts[].sequenceNumber` | number | 대화 세션 내 메시지 순서 |
+| `savedTexts[].sentAt` | string(date-time) | 메시지 전송 시각 |
+
+```json
+{
+  "savedTexts": [
+    {
+      "id": 5006,
+      "conversationSessionId": 1001,
+      "content": "오늘 하루는 어땠어? 힘든 일은 없었지?",
+      "sequenceNumber": 6,
+      "sentAt": "2026-07-29T15:30:02"
+    },
+    {
+      "id": 4982,
+      "conversationSessionId": 995,
+      "content": "오늘 무대 정말 멋졌어!",
+      "sequenceNumber": 12,
+      "sentAt": "2026-07-28T20:10:00"
+    }
+  ]
+}
+```
+
+---
+
+### 오류 응답 데이터
+Status Code : 404
+
+현재 사용자의 마지막 접근 `ACTIVE` 큐브 소유권이 존재하지 않는 경우
+
+```json
+{
+  "code": "CUBE_OWNERSHIP_NOT_FOUND",
+  "message": "큐브 소유권 정보를 찾을 수 없습니다."
+}
+```
+
+
+
+
+## 대화 보관함 삭제
+- http 메서드: DELETE
+- 엔드포인트: `/api/v1/users/me/conversation-messages/{conversationMessageId}/unsave`
+- 도메인: conversation
+
+### API 설명
+
+대화 보관함에서 사용자가 보관한 대화 메시지를 삭제했을 때 호출한다.
+
+대화 메시지 row를 삭제하지 않고 `is_text_saved`를 `false`로 변경하여 보관을 해제한다.
+
+---
+
+### 처리 정책
+
+- `conversationMessageId`에 해당하는 대화 메시지를 조회한다.
+- 현재 사용자의 `ACTIVE` 큐브 소유권 중 `is_last_accessed = true`인 소유권에 속한 메시지만 보관 해제할 수 있다.
+- 현재 보관 중인 메시지(`is_text_saved = true`)만 보관 해제할 수 있다.
+- API 호출이 성공하면 `avatar_conversation_message.is_text_saved`를 `false`로 변경한다.
+- 대화 메시지 row와 대화 세션 row는 삭제하지 않는다.
+- 메시지가 존재하지 않거나, 현재 사용자의 마지막 접근 활성 큐브 소유권에 속하지 않거나, 이미 `is_text_saved = false`이면 404: CONVERSATION_MESSAGE_NOT_FOUND를 반환한다.
+
+---
+
+### 요청 Query
+
+없음
+
+---
+
+### 요청 Path
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---:|:---:|---|
+| `conversationMessageId` | number | O | 보관 해제할 대화 메시지 id |
+
+요청 예시: `/api/v1/users/me/conversation-messages/5006/unsave`
+
+---
+
+### 요청 Body
+
+없음
+
+---
+
+### 정상 응답 데이터
+Status Code : 204
+
+응답 Body 없음
+
+---
+
+### 오류 응답 데이터
+Status Code : 404
+
+대화 메시지를 찾을 수 없거나 보관 해제할 수 없는 메시지인 경우
+
+```json
+{
+  "code": "CONVERSATION_MESSAGE_NOT_FOUND",
+  "message": "대화 메시지를 찾을 수 없습니다."
 }
 ```

@@ -1,19 +1,25 @@
 SET NAMES utf8mb4;
 
 INSERT INTO `user` (`id`, `email`, `password_hash`, `login_provider`, `provider_user_id`, `nickname`, `profile_character_img_url`, `chat_violation_count`, `status`) VALUES
-(1, 'cube@arzone.com', 'abcdef12!', 'EMAIL', 'jennylover', '블링크', NULL, 0, 'ACTIVE');
+(1, 'cube@arzone.com', 'abcdef12!', 'EMAIL', 'jennylover', '블링크', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(2, 'cubelove@arzone.com', 'afkfkf!', 'EMAIL', 'GDlover', '지드래곤짱', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(3, 'cubelove2323@arzone.com', 'afkfkf!', 'EMAIL', 'ROSElover', '로제짱', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE');
 
 INSERT INTO `auth_session` (`id`, `user_id`, `token_jti`, `status`, `issued_at`, `expires_at`, `device_id`) VALUES
 (1, 1, 'jti-mock-0001', 'ACTIVE', '2025-03-07 19:20:00', '2030-03-07 19:20:00', 'ios-jennylover');
 
 INSERT INTO `cube` (`id`, `serial_number`, `product_name`, `ownership_code_hash`, `artist_name`, `status`) VALUES
-(1, 'ARZ-CUBE-0001', 'NO.0026', 'JENNIE RUBY CUBE', 'Jennie', 'OWNED');
+(1, 'NO.0026', 'JENNIE RUBY CUBE', '9999', 'Jennie', 'OWNED'),
+(2, 'NO.0031', 'BIGBANG MADE CUBE', '1111', 'Big Bang', 'OWNED'),
+(3, 'NO.0022', 'ROSE ROISE CUBE', '2222', 'ROSE', 'OWNED');
 
 INSERT INTO `cube_verification` (`id`, `user_id`, `cube_id`, `verification_status`, `code_expires_at`, `verified_at`) VALUES
 (1, 1, 1, 'SUCCESS', '2025-03-14 19:25:00', '2025-03-07 19:25:00');
 
 INSERT INTO `cube_ownership` (`id`, `user_id`, `cube_id`, `avatar_nickname`, `ownership_status`, `is_last_accessed`, `acquired_at`) VALUES
-(1, 1, 1, '젠득이', 'ACTIVE', TRUE, '2025-03-07 19:30:00');
+(1, 1, 1, '젠득이', 'ACTIVE', TRUE, '2025-03-07 19:30:00'),
+(2, 2, 2, '지디득이', 'ACTIVE', TRUE, '2025-03-07 19:30:00'),
+(3, 3, 3, '로제득이', 'ACTIVE', TRUE, '2025-03-07 19:30:00');
 
 INSERT INTO `reward_item` (`id`, `name`, `reward_type`, `description`, `reward_count`) VALUES
 (1, '친밀도 포인트', 'AFFINITY_POINT', '친밀도 3포인트 제공', 3),
@@ -31,7 +37,6 @@ INSERT INTO `reward_item` (`id`, `name`, `reward_type`, `description`, `reward_c
 (13, '아바타 선대화', 'AVATAR_FIRST_TALK', '아바타 선대화 1일 5회', 5),
 (14, '뱃지', 'BADGE', 'BORN PINK 마스터', 1);
 
-
 INSERT INTO `level` (`id`, `reward_item_id`, `level`, `level_xp`, `level_name`) VALUES
 (1, 1, 1, 0, 'Intro'),
 (2, 2, 2, 100, 'Friend'),
@@ -42,13 +47,13 @@ INSERT INTO `affinity` (`id`, `cube_ownership_id`, `level_id`, `current_xp`) VAL
 (1, 1, 3, 840);
 
 INSERT INTO `mission` (`id`, `reward_item_id`, `mission_type`, `title`, `description`, `mission_info`, `target_action`, `target_count`, `start_at`, `end_at`, `is_active`) VALUES
-(1, 2, 'DAILY', '홈 화면 조회', '홈 화면 조회하기', 'home_view=1', 'HOME_VIEW', 1, '2025-03-24 00:00:00', '2025-03-24 23:59:59', TRUE),
-(2, 1, 'DAILY', '아바타와 대화', '아바타와 3회 대화하기', 'avatar_chat=3', 'CONVERSATION', 3, '2025-03-24 00:00:00', '2025-03-24 23:59:59', TRUE),
-(3, 2, 'DAILY', '음원 재생', '음원 재생하기', 'play_music=1', 'ALBUM_PLAY', 1, '2025-03-24 00:00:00', '2025-03-24 23:59:59', TRUE),
-(4, 5, 'DAILY', '아바타 현실 소환', '아바타를 3회 현실에서 소환하기', 'summon_avatar=3', 'SUMMON_AVATAR', 3, '2025-03-24 00:00:00', '2025-03-24 23:59:59', TRUE),
-(5, 4, 'DAILY', '갤러리 열람', '갤러리 5회 열람하기', 'open_gallery=5', 'OPEN_GALLERY', 5, '2025-03-24 00:00:00', '2025-03-24 23:59:59', TRUE),
-(6, 3, 'DAILY', '커뮤니티 글 작성', '커뮤니티 글 작성하기', 'write_post=1', 'COMMUNITY_POST', 1, '2025-03-24 00:00:00', '2025-03-24 23:59:59', TRUE),
-(7, 6, 'EVENT', '뮤직비디오 시청', '뮤직비디오 5회 시청하기', 'watch_music_video=5', 'PLAY_MUSIC_VIDEO', 5, '2025-03-07 00:00:00', '2025-04-06 23:59:59', TRUE);
+(1, 2, 'DAILY', '홈 화면 방문하기', 'AR ZONE 접속', 'home_view=1', 'HOME_VIEW', 1, NULL, NULL, TRUE),
+(2, 1, 'DAILY', '아바타와 대화하기', '텍스트 또는 음성 대화', 'avatar_chat=3', 'CONVERSATION', 3, NULL, NULL, TRUE),
+(3, 2, 'DAILY', '음원 재생하기', '앨범에서 노래 한 곡 재생', 'play_music=1', 'ALBUM_PLAY', 1, NULL, NULL, TRUE),
+(4, 5, 'DAILY', '아바타 현실 소환하기', 'AR 카메라 3회 사용', 'summon_avatar=3', 'SUMMON_AVATAR', 3, NULL, NULL, TRUE),
+(5, 4, 'DAILY', '갤러리 둘러보기', '아무 사진 5회 열람', 'open_gallery=5', 'OPEN_GALLERY', 5, NULL, NULL, TRUE),
+(6, 3, 'DAILY', '커뮤니티 글 업로드하기', '게시물 1회 업로드', 'write_post=1', 'COMMUNITY_POST', 1, NULL, NULL, TRUE),
+(7, 14, 'EVENT', '[RUBY] 콘서트 인증 이벤트', '아무 뮤직 비디오 5회 시청', 'watch_music_video=5', 'PLAY_MUSIC_VIDEO', 5, '2026-06-12 00:00:00', '2025-09-18 23:59:59', TRUE);
 
 INSERT INTO `mission_progress` (`id`, `cube_ownership_id`, `mission_id`, `current_count`, `status`, `reward_claimed`, `completed_at`, `claimed_at`) VALUES
 (1, 1, 1, 1, 'REWARDED', TRUE, '2025-03-24 10:00:00', '2025-03-24 10:02:00'),
@@ -153,14 +158,16 @@ INSERT INTO `album_image` (`id`, `album_id`, `title`, `image_type`, `album_conte
 
 
 INSERT INTO `avatar_conversation_session` (`id`, `cube_ownership_id`, `conversation_type`, `started_at`, `ended_at`, `audio_url`, `audio_duration_seconds`, `conversation_title`, `status`) VALUES
-(1, 1, 'TEXT', '2025-03-10 12:00:00', NULL, NULL, NULL, '오늘의 인사', 'ACTIVE'),
+(1, 1, 'TEXT', '2025-03-10 12:00:00', NULL, NULL, NULL, '오늘의 인사', 'NOT_ACTIVE'),
 (2, 1, 'VOICE', '2025-03-29 21:10:00', '2025-03-29 21:12:00', NULL, 120, '음성 대화', 'NOT_ACTIVE'),
 (3, 1, 'TEXT', '2025-04-12 20:20:00', '2025-04-12 20:31:00', NULL, NULL, 'Ruby 앨범 이야기', 'NOT_ACTIVE');
 
 INSERT INTO `avatar_conversation_message` (`id`, `conversation_session_id`, `sender_type`, `content`, `sequence_number`, `is_text_saved`, `status`, `violation_type`, `sent_at`) VALUES
-(1, 1, 'USER', '안녕, 오늘 기분 어때?', 1, TRUE, 'ALLOWED', NULL, '2025-03-10 12:00:10'),
+(1, 1, 'USER', '안녕, 오늘 기분 어때?', 1, FALSE, 'ALLOWED', NULL, '2025-03-10 12:00:10'),
 (2, 1, 'AVATAR', '좋아! 오늘은 like JENNIE 들어볼까?', 2, TRUE, 'ALLOWED', NULL, '2025-03-10 12:00:12'),
-(3, 3, 'USER', 'Ruby 앨범 콘셉트 설명해줘.', 1, TRUE, 'ALLOWED', NULL, '2025-04-12 20:20:10');
+(3, 1, 'USER', '뭐해?', 3, FALSE, 'ALLOWED', NULL, '2025-03-10 12:00:12'),
+(4, 1, 'AVATAR', '몰라', 4, TRUE, 'ALLOWED', NULL, '2025-03-10 12:00:12'),
+(5, 3, 'USER', 'Ruby 앨범 콘셉트 설명해줘.', 1, FALSE, 'ALLOWED', NULL, '2025-04-12 20:20:10');
 
 INSERT INTO `conversation_report` (`id`, `conversation_message_id`, `reason`, `detail_reason`) VALUES
 (1, 1, 'INCORRECT_PERSONA', '페르소나 응답이 부정확한 예시'),
@@ -168,7 +175,7 @@ INSERT INTO `conversation_report` (`id`, `conversation_message_id`, `reason`, `d
 (3, 3, 'INAPPROPRIATE_EXPRESSION', '부적절한 표현 감지');
 
 INSERT INTO `avatar_interaction_session` (`id`, `cube_ownership_id`, `started_at`, `ended_at`, `status`) VALUES
-(1, 1, '2025-03-10 13:00:00', NULL, 'ACTIVE'),
+(1, 1, '2025-03-10 13:00:00', NULL, 'COMPLETED'),
 (2, 1, '2025-03-18 19:20:00', '2025-03-18 19:24:00', 'COMPLETED'),
 (3, 1, '2025-03-20 21:00:00', '2025-03-20 21:05:00', 'COMPLETED');
 
@@ -198,13 +205,16 @@ INSERT INTO `comment_like` (`id`, `comment_id`, `user_id`, `is_liked`) VALUES
 (3, 3, 1, FALSE);
 
 INSERT INTO `market_product` (`id`, `cube_id`, `product_image_url`) VALUES
-(1, 1, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png');
+(1, 1, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png'),
+(2, 2, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
+(3, 3, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png');
 
 INSERT INTO `sell_listing` (`id`, `market_product_id`, `user_id`, `product_status`, `title`, `description`, `price`, `status`) VALUES
-(1, 1, 1, '좋음', 'Ruby Cube 26', '상태 좋은 큐브 판매합니다.', 35000, 'SOLD');
+(1, 2, 2, '좋음', '빅뱅 메이드 큐브 31번', '상태 좋은 큐브 판매합니다.', 35000, 'ACTIVE'),
+(2, 3, 3, '좋음', '로제 큐브 판매', '상태 좋은 큐브 판매합니다.', 35000, 'ACTIVE');
 
 INSERT INTO `trade` (`id`, `sell_listing_id`, `buyer_user_id`, `buyer_phone_number`, `buyer_address`, `total_price`, `paid_time`, `sent_time`, `shipped_time`, `delivered_time`, `completed_time`, `status`) VALUES
-(1, 1, 1, '010-1234-5678', '서울특별시 강남구 테헤란로 1', 35000, '2025-04-08 14:30:00', '2025-04-09 10:00:00', '2025-04-09 15:30:00', '2025-04-10 18:00:00', '2025-04-10 19:00:00', 'COMPLETED');
+(1, 1, 1, '010-1234-5678', '서울특별시 강남구 테헤란로 1', 36250, '2025-04-08 14:30:00', '2025-04-09 10:00:00', '2025-04-09 15:30:00', NULL, NULL, 'SHIPPING');
 
 INSERT INTO `listing_media` (`id`, `sell_listing_id`, `image_url`) VALUES
 (1, 1, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card-2.png');

@@ -1,12 +1,13 @@
-"""트랙 재생 세션 생성 로직."""
+"""앨범 도메인 트랙 재생 세션 로직."""
 
 from datetime import datetime, timedelta, timezone
 from typing import BinaryIO
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import ApiError
+from app.models.album import Album
 from app.models.cube import CubeOwnership
 from app.models.enums import (
     OwnershipStatus,
@@ -14,7 +15,12 @@ from app.models.enums import (
     TrackSessionStatus,
 )
 from app.models.track import Track, TrackCapture, TrackSession
-from app.schemas.track import (
+from app.schemas.album import (
+    AlbumInfoResponse,
+    AlbumResponse,
+    AlbumTrackDetailGetResponse,
+    AlbumTrackDetailResponse,
+    AlbumTrackResponse,
     TrackSessionCreateResponse,
     TrackSessionEndStatus,
     TrackSessionResponse,
@@ -22,6 +28,103 @@ from app.schemas.track import (
 from app.services.blob_storage import normalize_image_content_type, upload_track_capture
 
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
+
+
+def get_album(*, db: Session, current_user_id: int) -> AlbumResponse:
+    """현재 사용자의 마지막 활성 소유권을 확인한 뒤 대표 앨범을 조회합니다."""
+    ownership = db.scalar(
+        select(CubeOwnership.id)
+        .where(
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
+        )
+        .limit(1)
+    )
+    if ownership is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_OWNERSHIP_NOT_FOUND",
+            message="큐브 소유권 정보를 찾을 수 없습니다.",
+        )
+
+    album = db.scalar(
+        select(Album)
+        .options(selectinload(Album.tracks))
+        .order_by(Album.id.asc())
+        .limit(1)
+    )
+    if album is None:
+        raise ApiError(
+            status_code=500,
+            code="INTERNAL_SERVER_ERROR",
+            message="서버 내부 오류가 발생했습니다.",
+        )
+
+    tracks = sorted(album.tracks, key=lambda track: track.track_number)
+    return AlbumResponse(
+        album=AlbumInfoResponse(
+            id=album.id,
+            title=album.title,
+            artist_name=album.artist_name,
+            track_count=album.track_count,
+            track_total_seconds=album.track_total_second,
+            cover_image_url=album.cover_image_url,
+            release_date=album.release_date,
+            tracks=[
+                AlbumTrackResponse(
+                    id=track.id,
+                    track_number=track.track_number,
+                    title=track.title,
+                    artist_name=track.artist_name,
+                    duration_seconds=track.duration_seconds,
+                    is_title_track=track.is_title_track,
+                )
+                for track in tracks
+            ],
+        )
+    )
+
+
+def get_album_track(
+    *,
+    db: Session,
+    current_user_id: int,
+    track_id: int,
+) -> AlbumTrackDetailGetResponse:
+    """현재 사용자의 마지막 활성 소유권을 확인한 뒤 앨범 트랙을 조회합니다."""
+    ownership = db.scalar(
+        select(CubeOwnership.id)
+        .where(
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
+        )
+        .limit(1)
+    )
+    if ownership is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_OWNERSHIP_NOT_FOUND",
+            message="큐브 소유권 정보를 찾을 수 없습니다.",
+        )
+
+    track = db.scalar(select(Track).where(Track.id == track_id).limit(1))
+    if track is None:
+        raise ApiError(
+            status_code=404,
+            code="TRACK_NOT_FOUND",
+            message="앨범 트랙을 찾을 수 없습니다.",
+        )
+
+    return AlbumTrackDetailGetResponse(
+        track=AlbumTrackDetailResponse(
+            id=track.id,
+            audio_url=track.audio_url,
+            duration_seconds=track.duration_seconds,
+            lyrics=track.lyrics,
+        )
+    )
 
 
 def create_track_session(

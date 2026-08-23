@@ -1,6 +1,16 @@
 from fastapi import APIRouter
 
-from app.api.routes import avatar, conversation, gallery, home, market, stage, track
+from app.api.routes import (
+    album,
+    avatar,
+    conversation,
+    cube,
+    gallery,
+    home,
+    market,
+    mission,
+    stage,
+)
 
 api_router = APIRouter()
 api_router.include_router(avatar.router, prefix="/users/me", tags=["avatar"])
@@ -8,12 +18,15 @@ api_router.include_router(conversation.router, prefix="/users/me", tags=["conver
 api_router.include_router(gallery.router, prefix="/users/me", tags=["gallery"])
 api_router.include_router(home.router, prefix="/users/me", tags=["home"])
 api_router.include_router(market.router, prefix="/users/me", tags=["market"])
+api_router.include_router(mission.router, prefix="/users/me", tags=["mission"])
+api_router.include_router(cube.router, prefix="/cubes", tags=["cube"])
 api_router.include_router(stage.router, prefix="/stages", tags=["stage"])
-api_router.include_router(track.router, prefix="/tracks", tags=["track"])
+api_router.include_router(album.album_router, prefix="/album", tags=["album"])
+api_router.include_router(album.router, prefix="/tracks", tags=["album"])
 api_router.include_router(
-    track.track_session_router,
+    album.track_session_router,
     prefix="/users/me/track-sessions",
-    tags=["track"],
+    tags=["album"],
 )
 api_router.include_router(
     stage.stage_session_router,

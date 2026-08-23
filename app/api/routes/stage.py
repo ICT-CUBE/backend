@@ -3,25 +3,121 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Path, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Path,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_id
 from app.core.database import get_db
+from app.models.enums import StageVideoType
 from app.schemas.common import ErrorResponse
 from app.schemas.stage import (
+    StageListResponse,
     StageSessionCreateRequest,
     StageSessionCreateResponse,
     StageSessionUpdateRequest,
+    StageVideoDetailResponse,
 )
 from app.services.stage import (
     create_stage_session,
+    get_stage_video,
+    get_stages,
     save_stage_capture,
     save_stage_session,
 )
 
 router = APIRouter()
 stage_session_router = APIRouter()
+
+
+@router.get(
+    "",
+    response_model=StageListResponse,
+    summary="스테이지 조회",
+    description="현재 사용자의 스테이지 영상 목록을 조회합니다.",
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "현재 사용자의 마지막 접근 ACTIVE 큐브 소유권이 존재하지 않음",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "CUBE_OWNERSHIP_NOT_FOUND",
+                        "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def read_stages(
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+    video_type: Annotated[
+        StageVideoType,
+        Query(alias="videoType"),
+    ] = StageVideoType.MUSIC_VIDEO,
+) -> StageListResponse:
+    """GET /api/v1/stages"""
+    return get_stages(
+        db=db,
+        current_user_id=current_user_id,
+        video_type=video_type,
+    )
+
+
+@router.get(
+    "/{stageId}",
+    response_model=StageVideoDetailResponse,
+    summary="스테이지 영상 조회",
+    description="현재 사용자의 스테이지 영상 재생 정보를 조회합니다.",
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "스테이지 또는 큐브 소유권 정보가 없음",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "cubeOwnershipNotFound": {
+                            "summary": "큐브 소유권 없음",
+                            "value": {
+                                "code": "CUBE_OWNERSHIP_NOT_FOUND",
+                                "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+                            },
+                        },
+                        "stageNotFound": {
+                            "summary": "스테이지 없음",
+                            "value": {
+                                "code": "STAGE_NOT_FOUND",
+                                "message": "스테이지 영상을 찾을 수 없습니다.",
+                            },
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
+def read_stage_video(
+    stage_id: Annotated[int, Path(alias="stageId")],
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> StageVideoDetailResponse:
+    """GET /api/v1/stages/{stageId}"""
+    return get_stage_video(
+        db=db,
+        current_user_id=current_user_id,
+        stage_id=stage_id,
+    )
 
 
 @router.post(

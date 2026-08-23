@@ -1,18 +1,25 @@
 """마켓 거래 생성·조회·구매 확정 로직."""
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import NoReturn
-from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, select
+from sqlalchemy.orm import Session, aliased
 
 from app.core.exceptions import ApiError
-from app.models.cube import Cube
-from app.models.enums import SellListingStatus, TradeStatus
-from app.models.market import DigitalCertificate, MarketProduct, SellListing, Trade
+from app.models.cube import Cube, CubeOwnership
+from app.models.enums import OwnershipStatus, SellListingStatus, TradeStatus
+from app.models.market import (
+    DigitalCertificate,
+    MarketProduct,
+    SellListing,
+    Trade,
+)
 from app.models.user import User
 from app.schemas.market import (
+    SellableCubeItemResponse,
+    SellableCubesResponse,
+    SellListingCreateResponse,
     TradeCompleteCertificateResponse,
     TradeCompleteResponse,
     TradeCreateRequest,
@@ -29,6 +36,161 @@ TRADE_TIMELINE_LABELS = {
     TradeStatus.DELIVERED: "배송 완료",
     TradeStatus.COMPLETED: "구매 확정",
 }
+KOREA_TIMEZONE = timezone(timedelta(hours=9))
+
+
+def get_sellable_cubes(
+    *,
+    db: Session,
+    current_user_id: int,
+) -> SellableCubesResponse:
+    """현재 사용자가 새 판매글을 등록할 수 있는 활성 큐브를 반환합니다."""
+    listed_market_product = aliased(MarketProduct)
+    active_listing_exists = (
+        select(SellListing.id)
+        .join(
+            listed_market_product,
+            SellListing.market_product_id == listed_market_product.id,
+        )
+        .where(
+            listed_market_product.cube_id == Cube.id,
+            SellListing.user_id == current_user_id,
+            SellListing.status == SellListingStatus.ACTIVE,
+            SellListing.deleted_at.is_(None),
+        )
+        .exists()
+    )
+
+    rows = db.execute(
+        select(Cube, MarketProduct)
+        .join(CubeOwnership, CubeOwnership.cube_id == Cube.id)
+        .join(
+            MarketProduct,
+            and_(
+                MarketProduct.cube_id == Cube.id,
+                MarketProduct.deleted_at.is_(None),
+            ),
+        )
+        .where(
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            Cube.deleted_at.is_(None),
+            ~active_listing_exists,
+        )
+        .distinct()
+        .order_by(Cube.id.asc())
+    ).all()
+
+    return SellableCubesResponse(
+        cubes=[
+            SellableCubeItemResponse(
+                cube_id=cube.id,
+                market_product_id=market_product.id,
+                serial_number=cube.serial_number,
+                product_name=cube.product_name,
+                artist_name=cube.artist_name,
+                product_image_url=market_product.product_image_url,
+            )
+            for cube, market_product in rows
+        ]
+    )
+
+
+def create_sell_listing(
+    *,
+    db: Session,
+    current_user_id: int,
+    market_product_id: int,
+    product_status: str | None,
+    title: str,
+    description: str,
+    price: int,
+) -> SellListingCreateResponse:
+    """현재 사용자의 마켓 상품에 ACTIVE 판매글을 저장합니다."""
+    market_product = db.scalar(
+        select(MarketProduct)
+        .join(Cube, MarketProduct.cube_id == Cube.id)
+        .join(CubeOwnership, CubeOwnership.cube_id == Cube.id)
+        .where(
+            MarketProduct.id == market_product_id,
+            MarketProduct.deleted_at.is_(None),
+            Cube.deleted_at.is_(None),
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+        )
+        .limit(1)
+        .with_for_update()
+    )
+    if market_product is None:
+        _raise_market_product_not_found()
+
+    active_listing_id = db.scalar(
+        select(SellListing.id)
+        .where(
+            SellListing.market_product_id == market_product.id,
+            SellListing.status == SellListingStatus.ACTIVE,
+            SellListing.deleted_at.is_(None),
+        )
+        .limit(1)
+    )
+    if active_listing_id is not None:
+        db.rollback()
+        raise ApiError(
+            status_code=409,
+            code="SELL_LISTING_ALREADY_ACTIVE",
+            message="이미 판매 중인 마켓 상품입니다.",
+        )
+
+    sell_listing = SellListing(
+        market_product_id=market_product.id,
+        user_id=current_user_id,
+        product_status=product_status,
+        title=title,
+        description=description,
+        price=price,
+        status=SellListingStatus.ACTIVE,
+        deleted_at=None,
+    )
+    try:
+        db.add(sell_listing)
+        db.flush()
+        sell_listing_id = sell_listing.id
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return SellListingCreateResponse(sell_listing_id=sell_listing_id)
+
+
+def delete_sell_listing(
+    *,
+    db: Session,
+    current_user_id: int,
+    sell_listing_id: int,
+) -> None:
+    """현재 사용자가 등록한 판매글을 소프트 딜리트합니다."""
+    sell_listing = db.scalar(
+        select(SellListing)
+        .where(
+            SellListing.id == sell_listing_id,
+            SellListing.user_id == current_user_id,
+            SellListing.status != SellListingStatus.DELETED,
+            SellListing.deleted_at.is_(None),
+        )
+        .limit(1)
+        .with_for_update()
+    )
+    if sell_listing is None:
+        _raise_sell_listing_not_found()
+
+    sell_listing.status = SellListingStatus.DELETED
+    sell_listing.deleted_at = _kst_now_naive()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def create_trade(
@@ -202,6 +364,22 @@ def _raise_sell_listing_invalid() -> NoReturn:
     )
 
 
+def _raise_market_product_not_found() -> NoReturn:
+    raise ApiError(
+        status_code=404,
+        code="MARKET_PRODUCT_NOT_FOUND",
+        message="마켓 제품 정보를 찾을 수 없습니다.",
+    )
+
+
+def _raise_sell_listing_not_found() -> NoReturn:
+    raise ApiError(
+        status_code=404,
+        code="SELL_LISTING_NOT_FOUND",
+        message="판매 상품을 찾을 수 없습니다.",
+    )
+
+
 def _raise_trade_not_found() -> NoReturn:
     raise ApiError(
         status_code=404,
@@ -212,7 +390,7 @@ def _raise_trade_not_found() -> NoReturn:
 
 def _kst_now_naive() -> datetime:
     """DB 저장 정책에 맞춰 한국시간 기준 timezone 없는 datetime을 반환합니다."""
-    return datetime.now(ZoneInfo("Asia/Seoul")).replace(tzinfo=None, microsecond=0)
+    return datetime.now(KOREA_TIMEZONE).replace(tzinfo=None, microsecond=0)
 
 
 def _build_example_certificate(*, trade_id: int) -> DigitalCertificate:

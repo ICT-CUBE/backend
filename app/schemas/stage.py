@@ -1,9 +1,33 @@
 """스테이지 재생 세션 API 요청·응답 스키마."""
 
+from datetime import datetime
 from enum import StrEnum
 
 from app.models.enums import StageViewMode
 from app.schemas.base import ApiSchema
+
+
+class StageListItemResponse(ApiSchema):
+    id: int
+    title: str
+    description: str | None
+    thumbnail_url: str | None
+    recorded_at: datetime
+    is_title_video: bool
+
+
+class StageListResponse(ApiSchema):
+    stages: list[StageListItemResponse]
+
+
+class StageVideoResponse(ApiSchema):
+    id: int
+    video_url: str
+    duration_seconds: int
+
+
+class StageVideoDetailResponse(ApiSchema):
+    stage: StageVideoResponse
 
 
 class StageSessionEndStatus(StrEnum):

@@ -63,8 +63,8 @@ class Cube(Base):
     verifications: Mapped[list["CubeVerification"]] = relationship(
         back_populates="cube"
     )
-    market_products: Mapped[list["MarketProduct"]] = relationship(
-        back_populates="cube"
+    market_product: Mapped["MarketProduct | None"] = relationship(
+        back_populates="cube", uselist=False
     )
 
 

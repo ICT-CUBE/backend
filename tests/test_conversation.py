@@ -12,12 +12,14 @@ from app.main import app
 from app.models.conversation import (
     AvatarConversationMessage,
     AvatarConversationSession,
+    ConversationReport,
 )
 from app.models.cube import CubeOwnership
 from app.models.enums import (
     AvatarConversationSessionStatus,
     ConversationMessageSenderType,
     ConversationMessageStatus,
+    ConversationReportReason,
     ConversationType,
 )
 
@@ -100,6 +102,37 @@ def save_conversation_message_request(
         app.dependency_overrides.clear()
 
 
+def create_conversation_report_request(
+    db: Mock,
+    conversation_message_id: int = 5006,
+    body: dict | None = None,
+    raise_server_exceptions: bool = True,
+):
+    def override_get_db() -> Iterator[Session]:
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(
+            app,
+            raise_server_exceptions=raise_server_exceptions,
+        ) as client:
+            return client.post(
+                f"/api/v1/users/me/conversation-messages/"
+                f"{conversation_message_id}/reports",
+                json=(
+                    body
+                    if body is not None
+                    else {
+                        "reason": "INCORRECT_PERSONA",
+                        "detailReason": "아티스트 설정과 다른 답변입니다.",
+                    }
+                ),
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+
 def reply_conversation_message_request(
     db: Mock,
     conversation_session_id: int = 1001,
@@ -161,6 +194,40 @@ def request_conversation_sessions(db: Mock, query: str = "?conversationType=TEXT
         app.dependency_overrides.clear()
 
 
+def request_conversation_archive(db: Mock):
+    def override_get_db() -> Iterator[Session]:
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            return client.get("/api/v1/users/me/conversation-archive")
+    finally:
+        app.dependency_overrides.clear()
+
+
+def delete_conversation_archive_message_request(
+    db: Mock,
+    conversation_message_id: int = 5006,
+    raise_server_exceptions: bool = True,
+):
+    def override_get_db() -> Iterator[Session]:
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(
+            app,
+            raise_server_exceptions=raise_server_exceptions,
+        ) as client:
+            return client.delete(
+                f"/api/v1/users/me/conversation-messages/"
+                f"{conversation_message_id}/unsave"
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+
 def conversation_result(*rows: tuple[AvatarConversationSession, AvatarConversationMessage]):
     result = Mock()
     result.all.return_value = list(rows)
@@ -193,6 +260,7 @@ def session(
 def message(
     *,
     id: int,
+    conversation_session_id: int | None = None,
     content: str = "헐! 대박인데?",
     sent_at: datetime | None = None,
     sequence_number: int = 1,
@@ -202,6 +270,7 @@ def message(
 ) -> AvatarConversationMessage:
     return AvatarConversationMessage(
         id=id,
+        conversation_session_id=conversation_session_id,
         content=content,
         sent_at=sent_at or datetime.fromisoformat("2026-07-29T12:25:00"),
         sequence_number=sequence_number,
@@ -213,6 +282,7 @@ def message(
 
 def test_text_conversation_sessions_return_last_message_content() -> None:
     db = Mock(spec=Session)
+    db.scalar.return_value = CubeOwnership(id=1)
     db.execute.return_value = conversation_result(
         (
             session(id=1001, conversation_type=ConversationType.TEXT),
@@ -247,6 +317,7 @@ def test_text_conversation_sessions_return_last_message_content() -> None:
 
 def test_voice_conversation_sessions_return_null_content_and_audio_fields() -> None:
     db = Mock(spec=Session)
+    db.scalar.return_value = CubeOwnership(id=1)
     db.execute.return_value = conversation_result(
         (
             session(
@@ -279,6 +350,7 @@ def test_voice_conversation_sessions_return_null_content_and_audio_fields() -> N
 
 def test_conversation_sessions_use_requested_size_and_has_next() -> None:
     db = Mock(spec=Session)
+    db.scalar.return_value = CubeOwnership(id=1)
     db.execute.return_value = conversation_result(
         *[
             (
@@ -299,6 +371,7 @@ def test_conversation_sessions_use_requested_size_and_has_next() -> None:
 
 def test_conversation_sessions_requested_size_changes_page_offset() -> None:
     db = Mock(spec=Session)
+    db.scalar.return_value = CubeOwnership(id=1)
     db.execute.return_value = conversation_result(
         *[
             (
@@ -322,6 +395,7 @@ def test_conversation_sessions_requested_size_changes_page_offset() -> None:
 
 def test_conversation_sessions_return_empty_list() -> None:
     db = Mock(spec=Session)
+    db.scalar.return_value = CubeOwnership(id=1)
     db.execute.return_value = conversation_result()
 
     response = request_conversation_sessions(db)
@@ -351,7 +425,178 @@ def test_conversation_sessions_swagger_contract() -> None:
         "/api/v1/users/me/conversation-sessions"
     ]["get"]
 
-    assert set(operation["responses"]) == {"200"}
+    assert set(operation["responses"]) == {"200", "404"}
+    assert "security" not in operation
+
+
+def test_conversation_sessions_return_404_without_last_active_ownership() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = request_conversation_sessions(db)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "CUBE_OWNERSHIP_NOT_FOUND",
+        "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+    }
+    db.execute.assert_not_called()
+
+
+def test_conversation_archive_returns_saved_avatar_texts() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = CubeOwnership(id=1)
+    db.scalars.return_value.all.return_value = [
+        message(
+            id=5006,
+            conversation_session_id=1001,
+            content="오늘 하루는 어땠어?",
+            sent_at=datetime.fromisoformat("2026-07-29T15:30:02"),
+            sequence_number=6,
+            sender_type=ConversationMessageSenderType.AVATAR,
+            is_text_saved=True,
+            status=ConversationMessageStatus.BLOCKED,
+        ),
+        message(
+            id=4982,
+            conversation_session_id=995,
+            content="오늘 무대 정말 멋졌어!",
+            sent_at=datetime.fromisoformat("2026-07-28T20:10:00"),
+            sequence_number=12,
+            sender_type=ConversationMessageSenderType.AVATAR,
+            is_text_saved=True,
+        ),
+    ]
+    response = request_conversation_archive(db)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "savedTexts": [
+            {
+                "id": 5006,
+                "conversationSessionId": 1001,
+                "content": "오늘 하루는 어땠어?",
+                "sequenceNumber": 6,
+                "sentAt": "2026-07-29T15:30:02",
+            },
+            {
+                "id": 4982,
+                "conversationSessionId": 995,
+                "content": "오늘 무대 정말 멋졌어!",
+                "sequenceNumber": 12,
+                "sentAt": "2026-07-28T20:10:00",
+            },
+        ]
+    }
+
+
+def test_conversation_archive_returns_empty_list() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = CubeOwnership(id=1)
+    db.scalars.return_value.all.return_value = []
+
+    response = request_conversation_archive(db)
+
+    assert response.status_code == 200
+    assert response.json() == {"savedTexts": []}
+
+
+def test_conversation_archive_returns_404_without_last_active_ownership() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = request_conversation_archive(db)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "CUBE_OWNERSHIP_NOT_FOUND",
+        "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+    }
+    db.scalars.assert_not_called()
+
+
+def test_conversation_archive_swagger_contract() -> None:
+    operation = app.openapi()["paths"][
+        "/api/v1/users/me/conversation-archive"
+    ]["get"]
+
+    assert set(operation["responses"]) == {"200", "404"}
+    assert "security" not in operation
+
+
+def test_delete_conversation_archive_message_sets_is_text_saved_false() -> None:
+    db = Mock(spec=Session)
+    conversation_message = message(
+        id=5006,
+        conversation_session_id=1001,
+        sender_type=ConversationMessageSenderType.AVATAR,
+        is_text_saved=True,
+    )
+    db.scalar.return_value = conversation_message
+
+    response = delete_conversation_archive_message_request(db)
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert conversation_message.is_text_saved is False
+    db.commit.assert_called_once()
+
+
+def test_delete_conversation_archive_message_returns_404_when_not_saved() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = delete_conversation_archive_message_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "CONVERSATION_MESSAGE_NOT_FOUND",
+        "message": "대화 메시지를 찾을 수 없습니다.",
+    }
+    db.commit.assert_not_called()
+
+
+def test_delete_conversation_archive_message_rejects_invalid_path() -> None:
+    db = Mock(spec=Session)
+
+    response = delete_conversation_archive_message_request(
+        db,
+        conversation_message_id=0,
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "code": "INVALID_REQUEST",
+        "message": "요청값이 올바르지 않습니다.",
+    }
+    db.scalar.assert_not_called()
+
+
+def test_delete_conversation_archive_message_rolls_back_on_commit_failure() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = message(
+        id=5006,
+        conversation_session_id=1001,
+        sender_type=ConversationMessageSenderType.AVATAR,
+        is_text_saved=True,
+    )
+    db.commit.side_effect = RuntimeError("db failed")
+
+    response = delete_conversation_archive_message_request(
+        db,
+        raise_server_exceptions=False,
+    )
+
+    assert response.status_code == 500
+    db.rollback.assert_called_once()
+
+
+def test_delete_conversation_archive_message_swagger_contract() -> None:
+    operation = app.openapi()["paths"][
+        "/api/v1/users/me/conversation-messages/{conversationMessageId}/unsave"
+    ]["delete"]
+
+    assert set(operation["responses"]) == {"204", "404"}
     assert "security" not in operation
 
 
@@ -695,6 +940,139 @@ def test_save_conversation_message_swagger_contract() -> None:
     assert "security" not in operation
 
 
+def test_create_conversation_report_saves_orm_model_and_returns_204() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = message(
+        id=5006,
+        sender_type=ConversationMessageSenderType.AVATAR,
+    )
+
+    response = create_conversation_report_request(db)
+
+    assert response.status_code == 204
+    assert response.content == b""
+    report = db.add.call_args.args[0]
+    assert isinstance(report, ConversationReport)
+    assert report.conversation_message_id == 5006
+    assert report.reason == ConversationReportReason.INCORRECT_PERSONA
+    assert report.detail_reason == "아티스트 설정과 다른 답변입니다."
+    db.commit.assert_called_once()
+
+
+def test_create_conversation_report_accepts_null_and_blank_detail_reason() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = message(
+        id=5006,
+        sender_type=ConversationMessageSenderType.AVATAR,
+    )
+
+    null_response = create_conversation_report_request(
+        db,
+        body={"reason": "HALLUCINATION", "detailReason": None},
+    )
+    blank_response = create_conversation_report_request(
+        db,
+        body={"reason": "INAPPROPRIATE_EXPRESSION", "detailReason": ""},
+    )
+
+    assert null_response.status_code == 204
+    assert blank_response.status_code == 204
+    first_report = db.add.call_args_list[0].args[0]
+    second_report = db.add.call_args_list[1].args[0]
+    assert first_report.detail_reason is None
+    assert second_report.detail_reason == ""
+
+
+def test_create_conversation_report_allows_duplicate_reports() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = message(
+        id=5006,
+        sender_type=ConversationMessageSenderType.AVATAR,
+    )
+
+    first_response = create_conversation_report_request(db)
+    second_response = create_conversation_report_request(db)
+
+    assert first_response.status_code == 204
+    assert second_response.status_code == 204
+    assert db.add.call_count == 2
+    assert db.commit.call_count == 2
+
+
+def test_create_conversation_report_returns_404_for_unavailable_message() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = create_conversation_report_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "CONVERSATION_MESSAGE_NOT_FOUND",
+        "message": "대화 메시지를 찾을 수 없습니다.",
+    }
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_create_conversation_report_rejects_detail_reason_over_200_characters() -> None:
+    db = Mock(spec=Session)
+
+    response = create_conversation_report_request(
+        db,
+        body={"reason": "INCORRECT_PERSONA", "detailReason": "가" * 201},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "code": "INVALID_REQUEST",
+        "message": "요청값이 올바르지 않습니다.",
+    }
+    db.scalar.assert_not_called()
+
+
+def test_create_conversation_report_rejects_invalid_reason() -> None:
+    db = Mock(spec=Session)
+
+    response = create_conversation_report_request(
+        db,
+        body={"reason": "IMPERSONATION_OR_PRIVATE", "detailReason": None},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "code": "INVALID_REQUEST",
+        "message": "요청값이 올바르지 않습니다.",
+    }
+    db.scalar.assert_not_called()
+
+
+def test_create_conversation_report_rolls_back_when_commit_fails() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = message(
+        id=5006,
+        sender_type=ConversationMessageSenderType.AVATAR,
+    )
+    db.commit.side_effect = RuntimeError("db failed")
+
+    response = create_conversation_report_request(
+        db,
+        raise_server_exceptions=False,
+    )
+
+    assert response.status_code == 500
+    db.rollback.assert_called_once()
+
+
+def test_create_conversation_report_swagger_contract() -> None:
+    operation = app.openapi()["paths"][
+        "/api/v1/users/me/conversation-messages/{conversationMessageId}/reports"
+    ]["post"]
+
+    assert set(operation["responses"]) == {"204", "404"}
+    assert operation["tags"] == ["conversation"]
+    assert "security" not in operation
+
+
 def test_conversation_session_detail_returns_messages_descending() -> None:
     db = Mock(spec=Session)
     db.scalar.return_value = session(
@@ -756,6 +1134,12 @@ def test_conversation_session_detail_returns_404_for_unknown_session() -> None:
         "message": "대화 세션을 찾을 수 없습니다.",
     }
     db.scalars.assert_not_called()
+
+    statement = db.scalar.call_args.args[0]
+    query = str(statement)
+    assert "cube_ownership.user_id" in query
+    assert "cube_ownership.ownership_status" in query
+    assert "cube_ownership.is_last_accessed" in query
 
 
 def test_conversation_session_detail_returns_404_for_voice_session() -> None:

@@ -20,23 +20,28 @@ from app.core.database import get_db
 from app.models.enums import ConversationType
 from app.schemas.common import ErrorResponse
 from app.schemas.conversation import (
+    ConversationArchiveResponse,
     ConversationDetailResponse,
     ConversationMessageReplyRequest,
     ConversationMessageReplyResponse,
     ConversationMessageSaveResponse,
+    ConversationReportCreateRequest,
     ConversationSessionCreateRequest,
     ConversationSessionCreateResponse,
     ConversationSessionsResponse,
 )
 from app.services.conversation import (
     CONVERSATION_PAGE_SIZE,
+    create_conversation_report,
     create_conversation_session,
     delete_conversation_session,
+    get_conversation_archive,
     get_conversation_session_detail,
     get_conversation_sessions,
     reply_to_conversation_message,
     save_conversation_session,
     toggle_conversation_message_save,
+    unsave_conversation_archive_message,
 )
 
 router = APIRouter()
@@ -47,9 +52,23 @@ router = APIRouter()
     response_model=ConversationSessionsResponse,
     summary="텍스트 및 음성 대화 조회",
     description=(
-        "현재 사용자의 활성 큐브 소유권에 속한 텍스트 또는 음성 대화 "
-        "세션 목록을 요청한 size 단위로 마지막 메시지 최신순 조회합니다."
+        "현재 사용자의 마지막 접근 활성 큐브 소유권에 속한 텍스트 또는 "
+        "음성 대화 세션을 요청한 size 단위로 마지막 메시지 최신순 조회합니다."
     ),
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "마지막 접근 ACTIVE 큐브 소유권이 존재하지 않음",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "CUBE_OWNERSHIP_NOT_FOUND",
+                        "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
 )
 def read_conversation_sessions(
     db: Annotated[Session, Depends(get_db)],
@@ -69,6 +88,80 @@ def read_conversation_sessions(
         page=page,
         size=size,
     )
+
+
+@router.get(
+    "/conversation-archive",
+    response_model=ConversationArchiveResponse,
+    summary="대화 보관함 조회",
+    description=(
+        "현재 사용자의 마지막 접근 활성 큐브 소유권에 속한 보관된 "
+        "아바타 텍스트 대화 메시지를 최신순으로 조회합니다."
+    ),
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "마지막 접근 ACTIVE 큐브 소유권이 존재하지 않음",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "CUBE_OWNERSHIP_NOT_FOUND",
+                        "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def read_conversation_archive(
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> ConversationArchiveResponse:
+    """GET /api/v1/users/me/conversation-archive"""
+    return get_conversation_archive(
+        db=db,
+        current_user_id=current_user_id,
+    )
+
+
+@router.delete(
+    "/conversation-messages/{conversationMessageId}/unsave",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="대화 보관함 삭제",
+    description=(
+        "현재 사용자의 마지막 접근 활성 큐브 소유권에 속한 보관 메시지의 "
+        "is_text_saved를 false로 변경합니다."
+    ),
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "대화 메시지가 없거나 이미 보관 해제된 메시지임",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "CONVERSATION_MESSAGE_NOT_FOUND",
+                        "message": "대화 메시지를 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def delete_conversation_archive_message(
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+    conversation_message_id: Annotated[
+        int,
+        Path(alias="conversationMessageId", ge=1),
+    ],
+) -> Response:
+    """DELETE /api/v1/users/me/conversation-messages/{conversationMessageId}/unsave"""
+    unsave_conversation_archive_message(
+        db=db,
+        current_user_id=current_user_id,
+        conversation_message_id=conversation_message_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
@@ -191,6 +284,49 @@ def save_conversation_message(
         current_user_id=current_user_id,
         conversation_message_id=conversation_message_id,
     )
+
+
+@router.post(
+    "/conversation-messages/{conversationMessageId}/reports",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="텍스트 응답 오류 신고",
+    description="현재 사용자의 아바타 대화 메시지에 대한 오류 신고를 저장합니다.",
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": (
+                "대화 메시지가 없거나 현재 사용자의 메시지가 아니거나 "
+                "삭제된 세션 또는 USER 발신 메시지임"
+            ),
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "CONVERSATION_MESSAGE_NOT_FOUND",
+                        "message": "대화 메시지를 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def create_text_response_report(
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+    conversation_message_id: Annotated[
+        int,
+        Path(alias="conversationMessageId", ge=1),
+    ],
+    body: ConversationReportCreateRequest,
+) -> Response:
+    """POST /api/v1/users/me/conversation-messages/{conversationMessageId}/reports"""
+    create_conversation_report(
+        db=db,
+        current_user_id=current_user_id,
+        conversation_message_id=conversation_message_id,
+        reason=body.reason,
+        detail_reason=body.detail_reason,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
