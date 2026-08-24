@@ -44,7 +44,7 @@ INSERT INTO `level` (`id`, `reward_item_id`, `level`, `level_xp`, `level_name`) 
 (4, 6, 4, 2000, 'Special');
 
 INSERT INTO `affinity` (`id`, `cube_ownership_id`, `level_id`, `current_xp`) VALUES
-(1, 1, 3, 840);
+(1, 1, 3, 730);
 
 INSERT INTO `mission` (`id`, `reward_item_id`, `mission_type`, `title`, `description`, `mission_info`, `target_action`, `target_count`, `start_at`, `end_at`, `is_active`) VALUES
 (1, 2, 'DAILY', '홈 화면 방문하기', 'AR ZONE 접속', 'home_view=1', 'HOME_VIEW', 1, NULL, NULL, TRUE),
@@ -214,10 +214,9 @@ INSERT INTO `sell_listing` (`id`, `market_product_id`, `user_id`, `product_statu
 (2, 3, 3, '좋음', '로제 큐브 판매', '상태 좋은 큐브 판매합니다.', 35000, 'ACTIVE');
 
 INSERT INTO `trade` (`id`, `sell_listing_id`, `buyer_user_id`, `buyer_phone_number`, `buyer_address`, `total_price`, `paid_time`, `sent_time`, `shipped_time`, `delivered_time`, `completed_time`, `status`) VALUES
-(1, 1, 1, '010-1234-5678', '서울특별시 강남구 테헤란로 1', 36250, '2025-04-08 14:30:00', '2025-04-09 10:00:00', '2025-04-09 15:30:00', NULL, NULL, 'SHIPPING');
+(1, 1, 1, '010-1234-5678', '서울특별시 강남구 테헤란로 1', 36250, '2025-04-08 14:30:00', '2025-04-09 10:00:00', '2025-04-09 15:30:00', '2025-05-09 15:30:00', NULL, 'DELIVERED');
 
 INSERT INTO `listing_media` (`id`, `sell_listing_id`, `image_url`) VALUES
 (1, 1, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card-2.png');
 
-INSERT INTO `digital_certificate` (`id`, `trade_id`, `network`, `token_standard`, `token_id`, `contract_address`, `tx_hash`, `metadata_url`) VALUES
-(1, 1, 'Polygon Amoy', 'ERC-721', '1000001', '0x0000000000000000000000000000000000000002', '0xmocktxhash000000000000000000000000000000000000000000000000000000000002', 'https://example.com/metadata/1.json');
+-- INSERT INTO `digital_certificate` (`id`, `trade_id`, `network`, `token_standard`, `token_id`, `contract_address`, `tx_hash`, `metadata_url`) VALUES
