@@ -1,7 +1,9 @@
 """마켓 도메인 API 요청·응답 스키마."""
 
-from datetime import datetime
+from datetime import date, datetime
+from enum import StrEnum
 
+from app.models.enums import SellListingStatus
 from app.schemas.base import ApiSchema
 
 
@@ -65,12 +67,50 @@ class SellListingCreateResponse(ApiSchema):
     sell_listing_id: int
 
 
+class SellListingDetailItemResponse(ApiSchema):
+    sell_listing_id: int
+    image_urls: list[str]
+    seller_nickname: str | None
+    seller_profile_image_url: str | None
+    status: SellListingStatus
+    is_mine: bool
+    title: str
+    description: str
+    price: int
+    created_at: datetime
+    product_name: str
+    serial_number: str
+
+
+class SellListingDetailResponse(ApiSchema):
+    sell_listing: SellListingDetailItemResponse
+
+
 class TradeCreateRequest(ApiSchema):
     sell_listing_id: int
     buyer_address: str
     buyer_phone_number: str
     total_price: int
     paid_time: datetime
+
+
+class TradeHistoryStatus(StrEnum):
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+
+
+class TradeHistoryItemResponse(ApiSchema):
+    id: int
+    product_image_url: str | None
+    product_name: str
+    serial_number: str
+    price: int
+    paid_date: date
+    status: TradeHistoryStatus
+
+
+class TradeHistoryResponse(ApiSchema):
+    trades: list[TradeHistoryItemResponse]
 
 
 class TradeDetailCubeResponse(ApiSchema):

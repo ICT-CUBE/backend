@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_id
@@ -14,9 +14,11 @@ from app.schemas.market import (
     SellableCubesResponse,
     SellListingCreateRequest,
     SellListingCreateResponse,
+    SellListingDetailResponse,
     TradeCompleteResponse,
     TradeCreateRequest,
     TradeDetailResponse,
+    TradeHistoryResponse,
 )
 from app.services.market import (
     complete_trade,
@@ -25,8 +27,11 @@ from app.services.market import (
     delete_sell_listing,
     get_market,
     get_market_product_sell_listings,
+    get_sell_listing_detail,
     get_sellable_cubes,
     get_trade_detail,
+    get_trade_history,
+    search_market_sell_listings,
 )
 
 router = APIRouter()
@@ -115,6 +120,42 @@ def read_market_product_sell_listings(
 
 
 @router.get(
+    "/market/search",
+    response_model=MarketSellListingsResponse,
+    summary="마켓 검색 결과 조회",
+    description=(
+        "큐브 제품명 또는 아티스트명에 키워드가 포함된 마켓 상품의 판매 중인 판매글을 "
+        "판매글 id 내림차순으로 조회합니다."
+    ),
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "keyword가 없거나 공백만으로 이루어짐",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "INVALID_REQUEST",
+                        "message": "요청값이 올바르지 않습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def search_market(
+    keyword: Annotated[str, Query(min_length=1)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> MarketSellListingsResponse:
+    """GET /api/v1/users/me/market/search"""
+    return search_market_sell_listings(
+        db=db,
+        current_user_id=current_user_id,
+        keyword=keyword,
+    )
+
+
+@router.get(
     "/sellable-cubes",
     response_model=SellableCubesResponse,
     summary="판매 가능한 내 큐브 조회",
@@ -175,6 +216,42 @@ def create_market_sell_listing(
         title=body.title,
         description=body.description,
         price=body.price,
+    )
+
+
+@router.get(
+    "/sell-listings/{sellListingId}",
+    response_model=SellListingDetailResponse,
+    summary="판매글 상세 조회",
+    description=(
+        "삭제되지 않은 판매글의 상세 정보와 판매자·큐브 정보, "
+        "등록된 이미지 전체를 조회합니다."
+    ),
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "판매글이 존재하지 않거나 삭제됨",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "SELL_LISTING_NOT_FOUND",
+                        "message": "판매 상품을 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def read_sell_listing_detail(
+    sell_listing_id: Annotated[int, Path(alias="sellListingId", ge=1)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> SellListingDetailResponse:
+    """GET /api/v1/users/me/sell-listings/{sellListingId}"""
+    return get_sell_listing_detail(
+        db=db,
+        current_user_id=current_user_id,
+        sell_listing_id=sell_listing_id,
     )
 
 
@@ -262,6 +339,22 @@ def create_trade_progress(
     """POST /api/v1/users/me/trades"""
     create_trade(db=db, current_user_id=current_user_id, body=body)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/trades",
+    response_model=TradeHistoryResponse,
+    summary="내 거래 내역 조회",
+    description=(
+        "현재 사용자가 구매자로 참여한 거래 내역을 결제 시각 내림차순으로 조회합니다."
+    ),
+)
+def read_trade_history(
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> TradeHistoryResponse:
+    """GET /api/v1/users/me/trades"""
+    return get_trade_history(db=db, current_user_id=current_user_id)
 
 
 @router.get(

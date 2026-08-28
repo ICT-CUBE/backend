@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     azure_storage_conversation_audio_prefix: str = Field(
         default="conversation_audio"
     )
+    azure_storage_community_post_prefix: str = Field(default="community_post")
 
     model_config = SettingsConfigDict(
         env_file=".env",

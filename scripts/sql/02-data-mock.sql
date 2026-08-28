@@ -3,7 +3,14 @@ SET NAMES utf8mb4;
 INSERT INTO `user` (`id`, `email`, `password_hash`, `login_provider`, `provider_user_id`, `nickname`, `profile_character_img_url`, `chat_violation_count`, `status`) VALUES
 (1, 'cube@arzone.com', 'abcdef12!', 'EMAIL', 'jennylover', '블링크', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
 (2, 'cubelove@arzone.com', 'afkfkf!', 'EMAIL', 'GDlover', '지드래곤짱', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
-(3, 'cubelove2323@arzone.com', 'afkfkf!', 'EMAIL', 'ROSElover', '로제짱', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE');
+(3, 'cubelove2323@arzone.com', 'afkfkf!', 'EMAIL', 'ROSElover', '로제짱', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(4, 'blink04@arzone.com', 'mock_password', 'EMAIL', 'blink04', '한강블링크', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(5, 'rubycollector@arzone.com', 'mock_password', 'EMAIL', 'rubycollector', '루비수집가', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(6, 'jendeukfan@arzone.com', 'mock_password', 'EMAIL', 'jendeukfan', '젠득이팬', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(7, 'concertlover@arzone.com', 'mock_password', 'EMAIL', 'concertlover', '콘서트러버', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(8, 'arzoneexplorer@arzone.com', 'mock_password', 'EMAIL', 'arzoneexplorer', '아르존탐험가', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(9, 'cubemaster@arzone.com', 'mock_password', 'EMAIL', 'cubemaster', '큐브마스터', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(10, 'jenniesupport@arzone.com', 'mock_password', 'EMAIL', 'jenniesupport', '제니응원단', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE');
 
 INSERT INTO `auth_session` (`id`, `user_id`, `token_jti`, `status`, `issued_at`, `expires_at`, `device_id`) VALUES
 (1, 1, 'jti-mock-0001', 'ACTIVE', '2025-03-07 19:20:00', '2030-03-07 19:20:00', 'ios-jennylover');
@@ -233,27 +240,130 @@ INSERT INTO `avatar_interaction_session` (`id`, `cube_ownership_id`, `started_at
 -- INSERT INTO `avatar_interaction_picture` (`id`, `interaction_session_id`, `picture_img_url`, `pictured_at`) VALUES
 
 
-INSERT INTO `post` (`id`, `user_id`, `board_type`, `title`, `content`, `status`) VALUES
-(1, 1, 'FREE', 'Ruby 큐브 26번 등록했어요', '앨범 나오자마자 큐브 등록했습니다. AR로 like JENNIE 무대 보는데 진짜 눈앞에 있는 것 같아요.', 'ACTIVE'),
-(2, 1, 'CERTIFICATION', '큐브 인증 완료', '발매일에 바로 인증 성공했습니다. 코드 입력하고 3초 만에 됐어요.', 'ACTIVE'),
-(3, 1, 'FREE', '제니 다음 앨범', '제니 이번 앨범 너무 좋은데 다음 앨범은 언제쯤 나올까요?', 'ACTIVE');
+INSERT INTO `post` (`id`, `user_id`, `board_type`, `title`, `content`, `status`, `created_at`) VALUES
+(1, 1, 'FREE', 'Ruby 큐브 26번 등록했어요', '앨범 나오자마자 큐브 등록했습니다. AR로 like JENNIE 무대 보는데 진짜 눈앞에 있는 것 같아요.', 'ACTIVE', '2026-08-28 09:10:00'),
+(2, 4, 'FREE', '리액트 상태 관리 질문 있습니다', '커뮤니티 화면을 만들면서 상태 관리 방식을 고민하고 있습니다. 다들 어떤 방식을 사용하시나요?', 'ACTIVE', '2026-08-28 10:20:00'),
+(3, 6, 'FREE', '제니 다음 앨범이 기대돼요', '이번 Ruby 앨범을 계속 듣고 있는데 다음 앨범 소식도 빨리 듣고 싶어요.', 'ACTIVE', '2026-08-28 11:30:00'),
+(4, 8, 'FREE', '갤러리 기능 사용 팁 공유해요', '스테이지와 트랙에서 저장한 캡처를 갤러리에서 다시 보는 방법을 정리해봤어요.', 'ACTIVE', '2026-08-28 12:40:00'),
+(5, 10, 'FREE', '콘서트 갈 때 준비물 추천해주세요', '공연을 처음 보러 가는데 꼭 챙겨야 하는 준비물이 있다면 알려주세요.', 'ACTIVE', '2026-08-28 13:50:00'),
+(6, 2, 'CERTIFICATION', '큐브 인증 완료했습니다', '발매일에 구매한 큐브를 오늘 등록했습니다. 인증 과정도 빠르고 간단했어요.', 'ACTIVE', '2026-08-28 14:10:00'),
+(7, 3, 'CERTIFICATION', '콘서트 영상 5회 시청 인증', '이벤트 미션으로 콘서트 영상을 다섯 번 시청하고 보상까지 받았습니다.', 'ACTIVE', '2026-08-28 15:20:00'),
+(8, 5, 'CERTIFICATION', '친밀도 Close 달성 인증', '매일 대화와 미션을 진행해서 드디어 친밀도 Close 단계에 도달했습니다.', 'ACTIVE', '2026-08-28 16:30:00'),
+(9, 7, 'CERTIFICATION', '스페셜 재생 모드 해금 인증', '친밀도를 올린 뒤 스페셜 재생 모드가 정상적으로 해금된 것을 확인했습니다.', 'REPORTED', '2026-08-28 17:40:00'),
+(10, 9, 'CERTIFICATION', '마켓 거래 완료 인증합니다', '마켓에서 찾던 큐브를 구매하고 구매 확정까지 정상적으로 완료했습니다.', 'ACTIVE', '2026-08-28 18:50:00');
 
 -- INSERT INTO `post_media` (`id`, `post_id`, `post_image_url`) VALUES
 
 INSERT INTO `comment` (`id`, `post_id`, `user_id`, `content`, `status`) VALUES
-(1, 1, 1, '축하해요! 26번 부럽네요.', 'ACTIVE'),
-(2, 2, 1, '인증 이미지 멋져요.', 'ACTIVE'),
-(3, 3, 1, '저도 너무 기다리고 있어요.', 'ACTIVE');
+(1, 1, 2, '축하해요! 26번 큐브 정말 부럽네요.', 'ACTIVE'),
+(2, 1, 4, 'AR 무대가 실제로 보는 것처럼 생생하더라고요.', 'ACTIVE'),
+(3, 1, 6, '저도 같은 큐브 등록하고 싶어요.', 'ACTIVE'),
+(4, 1, 9, '시리얼 번호가 멋집니다.', 'ACTIVE'),
+(5, 2, 1, '저는 화면 단위 상태와 서버 상태를 나눠서 관리하고 있어요.', 'ACTIVE'),
+(6, 2, 5, '규모가 작으면 기본 상태 관리만으로도 충분한 것 같아요.', 'ACTIVE'),
+(7, 2, 8, 'API 캐시가 필요한지부터 확인해보는 걸 추천해요.', 'ACTIVE'),
+(8, 3, 2, '저도 다음 앨범 소식 기다리고 있어요.', 'ACTIVE'),
+(9, 3, 4, '이번 앨범 수록곡이 다 좋아서 매일 듣고 있습니다.', 'ACTIVE'),
+(10, 3, 7, '다음 활동도 멋진 무대가 많았으면 좋겠어요.', 'ACTIVE'),
+(11, 3, 9, '새로운 콘셉트도 기대됩니다.', 'ACTIVE'),
+(12, 3, 10, '공식 소식 나오면 같이 공유해요.', 'ACTIVE'),
+(13, 4, 1, '캡처를 다시 보는 방법이 궁금했는데 감사합니다.', 'ACTIVE'),
+(14, 4, 3, '트랙 캡처도 같은 방식으로 볼 수 있나요?', 'ACTIVE'),
+(15, 4, 5, '정리해주신 내용대로 하니 잘 됩니다.', 'ACTIVE'),
+(16, 4, 7, '갤러리 필터도 함께 사용하면 편해요.', 'ACTIVE'),
+(17, 5, 2, '보조 배터리는 꼭 챙기는 걸 추천해요.', 'ACTIVE'),
+(18, 5, 3, '공연장 입장 시간을 미리 확인하세요.', 'ACTIVE'),
+(19, 5, 4, '신분증과 예매 내역도 잊지 마세요.', 'ACTIVE'),
+(20, 5, 6, '편한 신발을 신고 가는 게 좋아요.', 'ACTIVE'),
+(21, 5, 8, '응원봉 배터리도 여분으로 챙기세요.', 'ACTIVE'),
+(22, 5, 9, '물은 공연장 반입 규정을 확인해야 해요.', 'ACTIVE'),
+(23, 6, 1, '인증 완료 축하드립니다.', 'ACTIVE'),
+(24, 6, 3, '저도 코드 입력하니 바로 등록됐어요.', 'ACTIVE'),
+(25, 6, 5, '큐브 디자인이 정말 예쁘네요.', 'ACTIVE'),
+(26, 6, 7, '인증 과정이 간단해서 좋았습니다.', 'ACTIVE'),
+(27, 6, 10, '등록 후 홈 화면도 잘 나오나요?', 'ACTIVE'),
+(28, 7, 2, '이벤트 보상까지 받으셨군요.', 'ACTIVE'),
+(29, 7, 6, '저도 오늘 남은 횟수 채워야겠어요.', 'ACTIVE'),
+(30, 7, 8, '콘서트 영상이 멋져서 다섯 번도 금방이더라고요.', 'ACTIVE'),
+(31, 8, 1, 'Close 달성 축하해요.', 'ACTIVE'),
+(32, 8, 4, '매일 꾸준히 진행하신 게 대단합니다.', 'ACTIVE'),
+(33, 8, 7, '저도 곧 Close 단계에 도달할 것 같아요.', 'ACTIVE'),
+(34, 8, 9, '해금된 기능도 궁금하네요.', 'ACTIVE'),
+(35, 9, 2, '스페셜 모드 해금 축하드립니다.', 'ACTIVE'),
+(36, 9, 3, '기본 재생과 어떤 차이가 있나요?', 'ACTIVE'),
+(37, 9, 5, '저도 친밀도를 더 올려야겠어요.', 'ACTIVE'),
+(38, 9, 8, '해금 조건 정보 감사합니다.', 'ACTIVE'),
+(39, 9, 10, '스페셜 모드 영상이 궁금합니다.', 'ACTIVE'),
+(40, 10, 1, '거래 완료 축하드립니다.', 'ACTIVE'),
+(41, 10, 2, '배송은 얼마나 걸렸나요?', 'ACTIVE'),
+(42, 10, 4, '저도 같은 제품을 찾고 있어요.', 'ACTIVE'),
+(43, 10, 6, '구매 확정 화면이 잘 나오는지 궁금해요.', 'ACTIVE'),
+(44, 10, 7, '좋은 판매자를 만나셨네요.', 'ACTIVE'),
+(45, 10, 8, '디지털 인증서도 확인해보세요.', 'ACTIVE');
 
 INSERT INTO `post_like` (`id`, `post_id`, `user_id`, `is_liked`) VALUES
 (1, 1, 1, TRUE),
-(2, 2, 1, FALSE),
-(3, 3, 1, TRUE);
+(2, 1, 2, TRUE),
+(3, 1, 4, TRUE),
+(4, 1, 6, FALSE),
+(5, 1, 8, TRUE),
+(6, 2, 10, TRUE),
+(7, 2, 3, TRUE),
+(8, 2, 5, TRUE),
+(9, 2, 7, TRUE),
+(10, 2, 9, FALSE),
+(11, 3, 1, TRUE),
+(12, 3, 2, TRUE),
+(13, 3, 4, FALSE),
+(14, 3, 8, TRUE),
+(15, 3, 10, TRUE),
+(16, 4, 1, FALSE),
+(17, 4, 3, TRUE),
+(18, 4, 5, FALSE),
+(19, 4, 6, TRUE),
+(20, 4, 9, TRUE),
+(21, 5, 1, TRUE),
+(22, 5, 2, FALSE),
+(23, 5, 4, TRUE),
+(24, 5, 7, TRUE),
+(25, 5, 10, TRUE),
+(26, 6, 1, FALSE),
+(27, 6, 3, TRUE),
+(28, 6, 5, TRUE),
+(29, 6, 8, TRUE),
+(30, 6, 9, TRUE),
+(31, 7, 1, TRUE),
+(32, 7, 2, TRUE),
+(33, 7, 4, TRUE),
+(34, 7, 6, TRUE),
+(35, 7, 10, FALSE),
+(36, 8, 1, FALSE),
+(37, 8, 3, TRUE),
+(38, 8, 5, TRUE),
+(39, 8, 7, FALSE),
+(40, 8, 9, TRUE),
+(41, 9, 1, TRUE),
+(42, 9, 2, FALSE),
+(43, 9, 4, TRUE),
+(44, 9, 8, TRUE),
+(45, 9, 10, TRUE),
+(46, 10, 1, FALSE),
+(47, 10, 3, TRUE),
+(48, 10, 5, TRUE),
+(49, 10, 6, TRUE),
+(50, 10, 9, TRUE);
 
 INSERT INTO `comment_like` (`id`, `comment_id`, `user_id`, `is_liked`) VALUES
-(1, 1, 1, TRUE),
-(2, 2, 1, TRUE),
-(3, 3, 1, FALSE);
+(1, 1, 2, TRUE),
+(2, 1, 4, TRUE),
+(3, 2, 1, TRUE),
+(4, 5, 3, TRUE),
+(5, 8, 1, TRUE),
+(6, 12, 7, TRUE),
+(7, 23, 4, TRUE),
+(8, 31, 9, TRUE),
+(9, 40, 1, FALSE),
+(10, 45, 6, TRUE);
 
 INSERT INTO `market_product` (`id`, `cube_id`, `product_image_url`) VALUES
 (1, 1, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png'),

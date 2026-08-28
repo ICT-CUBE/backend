@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import NoReturn
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session, aliased, joinedload
 
 from app.core.exceptions import ApiError
@@ -16,6 +16,7 @@ from app.models.enums import (
 )
 from app.models.market import (
     DigitalCertificate,
+    ListingMedia,
     MarketProduct,
     SellingListLike,
     SellListing,
@@ -31,13 +32,22 @@ from app.schemas.market import (
     SellableCubeItemResponse,
     SellableCubesResponse,
     SellListingCreateResponse,
+    SellListingDetailItemResponse,
+    SellListingDetailResponse,
     TradeCompleteCertificateResponse,
     TradeCompleteResponse,
     TradeCreateRequest,
     TradeDetailCubeResponse,
     TradeDetailItemResponse,
     TradeDetailResponse,
+    TradeHistoryItemResponse,
+    TradeHistoryResponse,
+    TradeHistoryStatus,
     TradeTimelineItemResponse,
+)
+from app.services.common.search import (
+    LIKE_ESCAPE_CHARACTER,
+    like_contains_pattern,
 )
 
 TRADE_TIMELINE_LABELS = {
@@ -211,33 +221,8 @@ def get_market_product_sell_listings(
             message="마켓 제품 정보를 찾을 수 없습니다.",
         )
 
-    like_count = (
-        select(func.count(SellingListLike.id))
-        .where(
-            SellingListLike.selling_list_id == SellListing.id,
-            SellingListLike.is_liked.is_(True),
-        )
-        .scalar_subquery()
-    )
     rows = db.execute(
-        select(SellListing, Cube, User.nickname, like_count)
-        .join(
-            MarketProduct,
-            and_(
-                MarketProduct.id == SellListing.market_product_id,
-                MarketProduct.deleted_at.is_(None),
-            ),
-        )
-        .join(Cube, Cube.id == MarketProduct.cube_id)
-        .join(User, User.id == SellListing.user_id)
-        .where(
-            Cube.product_name == product_name,
-            Cube.deleted_at.is_(None),
-            Cube.status != CubeStatus.DISABLED,
-            SellListing.status == SellListingStatus.ACTIVE,
-            SellListing.deleted_at.is_(None),
-        )
-        .order_by(SellListing.id.desc())
+        _select_active_sell_listings().where(Cube.product_name == product_name)
     ).all()
 
     return MarketSellListingsResponse(
@@ -254,6 +239,80 @@ def get_market_product_sell_listings(
             # DB 콜레이션이 대소문자를 구분하지 않으므로 제품명을 한 번 더 정확히 비교합니다.
             if cube.product_name == product_name
         ]
+    )
+
+
+def search_market_sell_listings(
+    *,
+    db: Session,
+    current_user_id: int,
+    keyword: str,
+) -> MarketSellListingsResponse:
+    """제품명 또는 아티스트명에 키워드가 포함된 큐브의 판매 중인 판매글을 조회합니다.
+
+    판매자 본인 판매글도 제외하지 않으므로 `current_user_id`로 결과를 거르지 않습니다.
+    """
+    search_keyword = keyword.strip()
+    if not search_keyword:
+        raise ApiError(
+            status_code=400,
+            code="INVALID_REQUEST",
+            message="요청값이 올바르지 않습니다.",
+        )
+
+    keyword_pattern = like_contains_pattern(search_keyword)
+    rows = db.execute(
+        _select_active_sell_listings().where(
+            or_(
+                Cube.product_name.like(keyword_pattern, escape=LIKE_ESCAPE_CHARACTER),
+                Cube.artist_name.like(keyword_pattern, escape=LIKE_ESCAPE_CHARACTER),
+            )
+        )
+    ).all()
+
+    return MarketSellListingsResponse(
+        sell_listings=[
+            MarketSellListingItemResponse(
+                sell_listing_id=sell_listing.id,
+                product_name=cube.product_name,
+                serial_number=cube.serial_number,
+                seller_nickname=seller_nickname,
+                price=sell_listing.price,
+                like_count=like_count_value,
+            )
+            for sell_listing, cube, seller_nickname, like_count_value in rows
+        ]
+    )
+
+
+def _select_active_sell_listings() -> Select[tuple[SellListing, Cube, str | None, int]]:
+    """판매 중인 판매글과 큐브·판매자 닉네임·좋아요 수를 함께 조회하는 select를 만듭니다."""
+    like_count = (
+        select(func.count(SellingListLike.id))
+        .where(
+            SellingListLike.selling_list_id == SellListing.id,
+            SellingListLike.is_liked.is_(True),
+        )
+        .scalar_subquery()
+    )
+    return (
+        select(SellListing, Cube, User.nickname, like_count)
+        .join(
+            MarketProduct,
+            and_(
+                MarketProduct.id == SellListing.market_product_id,
+                MarketProduct.deleted_at.is_(None),
+            ),
+        )
+        .join(Cube, Cube.id == MarketProduct.cube_id)
+        .join(User, User.id == SellListing.user_id)
+        .where(
+            Cube.deleted_at.is_(None),
+            Cube.status != CubeStatus.DISABLED,
+            SellListing.status == SellListingStatus.ACTIVE,
+            SellListing.deleted_at.is_(None),
+        )
+        .order_by(SellListing.id.desc())
     )
 
 
@@ -381,6 +440,61 @@ def create_sell_listing(
     return SellListingCreateResponse(sell_listing_id=sell_listing_id)
 
 
+def get_sell_listing_detail(
+    *,
+    db: Session,
+    current_user_id: int,
+    sell_listing_id: int,
+) -> SellListingDetailResponse:
+    """삭제되지 않은 판매글의 상세 정보와 등록된 이미지를 조회합니다.
+
+    본인 판매글도 조회할 수 있으므로 `current_user_id`는 `isMine` 판단에만 씁니다.
+    """
+    row = db.execute(
+        select(SellListing, User, Cube)
+        .join(User, User.id == SellListing.user_id)
+        .join(MarketProduct, MarketProduct.id == SellListing.market_product_id)
+        .join(Cube, Cube.id == MarketProduct.cube_id)
+        .where(
+            SellListing.id == sell_listing_id,
+            SellListing.status != SellListingStatus.DELETED,
+            SellListing.deleted_at.is_(None),
+        )
+        .limit(1)
+    ).first()
+    if row is None:
+        _raise_sell_listing_not_found()
+
+    sell_listing, seller, cube = row
+    image_urls = list(
+        db.scalars(
+            select(ListingMedia.image_url)
+            .where(
+                ListingMedia.sell_listing_id == sell_listing.id,
+                ListingMedia.deleted_at.is_(None),
+            )
+            .order_by(ListingMedia.id.asc())
+        )
+    )
+
+    return SellListingDetailResponse(
+        sell_listing=SellListingDetailItemResponse(
+            sell_listing_id=sell_listing.id,
+            image_urls=image_urls,
+            seller_nickname=seller.nickname,
+            seller_profile_image_url=seller.profile_character_img_url,
+            status=sell_listing.status,
+            is_mine=sell_listing.user_id == current_user_id,
+            title=sell_listing.title,
+            description=sell_listing.description,
+            price=sell_listing.price,
+            created_at=sell_listing.created_at,
+            product_name=cube.product_name,
+            serial_number=cube.serial_number,
+        )
+    )
+
+
 def delete_sell_listing(
     *,
     db: Session,
@@ -475,6 +589,66 @@ def create_trade(
     except Exception:
         db.rollback()
         raise
+
+
+def get_trade_history(
+    *,
+    db: Session,
+    current_user_id: int,
+) -> TradeHistoryResponse:
+    """현재 사용자가 구매자인 거래 내역을 결제 시각 내림차순으로 조회합니다."""
+    product_image_url = (
+        select(ListingMedia.image_url)
+        .where(
+            ListingMedia.sell_listing_id == SellListing.id,
+            ListingMedia.deleted_at.is_(None),
+        )
+        .order_by(ListingMedia.id.asc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    rows = db.execute(
+        select(Trade, SellListing.price, Cube, product_image_url)
+        .join(
+            SellListing,
+            and_(
+                SellListing.id == Trade.sell_listing_id,
+                SellListing.deleted_at.is_(None),
+            ),
+        )
+        .join(
+            MarketProduct,
+            and_(
+                MarketProduct.id == SellListing.market_product_id,
+                MarketProduct.deleted_at.is_(None),
+            ),
+        )
+        .join(Cube, Cube.id == MarketProduct.cube_id)
+        .where(Trade.buyer_user_id == current_user_id)
+        .order_by(Trade.paid_time.desc(), Trade.id.desc())
+    ).all()
+
+    return TradeHistoryResponse(
+        trades=[
+            TradeHistoryItemResponse(
+                id=trade.id,
+                product_image_url=image_url,
+                product_name=cube.product_name,
+                serial_number=cube.serial_number,
+                price=price,
+                paid_date=trade.paid_time.date(),
+                status=_trade_history_status(trade.status),
+            )
+            for trade, price, cube, image_url in rows
+        ]
+    )
+
+
+def _trade_history_status(trade_status: TradeStatus) -> TradeHistoryStatus:
+    """거래 상태를 거래 내역 화면에 표시할 진행 상태로 변환합니다."""
+    if trade_status == TradeStatus.COMPLETED:
+        return TradeHistoryStatus.COMPLETED
+    return TradeHistoryStatus.IN_PROGRESS
 
 
 def get_trade_detail(
