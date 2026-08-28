@@ -1,29 +1,20 @@
 """홈 정보 조회 API 테스트."""
 
-from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock
 
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.main import app
 from app.models.cube import Affinity, Cube, CubeOwnership, Level
 from app.models.enums import LevelName, OwnershipStatus
 from app.models.user import User
+from tests.conftest import api_client
 
 
 def request_home(db: Mock):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.get("/api/v1/users/me/home")
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.get("/api/v1/users/me/home")
 
 
 def make_ownership(status: OwnershipStatus) -> CubeOwnership:

@@ -14,7 +14,11 @@ INSERT INTO `cube` (`id`, `serial_number`, `product_name`, `ownership_code_hash`
 (3, 'NO.0022', 'ROSE ROISE CUBE', '2222', 'ROSE', 'OWNED'),
 (4, 'NO.0044', 'JENNIE SOLO CUBE', '4444', 'Jennie', 'UNREGISTERED'),
 (5, 'NO.0055', 'BIGBANG STILL LIFE CUBE', '5555', 'Big Bang', 'UNREGISTERED'),
-(6, 'NO.0066', 'ROSE ROSIE CUBE', '6666', 'ROSE', 'UNREGISTERED');
+(6, 'NO.0066', 'ROSE ROSIE CUBE', '6666', 'ROSE', 'UNREGISTERED'),
+(7, 'NO.0077', 'JENNIE RUBY CUBE', '7777', 'Jennie', 'UNREGISTERED'),
+(8, 'NO.0088', 'AESPA ARMAGEDDON CUBE', '8888', 'AESPA', 'UNREGISTERED'),
+(9, 'NO.0099', 'ROSE ROISE CUBE', '9990', 'ROSE', 'OWNED'),
+(10, 'NO.0100', 'IU THE WINNING CUBE', '1010', 'IU', 'OWNED');
 
 INSERT INTO `cube_verification` (`id`, `user_id`, `cube_id`, `verification_status`, `code_expires_at`, `verified_at`) VALUES
 (1, 1, 1, 'SUCCESS', '2025-03-14 19:25:00', '2025-03-07 19:25:00');
@@ -24,30 +28,32 @@ INSERT INTO `cube_ownership` (`id`, `user_id`, `cube_id`, `avatar_nickname`, `ow
 (2, 2, 2, '지디득이', 'ACTIVE', TRUE, '2025-03-07 19:30:00'),
 (3, 3, 3, '로제득이', 'ACTIVE', TRUE, '2025-03-07 19:30:00');
 
-INSERT INTO `reward_item` (`id`, `name`, `reward_type`, `description`, `reward_count`) VALUES
-(1, '친밀도 포인트', 'AFFINITY_POINT', '친밀도 3포인트 제공', 3),
-(2, '친밀도 포인트', 'AFFINITY_POINT', '친밀도 5포인트 제공', 5),
-(3, '친밀도 포인트', 'AFFINITY_POINT', '친밀도 10포인트 제공', 10),
-(4, '친밀도 포인트', 'AFFINITY_POINT', '친밀도 20포인트 제공', 20),
-(5, '친밀도 포인트', 'AFFINITY_POINT', '친밀도 30포인트 제공', 30),
-(6, '일일 대화 가능 횟수', 'CONVERSATION_COUNT', '하루에 대화 제한 30회', 30),
-(7, '일일 대화 가능 횟수', 'CONVERSATION_COUNT', '하루에 대화 제한 100회', 100),
-(8, '일일 대화 가능 횟수', 'CONVERSATION_COUNT', '하루에 대화 제한 없음', NULL),
-(9, '멘트 종류', 'COMMENT_TYPE', '일상 멘트와 애칭 부르기', NULL),
-(10, '멘트 종류', 'COMMENT_TYPE', '사적인 멘트와 비하인드 대화', NULL),
-(11, '스페절 음성', 'SPECIAL_COMMENT', '시즌 한정 음성 추가', NULL),
-(12, '아바타 선대화', 'AVATAR_FIRST_TALK', '아바타 선대화 1일 1회', 1),
-(13, '아바타 선대화', 'AVATAR_FIRST_TALK', '아바타 선대화 1일 5회', 5),
-(14, '뱃지', 'BADGE', 'BORN PINK 마스터', 1);
+INSERT INTO `reward_item` (`id`, `name`, `reward_type`, `description`, `reward_count`, `reward_level`) VALUES
+(1, '친밀도 포인트', 'AFFINITY_POINT', '친밀도 3포인트 제공', 3, NULL),
+(2, '친밀도 포인트', 'AFFINITY_POINT', '친밀도 5포인트 제공', 5, NULL),
+(3, '친밀도 포인트', 'AFFINITY_POINT', '친밀도 10포인트 제공', 10, NULL),
+(4, '친밀도 포인트', 'AFFINITY_POINT', '친밀도 20포인트 제공', 20, NULL),
+(5, '친밀도 포인트', 'AFFINITY_POINT', '친밀도 30포인트 제공', 30, NULL),
+(6, '일일 대화 가능 횟수', 'CONVERSATION_COUNT', '하루에 대화 제한 5회', 5, 1),
+(7, '일일 대화 가능 횟수', 'CONVERSATION_COUNT', '하루에 대화 제한 30회', 30, 2),
+(8, '일일 대화 가능 횟수', 'CONVERSATION_COUNT', '하루에 대화 제한 100회', 100, 3),
+(9, '일일 대화 가능 횟수', 'CONVERSATION_COUNT', '하루에 대화 제한 없음', NULL, 4),
+(10, '멘트 종류', 'COMMENT_TYPE', '기본 인사', NULL, 1),
+(11, '멘트 종류', 'COMMENT_TYPE', '일상 멘트와 애칭 부르기', NULL, 2),
+(12, '멘트 종류', 'COMMENT_TYPE', '사적인 멘트와 비하인드 대화', NULL, 3),
+(13, '스페셜 음성', 'SPECIAL_COMMENT', '유행어 음성 해금 및 시즌 한정 음성 추가', NULL, 3),
+(14, '뱃지', 'BADGE', 'BORN PINK 마스터', 1, NULL),
+(15, '아바타 선대화', 'AVATAR_FIRST_TALK', '아바타 선대화 1일 1회', 1, 3),
+(16, '아바타 선대화', 'AVATAR_FIRST_TALK', '아바타 선대화 1일 5회', 5, 4);
 
-INSERT INTO `level` (`id`, `reward_item_id`, `level`, `level_xp`, `level_name`) VALUES
-(1, 1, 1, 0, 'Intro'),
-(2, 2, 2, 100, 'Friend'),
-(3, 3, 3, 800, 'Close'),
-(4, 6, 4, 2000, 'Special');
+INSERT INTO `level` (`id`, `level`, `level_xp`, `level_name`) VALUES
+(1, 1, 0, 'Intro'),
+(2, 2, 100, 'Friend'),
+(3, 3, 800, 'Close'),
+(4, 4, 2000, 'Special');
 
 INSERT INTO `affinity` (`id`, `cube_ownership_id`, `level_id`, `current_xp`) VALUES
-(1, 1, 3, 730);
+(1, 1, 3, 1245);
 
 INSERT INTO `mission` (`id`, `reward_item_id`, `mission_type`, `title`, `description`, `mission_info`, `target_action`, `target_count`, `start_at`, `end_at`, `is_active`) VALUES
 (1, 2, 'DAILY', '홈 화면 방문하기', 'AR ZONE 접속', 'home_view=1', 'HOME_VIEW', 1, NULL, NULL, TRUE),
@@ -69,8 +75,16 @@ INSERT INTO `mission_progress` (`id`, `cube_ownership_id`, `mission_id`, `curren
 
 INSERT INTO `user_reward` (`id`, `cube_ownership_id`, `reward_item_id`, `acquired_at`) VALUES
 (1, 1, 2, '2025-03-24 10:02:00'),
-(2, 1, 6, '2025-03-18 22:32:00'),
-(3, 1, 5, '2025-03-24 21:11:00');
+(2, 1, 14, '2025-03-18 22:32:00'),
+(3, 1, 5, '2025-03-24 21:11:00'),
+(4, 1, 6, '2025-03-07 19:30:00'),
+(5, 1, 10, '2025-03-07 19:30:00'),
+(6, 1, 7, '2025-03-15 12:00:00'),
+(7, 1, 11, '2025-03-15 12:00:00'),
+(8, 1, 8, '2025-03-23 20:45:00'),
+(9, 1, 12, '2025-03-23 20:45:00'),
+(10, 1, 13, '2025-03-23 20:45:00'),
+(11, 1, 15, '2025-03-23 20:45:00');
 
 INSERT INTO `notification` (`id`, `user_id`, `notification_type`, `title`, `content`, `is_read`, `sent_at`, `read_at`) VALUES
 (1, 1, 'MISSION', '미션 완료', '홈 화면 조회 미션 보상을 받았어요.', TRUE, '2025-03-24 10:01:00', '2025-03-24 10:02:00'),
@@ -247,11 +261,25 @@ INSERT INTO `market_product` (`id`, `cube_id`, `product_image_url`) VALUES
 (3, 3, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
 (4, 4, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png'),
 (5, 5, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
-(6, 6, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png');
+(6, 6, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
+(7, 7, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png'),
+(8, 8, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
+(9, 9, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
+(10, 10, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png');
 
 INSERT INTO `sell_listing` (`id`, `market_product_id`, `user_id`, `product_status`, `title`, `description`, `price`, `status`) VALUES
 (1, 2, 2, '좋음', '빅뱅 메이드 큐브 31번', '상태 좋은 큐브 판매합니다.', 35000, 'ACTIVE'),
-(2, 3, 3, '좋음', '로제 큐브 판매', '상태 좋은 큐브 판매합니다.', 35000, 'ACTIVE');
+(2, 3, 3, '좋음', '로제 큐브 판매', '상태 좋은 큐브 판매합니다.', 35000, 'ACTIVE'),
+(3, 9, 3, '미개봉', '로제 ROISE 큐브 99번', '미개봉 상태로 보관한 로제 큐브입니다.', 42000, 'ACTIVE'),
+(4, 10, 2, '새상품', '아이유 THE WINNING 큐브', '구성품을 모두 포함한 새상품입니다.', 45000, 'ACTIVE');
+
+INSERT INTO `selling_list_like` (`id`, `selling_list_id`, `user_id`, `is_liked`) VALUES
+(1, 1, 3, TRUE),
+(2, 2, 1, TRUE),
+(3, 3, 1, TRUE),
+(4, 3, 2, FALSE),
+(5, 4, 1, TRUE),
+(6, 4, 3, TRUE);
 
 INSERT INTO `trade` (`id`, `sell_listing_id`, `buyer_user_id`, `buyer_phone_number`, `buyer_address`, `total_price`, `paid_time`, `sent_time`, `shipped_time`, `delivered_time`, `completed_time`, `status`) VALUES
 (1, 1, 1, '010-1234-5678', '서울특별시 강남구 테헤란로 1', 36250, '2025-04-08 14:30:00', '2025-04-09 10:00:00', '2025-04-09 15:30:00', '2025-05-09 15:30:00', NULL, 'DELIVERED');

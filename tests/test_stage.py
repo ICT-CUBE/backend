@@ -1,13 +1,10 @@
 """스테이지 재생 세션 API 테스트."""
 
-from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock, patch
 
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.main import app
 from app.models.cube import CubeOwnership
 from app.models.enums import (
@@ -17,6 +14,7 @@ from app.models.enums import (
     StageViewMode,
 )
 from app.models.stage import Stage, StageCapture, StageSession
+from tests.conftest import api_client
 
 
 def request_stage_list(
@@ -24,16 +22,9 @@ def request_stage_list(
     *,
     video_type: str | None = None,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            params = {} if video_type is None else {"videoType": video_type}
-            return client.get("/api/v1/stages", params=params)
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        params = {} if video_type is None else {"videoType": video_type}
+        return client.get("/api/v1/stages", params=params)
 
 
 def request_stage_video(
@@ -41,15 +32,8 @@ def request_stage_video(
     *,
     stage_id: int = 1,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.get(f"/api/v1/stages/{stage_id}")
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.get(f"/api/v1/stages/{stage_id}")
 
 
 def request_stage_session(
@@ -58,18 +42,11 @@ def request_stage_session(
     stage_id: int = 1,
     body: dict[str, str] | None = None,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.post(
-                f"/api/v1/stages/{stage_id}/sessions",
-                json=body if body is not None else {"viewMode": "AR"},
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.post(
+            f"/api/v1/stages/{stage_id}/sessions",
+            json=body if body is not None else {"viewMode": "AR"},
+        )
 
 
 def save_stage_session_request(
@@ -78,24 +55,17 @@ def save_stage_session_request(
     stage_session_id: int = 501,
     body: dict[str, str | int] | None = None,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.patch(
-                f"/api/v1/users/me/stage-sessions/{stage_session_id}",
-                json=body
-                if body is not None
-                else {
-                    "status": "CANCELLED",
-                    "lastPositionSeconds": 74,
-                    "viewedSeconds": 62,
-                },
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.patch(
+            f"/api/v1/users/me/stage-sessions/{stage_session_id}",
+            json=body
+            if body is not None
+            else {
+                "status": "CANCELLED",
+                "lastPositionSeconds": 74,
+                "viewedSeconds": 62,
+            },
+        )
 
 
 def save_stage_capture_request(
@@ -107,31 +77,25 @@ def save_stage_capture_request(
     include_image: bool = True,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        files = (
-            {"image": ("capture.png", b"fake-image", content_type)}
-            if include_image
-            else None
+    files = (
+        {"image": ("capture.png", b"fake-image", content_type)}
+        if include_image
+        else None
+    )
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.post(
+            f"/api/v1/users/me/stage-sessions/{stage_session_id}/captures",
+            files=files,
+            data=data
+            if data is not None
+            else {
+                "capturedPositionSeconds": "74",
+                "capturedAt": "2026-07-29T15:05:20",
+            },
         )
-        with TestClient(
-            app, raise_server_exceptions=raise_server_exceptions
-        ) as client:
-            return client.post(
-                f"/api/v1/users/me/stage-sessions/{stage_session_id}/captures",
-                files=files,
-                data=data
-                if data is not None
-                else {
-                    "capturedPositionSeconds": "74",
-                    "capturedAt": "2026-07-29T15:05:20",
-                },
-            )
-    finally:
-        app.dependency_overrides.clear()
 
 
 def active_stage() -> Stage:

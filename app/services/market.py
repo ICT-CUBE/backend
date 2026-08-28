@@ -3,20 +3,31 @@
 from datetime import datetime, timedelta, timezone
 from typing import NoReturn
 
-from sqlalchemy import and_, select
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.orm import Session, aliased, joinedload
 
 from app.core.exceptions import ApiError
-from app.models.cube import Cube, CubeOwnership
-from app.models.enums import OwnershipStatus, SellListingStatus, TradeStatus
+from app.models.cube import Affinity, Cube, CubeOwnership
+from app.models.enums import (
+    CubeStatus,
+    OwnershipStatus,
+    SellListingStatus,
+    TradeStatus,
+)
 from app.models.market import (
     DigitalCertificate,
     MarketProduct,
+    SellingListLike,
     SellListing,
     Trade,
 )
 from app.models.user import User
 from app.schemas.market import (
+    MarketProductItemResponse,
+    MarketProfileResponse,
+    MarketResponse,
+    MarketSellListingItemResponse,
+    MarketSellListingsResponse,
     SellableCubeItemResponse,
     SellableCubesResponse,
     SellListingCreateResponse,
@@ -37,6 +48,213 @@ TRADE_TIMELINE_LABELS = {
     TradeStatus.COMPLETED: "구매 확정",
 }
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
+# 결제가 완료된 이후의 모든 거래 상태를 체결된 거래로 봅니다.
+SETTLED_TRADE_STATUSES = (
+    TradeStatus.PAID,
+    TradeStatus.SENT,
+    TradeStatus.SHIPPING,
+    TradeStatus.DELIVERED,
+    TradeStatus.COMPLETED,
+)
+
+
+def get_market(*, db: Session, current_user_id: int) -> MarketResponse:
+    """현재 사용자의 마켓 홈 프로필과 제품명별 대표 상품 목록을 조회합니다."""
+    cube_ownership = db.scalar(
+        select(CubeOwnership)
+        .where(
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
+        )
+        .options(
+            joinedload(CubeOwnership.user),
+            joinedload(CubeOwnership.affinity).joinedload(Affinity.level_info),
+        )
+        .limit(1)
+    )
+    if cube_ownership is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_OWNERSHIP_NOT_FOUND",
+            message="큐브 소유권 정보를 찾을 수 없습니다.",
+        )
+
+    affinity = cube_ownership.affinity
+    if affinity is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_AFFINITY_NOT_FOUND",
+            message="큐브 친밀도 정보를 찾을 수 없습니다.",
+        )
+
+    level = affinity.level_info
+    return MarketResponse(
+        profile=MarketProfileResponse(
+            profile_character_img_url=cube_ownership.user.profile_character_img_url,
+            avatar_nickname=cube_ownership.avatar_nickname,
+            level=level.level,
+            level_name=level.level_name.value,
+            total_trade_count=_get_total_trade_count(
+                db=db,
+                current_user_id=current_user_id,
+            ),
+        ),
+        products=_get_representative_products(db=db),
+    )
+
+
+def _get_total_trade_count(*, db: Session, current_user_id: int) -> int:
+    """현재 사용자가 구매자 또는 판매자로 참여한 구매 확정 거래 수를 셉니다."""
+    total_trade_count = db.scalar(
+        select(func.count(Trade.id))
+        .join(Trade.sell_listing)
+        .where(
+            Trade.status == TradeStatus.COMPLETED,
+            or_(
+                Trade.buyer_user_id == current_user_id,
+                SellListing.user_id == current_user_id,
+            ),
+        )
+    )
+    return int(total_trade_count or 0)
+
+
+def _get_representative_products(*, db: Session) -> list[MarketProductItemResponse]:
+    """제품명이 같은 큐브를 묶고 id가 가장 작은 큐브를 대표로 반환합니다."""
+    rows = db.execute(
+        select(Cube, MarketProduct)
+        .join(
+            MarketProduct,
+            and_(
+                MarketProduct.cube_id == Cube.id,
+                MarketProduct.deleted_at.is_(None),
+            ),
+        )
+        .where(
+            Cube.deleted_at.is_(None),
+            Cube.status != CubeStatus.DISABLED,
+        )
+        .order_by(Cube.id.asc())
+    ).all()
+
+    # 제품명 정규화 없이 그대로 비교하며, id 오름차순이라 먼저 나온 큐브가 대표입니다.
+    representatives: dict[str, tuple[Cube, MarketProduct]] = {}
+    for cube, market_product in rows:
+        representatives.setdefault(cube.product_name, (cube, market_product))
+    if not representatives:
+        return []
+
+    price_by_product_name = _get_latest_trade_price_by_product_name(db=db)
+    return [
+        MarketProductItemResponse(
+            representative_cube_id=cube.id,
+            market_product_id=market_product.id,
+            product_name=cube.product_name,
+            artist_name=cube.artist_name,
+            product_image_url=market_product.product_image_url,
+            latest_trade_price=price_by_product_name.get(cube.product_name),
+        )
+        for cube, market_product in representatives.values()
+    ]
+
+
+def _get_latest_trade_price_by_product_name(*, db: Session) -> dict[str, int]:
+    """제품명별 가장 최근 체결 거래의 판매글 가격을 모읍니다."""
+    rows = db.execute(
+        select(Cube.product_name, SellListing.price)
+        .select_from(Trade)
+        .join(Trade.sell_listing)
+        .join(SellListing.market_product)
+        .join(MarketProduct.cube)
+        .where(Trade.status.in_(SETTLED_TRADE_STATUSES))
+        .order_by(Trade.paid_time.desc(), Trade.id.desc())
+    ).all()
+
+    # 최근 순으로 정렬되어 있으므로 제품명마다 처음 만난 거래가 최근 체결 거래입니다.
+    latest_price_by_product_name: dict[str, int] = {}
+    for product_name, price in rows:
+        latest_price_by_product_name.setdefault(product_name, price)
+    return latest_price_by_product_name
+
+
+def get_market_product_sell_listings(
+    *,
+    db: Session,
+    current_user_id: int,
+    representative_cube_id: int,
+) -> MarketSellListingsResponse:
+    """대표 큐브와 제품명이 같은 시리얼 큐브의 판매 중인 판매글을 조회합니다.
+
+    판매자 본인 판매글도 제외하지 않으므로 `current_user_id`로 결과를 거르지 않습니다.
+    """
+    product_name = db.scalar(
+        select(Cube.product_name)
+        .join(
+            MarketProduct,
+            and_(
+                MarketProduct.cube_id == Cube.id,
+                MarketProduct.deleted_at.is_(None),
+            ),
+        )
+        .where(
+            Cube.id == representative_cube_id,
+            Cube.deleted_at.is_(None),
+            Cube.status != CubeStatus.DISABLED,
+        )
+        .limit(1)
+    )
+    if product_name is None:
+        raise ApiError(
+            status_code=404,
+            code="MARKET_PRODUCT_NOT_FOUND",
+            message="마켓 제품 정보를 찾을 수 없습니다.",
+        )
+
+    like_count = (
+        select(func.count(SellingListLike.id))
+        .where(
+            SellingListLike.selling_list_id == SellListing.id,
+            SellingListLike.is_liked.is_(True),
+        )
+        .scalar_subquery()
+    )
+    rows = db.execute(
+        select(SellListing, Cube, User.nickname, like_count)
+        .join(
+            MarketProduct,
+            and_(
+                MarketProduct.id == SellListing.market_product_id,
+                MarketProduct.deleted_at.is_(None),
+            ),
+        )
+        .join(Cube, Cube.id == MarketProduct.cube_id)
+        .join(User, User.id == SellListing.user_id)
+        .where(
+            Cube.product_name == product_name,
+            Cube.deleted_at.is_(None),
+            Cube.status != CubeStatus.DISABLED,
+            SellListing.status == SellListingStatus.ACTIVE,
+            SellListing.deleted_at.is_(None),
+        )
+        .order_by(SellListing.id.desc())
+    ).all()
+
+    return MarketSellListingsResponse(
+        sell_listings=[
+            MarketSellListingItemResponse(
+                sell_listing_id=sell_listing.id,
+                product_name=cube.product_name,
+                serial_number=cube.serial_number,
+                seller_nickname=seller_nickname,
+                price=sell_listing.price,
+                like_count=like_count_value,
+            )
+            for sell_listing, cube, seller_nickname, like_count_value in rows
+            # DB 콜레이션이 대소문자를 구분하지 않으므로 제품명을 한 번 더 정확히 비교합니다.
+            if cube.product_name == product_name
+        ]
+    )
 
 
 def get_sellable_cubes(

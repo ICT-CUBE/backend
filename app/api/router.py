@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    affinity,
     album,
     avatar,
     conversation,
@@ -13,6 +14,7 @@ from app.api.routes import (
 )
 
 api_router = APIRouter()
+api_router.include_router(affinity.router, prefix="/users/me", tags=["affinity"])
 api_router.include_router(avatar.router, prefix="/users/me", tags=["avatar"])
 api_router.include_router(conversation.router, prefix="/users/me", tags=["conversation"])
 api_router.include_router(gallery.router, prefix="/users/me", tags=["gallery"])
@@ -32,4 +34,9 @@ api_router.include_router(
     stage.stage_session_router,
     prefix="/users/me/stage-sessions",
     tags=["stage"],
+)
+api_router.include_router(
+    cube.cube_ownership_router,
+    prefix="/users/me/cube-ownerships",
+    tags=["cube"],
 )

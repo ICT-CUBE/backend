@@ -4,6 +4,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS `listing_media`;
 DROP TABLE IF EXISTS `digital_certificate`;
 DROP TABLE IF EXISTS `trade`;
+DROP TABLE IF EXISTS `selling_list_like`;
 DROP TABLE IF EXISTS `sell_listing`;
 DROP TABLE IF EXISTS `market_product`;
 DROP TABLE IF EXISTS `comment_like`;
@@ -136,6 +137,7 @@ CREATE TABLE `reward_item` (
     `reward_type` VARCHAR(30) NOT NULL,
     `description` VARCHAR(255) NULL,
     `reward_count` INT NULL,
+    `reward_level` INT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted_at` DATETIME NULL,
@@ -145,16 +147,13 @@ CREATE TABLE `reward_item` (
 
 CREATE TABLE `level` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `reward_item_id` BIGINT NOT NULL,
     `level` INT NOT NULL,
     `level_xp` INT NOT NULL,
     `level_name` VARCHAR(30) NOT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_level_reward_item_id` (`reward_item_id`),
     UNIQUE KEY `uk_level_level` (`level`),
-    CONSTRAINT `fk_level_reward_item` FOREIGN KEY (`reward_item_id`) REFERENCES `reward_item` (`id`),
     CONSTRAINT `ck_level_name` CHECK (`level_name` IN ('Intro', 'Friend', 'Close', 'Special'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -583,6 +582,20 @@ CREATE TABLE `sell_listing` (
     CONSTRAINT `fk_sell_listing_market_product` FOREIGN KEY (`market_product_id`) REFERENCES `market_product` (`id`),
     CONSTRAINT `fk_sell_listing_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`),
     CONSTRAINT `ck_sell_listing_status` CHECK (`status` IN ('ACTIVE', 'SOLD', 'DELETED'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `selling_list_like` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `selling_list_id` BIGINT NOT NULL,
+    `user_id` BIGINT NOT NULL,
+    `is_liked` BOOLEAN NOT NULL DEFAULT TRUE,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_selling_list_like_selling_list_user` (`selling_list_id`, `user_id`),
+    KEY `idx_selling_list_like_user_id` (`user_id`),
+    CONSTRAINT `fk_selling_list_like_sell_listing` FOREIGN KEY (`selling_list_id`) REFERENCES `sell_listing` (`id`),
+    CONSTRAINT `fk_selling_list_like_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `trade` (

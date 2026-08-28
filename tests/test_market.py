@@ -1,16 +1,19 @@
-"""마켓 거래 생성 API 테스트."""
+"""마켓 도메인 API 테스트."""
 
-from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock
 
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.main import app
-from app.models.cube import Cube
-from app.models.enums import SellListingStatus, TradeStatus
+from app.models.cube import Affinity, Cube, CubeOwnership, Level
+from app.models.enums import (
+    CubeStatus,
+    LevelName,
+    OwnershipStatus,
+    SellListingStatus,
+    TradeStatus,
+)
 from app.models.market import (
     DigitalCertificate,
     MarketProduct,
@@ -18,18 +21,12 @@ from app.models.market import (
     Trade,
 )
 from app.models.user import User
+from tests.conftest import api_client
 
 
 def read_sellable_cubes_request(db: Mock):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.get("/api/v1/users/me/sellable-cubes")
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.get("/api/v1/users/me/sellable-cubes")
 
 
 def create_trade_request(
@@ -37,26 +34,19 @@ def create_trade_request(
     *,
     body: dict[str, int | str] | None = None,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.post(
-                "/api/v1/users/me/trades",
-                json=body
-                if body is not None
-                else {
-                    "sellListingId": 1,
-                    "buyerAddress": "서울특별시 강남구 테헤란로 429,1934호",
-                    "buyerPhoneNumber": "010-4282-4533",
-                    "totalPrice": 12740,
-                    "paidTime": "2026-08-15T21:30:00",
-                },
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.post(
+            "/api/v1/users/me/trades",
+            json=body
+            if body is not None
+            else {
+                "sellListingId": 1,
+                "buyerAddress": "서울특별시 강남구 테헤란로 429,1934호",
+                "buyerPhoneNumber": "010-4282-4533",
+                "totalPrice": 12740,
+                "paidTime": "2026-08-15T21:30:00",
+            },
+        )
 
 
 def create_sell_listing_request(
@@ -64,28 +54,21 @@ def create_sell_listing_request(
     *,
     body: dict[str, object] | None = None,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.post(
-                "/api/v1/users/me/sell-listings",
-                json=(
-                    body
-                    if body is not None
-                    else {
-                        "marketProductId": 1,
-                        "productStatus": "미개봉",
-                        "title": "제니 루비 큐브 판매",
-                        "description": "상태 좋습니다.",
-                        "price": 12500,
-                    }
-                ),
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.post(
+            "/api/v1/users/me/sell-listings",
+            json=(
+                body
+                if body is not None
+                else {
+                    "marketProductId": 1,
+                    "productStatus": "미개봉",
+                    "title": "제니 루비 큐브 판매",
+                    "description": "상태 좋습니다.",
+                    "price": 12500,
+                }
+            ),
+        )
 
 
 def delete_sell_listing_request(
@@ -93,17 +76,10 @@ def delete_sell_listing_request(
     *,
     sell_listing_id: int = 1,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.delete(
-                f"/api/v1/users/me/sell-listings/{sell_listing_id}"
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.delete(
+            f"/api/v1/users/me/sell-listings/{sell_listing_id}"
+        )
 
 
 def read_trade_detail_request(
@@ -111,15 +87,8 @@ def read_trade_detail_request(
     *,
     trade_id: int = 1,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.get(f"/api/v1/users/me/trades/{trade_id}")
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.get(f"/api/v1/users/me/trades/{trade_id}")
 
 
 def complete_trade_request(
@@ -127,15 +96,8 @@ def complete_trade_request(
     *,
     trade_id: int = 1,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.patch(f"/api/v1/users/me/trades/{trade_id}/complete")
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.patch(f"/api/v1/users/me/trades/{trade_id}/complete")
 
 
 def active_sell_listing(*, user_id: int = 2) -> SellListing:
@@ -710,4 +672,708 @@ def test_complete_trade_swagger_responses() -> None:
     ]
 
     assert set(operation["responses"]) == {"200", "404", "409"}
+    assert "security" not in operation
+
+
+# --- 마켓 조회: GET /api/v1/users/me/market ---
+
+MARKET_OWNERSHIP_NOT_FOUND_RESPONSE = {
+    "code": "CUBE_OWNERSHIP_NOT_FOUND",
+    "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+}
+MARKET_AFFINITY_NOT_FOUND_RESPONSE = {
+    "code": "CUBE_AFFINITY_NOT_FOUND",
+    "message": "큐브 친밀도 정보를 찾을 수 없습니다.",
+}
+
+
+def read_market_request(db: Mock):
+    with api_client(db) as client:
+        return client.get("/api/v1/users/me/market")
+
+
+def market_ownership(
+    *,
+    profile_character_img_url: str | None = "https://cdn.example.com/profile_002.png",
+    avatar_nickname: str | None = "젠득이",
+    with_affinity: bool = True,
+) -> CubeOwnership:
+    level = Level(id=3, level=3, level_name=LevelName.CLOSE, level_xp=800)
+    return CubeOwnership(
+        id=1,
+        user_id=1,
+        avatar_nickname=avatar_nickname,
+        ownership_status=OwnershipStatus.ACTIVE,
+        is_last_accessed=True,
+        user=User(id=1, profile_character_img_url=profile_character_img_url),
+        affinity=(
+            Affinity(id=1, current_xp=1245, level_info=level)
+            if with_affinity
+            else None
+        ),
+    )
+
+
+def market_cube(
+    *,
+    cube_id: int,
+    product_name: str,
+    artist_name: str = "Jennie",
+) -> Cube:
+    return Cube(
+        id=cube_id,
+        serial_number=f"NO.{cube_id:04d}",
+        product_name=product_name,
+        artist_name=artist_name,
+        status=CubeStatus.OWNED,
+        deleted_at=None,
+    )
+
+
+def market_product(
+    *,
+    market_product_id: int,
+    cube_id: int,
+    product_image_url: str | None = "https://cdn.example.com/cube.png",
+) -> MarketProduct:
+    return MarketProduct(
+        id=market_product_id,
+        cube_id=cube_id,
+        product_image_url=product_image_url,
+        deleted_at=None,
+    )
+
+
+def set_market_results(
+    db: Mock,
+    *,
+    ownership: CubeOwnership | None,
+    total_trade_count: int | None = 0,
+    product_rows: list[tuple[Cube, MarketProduct]] | None = None,
+    trade_rows: list[tuple[str, int]] | None = None,
+) -> None:
+    """서비스가 db.scalar / db.execute 를 호출하는 순서대로 결과를 지정합니다."""
+    db.scalar.side_effect = [ownership, total_trade_count]
+    db.execute.side_effect = [
+        Mock(all=Mock(return_value=product_rows or [])),
+        Mock(all=Mock(return_value=trade_rows or [])),
+    ]
+
+
+def test_read_market_returns_profile_and_representative_products():
+    db = Mock(spec=Session)
+    cube_one = market_cube(cube_id=1, product_name="JENNIE RUBY CUBE")
+    cube_two = market_cube(
+        cube_id=2,
+        product_name="BIGBANG MADE CUBE",
+        artist_name="Big Bang",
+    )
+    set_market_results(
+        db,
+        ownership=market_ownership(),
+        total_trade_count=24,
+        product_rows=[
+            (cube_one, market_product(market_product_id=1, cube_id=1)),
+            (cube_two, market_product(market_product_id=2, cube_id=2)),
+        ],
+        trade_rows=[("JENNIE RUBY CUBE", 12500)],
+    )
+
+    response = read_market_request(db)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "profile": {
+            "profileCharacterImgUrl": "https://cdn.example.com/profile_002.png",
+            "avatarNickname": "젠득이",
+            "level": 3,
+            "levelName": "Close",
+            "totalTradeCount": 24,
+        },
+        "products": [
+            {
+                "representativeCubeId": 1,
+                "marketProductId": 1,
+                "productName": "JENNIE RUBY CUBE",
+                "artistName": "Jennie",
+                "productImageUrl": "https://cdn.example.com/cube.png",
+                "latestTradePrice": 12500,
+            },
+            {
+                "representativeCubeId": 2,
+                "marketProductId": 2,
+                "productName": "BIGBANG MADE CUBE",
+                "artistName": "Big Bang",
+                "productImageUrl": "https://cdn.example.com/cube.png",
+                "latestTradePrice": None,
+            },
+        ],
+    }
+    db.commit.assert_not_called()
+
+
+def test_read_market_groups_same_product_name_into_smallest_cube_id():
+    db = Mock(spec=Session)
+    set_market_results(
+        db,
+        ownership=market_ownership(),
+        product_rows=[
+            (
+                market_cube(cube_id=3, product_name="JENNIE RUBY CUBE"),
+                market_product(market_product_id=3, cube_id=3),
+            ),
+            (
+                market_cube(cube_id=7, product_name="JENNIE RUBY CUBE"),
+                market_product(market_product_id=7, cube_id=7),
+            ),
+        ],
+    )
+
+    response = read_market_request(db)
+
+    assert response.status_code == 200
+    products = response.json()["products"]
+    assert len(products) == 1
+    assert products[0]["representativeCubeId"] == 3
+    assert products[0]["marketProductId"] == 3
+
+
+def test_read_market_treats_different_letter_case_as_different_products():
+    db = Mock(spec=Session)
+    set_market_results(
+        db,
+        ownership=market_ownership(),
+        product_rows=[
+            (
+                market_cube(cube_id=1, product_name="JENNIE RUBY CUBE"),
+                market_product(market_product_id=1, cube_id=1),
+            ),
+            (
+                market_cube(cube_id=2, product_name="jennie ruby cube"),
+                market_product(market_product_id=2, cube_id=2),
+            ),
+        ],
+    )
+
+    response = read_market_request(db)
+
+    assert response.status_code == 200
+    assert [item["productName"] for item in response.json()["products"]] == [
+        "JENNIE RUBY CUBE",
+        "jennie ruby cube",
+    ]
+
+
+def test_read_market_orders_products_by_representative_cube_id():
+    db = Mock(spec=Session)
+    set_market_results(
+        db,
+        ownership=market_ownership(),
+        product_rows=[
+            (
+                market_cube(cube_id=2, product_name="B CUBE"),
+                market_product(market_product_id=2, cube_id=2),
+            ),
+            (
+                market_cube(cube_id=5, product_name="A CUBE"),
+                market_product(market_product_id=5, cube_id=5),
+            ),
+            (
+                market_cube(cube_id=9, product_name="C CUBE"),
+                market_product(market_product_id=9, cube_id=9),
+            ),
+        ],
+    )
+
+    response = read_market_request(db)
+
+    assert response.status_code == 200
+    assert [item["representativeCubeId"] for item in response.json()["products"]] == [
+        2,
+        5,
+        9,
+    ]
+
+
+def test_read_market_uses_most_recent_settled_trade_price():
+    db = Mock(spec=Session)
+    set_market_results(
+        db,
+        ownership=market_ownership(),
+        product_rows=[
+            (
+                market_cube(cube_id=1, product_name="JENNIE RUBY CUBE"),
+                market_product(market_product_id=1, cube_id=1),
+            ),
+        ],
+        # 쿼리가 최신순으로 정렬해 주므로 같은 제품명의 첫 행이 최근 체결가입니다.
+        trade_rows=[
+            ("JENNIE RUBY CUBE", 12500),
+            ("JENNIE RUBY CUBE", 99000),
+        ],
+    )
+
+    response = read_market_request(db)
+
+    assert response.status_code == 200
+    assert response.json()["products"][0]["latestTradePrice"] == 12500
+
+
+def test_read_market_returns_null_price_when_no_settled_trade():
+    db = Mock(spec=Session)
+    set_market_results(
+        db,
+        ownership=market_ownership(),
+        product_rows=[
+            (
+                market_cube(cube_id=1, product_name="JENNIE RUBY CUBE"),
+                market_product(market_product_id=1, cube_id=1),
+            ),
+        ],
+        trade_rows=[],
+    )
+
+    response = read_market_request(db)
+
+    assert response.status_code == 200
+    assert response.json()["products"][0]["latestTradePrice"] is None
+
+
+def test_read_market_returns_null_image_when_representative_product_has_none():
+    db = Mock(spec=Session)
+    set_market_results(
+        db,
+        ownership=market_ownership(),
+        product_rows=[
+            (
+                market_cube(cube_id=1, product_name="JENNIE RUBY CUBE"),
+                market_product(
+                    market_product_id=1,
+                    cube_id=1,
+                    product_image_url=None,
+                ),
+            ),
+        ],
+    )
+
+    response = read_market_request(db)
+
+    assert response.status_code == 200
+    assert response.json()["products"][0]["productImageUrl"] is None
+
+
+def test_read_market_returns_empty_products_when_no_product_group():
+    db = Mock(spec=Session)
+    set_market_results(db, ownership=market_ownership(), product_rows=[])
+
+    response = read_market_request(db)
+
+    assert response.status_code == 200
+    assert response.json()["products"] == []
+    # 제품군이 없으면 시세 조회 쿼리를 실행하지 않습니다.
+    assert db.execute.call_count == 1
+
+
+def test_read_market_returns_null_profile_fields_when_not_set():
+    db = Mock(spec=Session)
+    set_market_results(
+        db,
+        ownership=market_ownership(
+            profile_character_img_url=None,
+            avatar_nickname=None,
+        ),
+    )
+
+    response = read_market_request(db)
+
+    assert response.status_code == 200
+    assert response.json()["profile"]["profileCharacterImgUrl"] is None
+    assert response.json()["profile"]["avatarNickname"] is None
+
+
+def test_read_market_returns_zero_trade_count_when_count_is_none():
+    db = Mock(spec=Session)
+    set_market_results(db, ownership=market_ownership(), total_trade_count=None)
+
+    response = read_market_request(db)
+
+    assert response.status_code == 200
+    assert response.json()["profile"]["totalTradeCount"] == 0
+
+
+def test_read_market_returns_404_when_ownership_not_found():
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = read_market_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == MARKET_OWNERSHIP_NOT_FOUND_RESPONSE
+    db.execute.assert_not_called()
+
+
+def test_read_market_returns_404_when_affinity_not_found():
+    db = Mock(spec=Session)
+    db.scalar.return_value = market_ownership(with_affinity=False)
+
+    response = read_market_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == MARKET_AFFINITY_NOT_FOUND_RESPONSE
+    db.execute.assert_not_called()
+
+
+def test_read_market_queries_only_own_active_last_accessed_ownership():
+    db = Mock(spec=Session)
+    set_market_results(db, ownership=market_ownership())
+
+    read_market_request(db)
+
+    where_clause = compiled_query(db.scalar.call_args_list[0]).split("WHERE")[1]
+    assert "cube_ownership.user_id = 1" in where_clause
+    assert "cube_ownership.ownership_status = 'ACTIVE'" in where_clause
+    assert "cube_ownership.is_last_accessed IS true" in where_clause
+
+
+def test_read_market_counts_only_completed_trades_of_buyer_or_seller():
+    db = Mock(spec=Session)
+    set_market_results(db, ownership=market_ownership())
+
+    read_market_request(db)
+
+    query = compiled_query(db.scalar.call_args_list[1])
+    assert "count(trade.id)" in query
+    assert "trade.status = 'COMPLETED'" in query
+    assert "trade.buyer_user_id = 1 OR sell_listing.user_id = 1" in query
+
+
+def test_read_market_excludes_deleted_and_disabled_cubes_from_products():
+    db = Mock(spec=Session)
+    set_market_results(
+        db,
+        ownership=market_ownership(),
+        product_rows=[
+            (
+                market_cube(cube_id=1, product_name="JENNIE RUBY CUBE"),
+                market_product(market_product_id=1, cube_id=1),
+            ),
+        ],
+    )
+
+    read_market_request(db)
+
+    query = compiled_query(db.execute.call_args_list[0])
+    assert "cube.deleted_at IS NULL" in query
+    assert "cube.status != 'DISABLED'" in query
+    assert "market_product.deleted_at IS NULL" in query
+    assert "ORDER BY cube.id ASC" in query
+
+
+def test_read_market_orders_trade_price_query_by_paid_time_and_trade_id():
+    db = Mock(spec=Session)
+    set_market_results(
+        db,
+        ownership=market_ownership(),
+        product_rows=[
+            (
+                market_cube(cube_id=1, product_name="JENNIE RUBY CUBE"),
+                market_product(market_product_id=1, cube_id=1),
+            ),
+        ],
+    )
+
+    read_market_request(db)
+
+    query = compiled_query(db.execute.call_args_list[1])
+    assert "sell_listing.price" in query
+    assert (
+        "trade.status IN ('PAID', 'SENT', 'SHIPPING', 'DELIVERED', 'COMPLETED')"
+        in query
+    )
+    assert "ORDER BY trade.paid_time DESC, trade.id DESC" in query
+    # 삭제된 판매글의 과거 거래도 시세 계산에 포함합니다.
+    assert "sell_listing.deleted_at IS NULL" not in query
+
+
+def test_read_market_swagger_contract():
+    operation = app.openapi()["paths"]["/api/v1/users/me/market"]["get"]
+
+    assert set(operation["responses"]) == {"200", "404"}
+    assert "security" not in operation
+
+
+def compiled_query(call) -> str:
+    return str(call.args[0].compile(compile_kwargs={"literal_binds": True}))
+
+
+# --- 마켓 세부 상품 조회: GET /users/me/market/products/{id}/sell-listings ---
+
+MARKET_PRODUCT_NOT_FOUND_RESPONSE = {
+    "code": "MARKET_PRODUCT_NOT_FOUND",
+    "message": "마켓 제품 정보를 찾을 수 없습니다.",
+}
+INVALID_REQUEST_RESPONSE = {
+    "code": "INVALID_REQUEST",
+    "message": "요청값이 올바르지 않습니다.",
+}
+
+
+def read_market_sell_listings_request(db: Mock, *, representative_cube_id: int | str = 3):
+    with api_client(db) as client:
+        return client.get(
+            "/api/v1/users/me/market/products/"
+            f"{representative_cube_id}/sell-listings"
+        )
+
+
+def market_sell_listing(
+    *,
+    sell_listing_id: int,
+    market_product_id: int,
+    price: int,
+    user_id: int = 3,
+) -> SellListing:
+    return SellListing(
+        id=sell_listing_id,
+        market_product_id=market_product_id,
+        user_id=user_id,
+        price=price,
+        status=SellListingStatus.ACTIVE,
+        deleted_at=None,
+    )
+
+
+def set_sell_listing_results(
+    db: Mock,
+    *,
+    product_name: str | None,
+    rows: list[tuple[SellListing, Cube, str | None, int]] | None = None,
+) -> None:
+    """서비스가 db.scalar / db.execute 를 호출하는 순서대로 결과를 지정합니다."""
+    db.scalar.return_value = product_name
+    db.execute.return_value.all.return_value = rows or []
+
+
+def test_read_market_sell_listings_returns_listings_of_same_product_name():
+    db = Mock(spec=Session)
+    set_sell_listing_results(
+        db,
+        product_name="ROSE ROISE CUBE",
+        rows=[
+            (
+                market_sell_listing(
+                    sell_listing_id=3,
+                    market_product_id=9,
+                    price=42000,
+                ),
+                market_cube(cube_id=9, product_name="ROSE ROISE CUBE", artist_name="ROSE"),
+                "로제짱",
+                1,
+            ),
+            (
+                market_sell_listing(
+                    sell_listing_id=2,
+                    market_product_id=3,
+                    price=35000,
+                ),
+                market_cube(cube_id=3, product_name="ROSE ROISE CUBE", artist_name="ROSE"),
+                "로제짱",
+                1,
+            ),
+        ],
+    )
+
+    response = read_market_sell_listings_request(db)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "sellListings": [
+            {
+                "sellListingId": 3,
+                "productName": "ROSE ROISE CUBE",
+                "serialNumber": "NO.0009",
+                "sellerNickname": "로제짱",
+                "price": 42000,
+                "likeCount": 1,
+            },
+            {
+                "sellListingId": 2,
+                "productName": "ROSE ROISE CUBE",
+                "serialNumber": "NO.0003",
+                "sellerNickname": "로제짱",
+                "price": 35000,
+                "likeCount": 1,
+            },
+        ]
+    }
+    db.commit.assert_not_called()
+
+
+def test_read_market_sell_listings_returns_empty_list_when_nothing_on_sale():
+    db = Mock(spec=Session)
+    set_sell_listing_results(db, product_name="ROSE ROISE CUBE", rows=[])
+
+    response = read_market_sell_listings_request(db)
+
+    assert response.status_code == 200
+    assert response.json() == {"sellListings": []}
+
+
+def test_read_market_sell_listings_returns_zero_like_count():
+    db = Mock(spec=Session)
+    set_sell_listing_results(
+        db,
+        product_name="ROSE ROISE CUBE",
+        rows=[
+            (
+                market_sell_listing(sell_listing_id=2, market_product_id=3, price=35000),
+                market_cube(cube_id=3, product_name="ROSE ROISE CUBE"),
+                "로제짱",
+                0,
+            ),
+        ],
+    )
+
+    response = read_market_sell_listings_request(db)
+
+    assert response.status_code == 200
+    assert response.json()["sellListings"][0]["likeCount"] == 0
+
+
+def test_read_market_sell_listings_returns_null_seller_nickname():
+    db = Mock(spec=Session)
+    set_sell_listing_results(
+        db,
+        product_name="ROSE ROISE CUBE",
+        rows=[
+            (
+                market_sell_listing(sell_listing_id=2, market_product_id=3, price=35000),
+                market_cube(cube_id=3, product_name="ROSE ROISE CUBE"),
+                None,
+                1,
+            ),
+        ],
+    )
+
+    response = read_market_sell_listings_request(db)
+
+    assert response.status_code == 200
+    assert response.json()["sellListings"][0]["sellerNickname"] is None
+
+
+def test_read_market_sell_listings_excludes_product_name_with_different_letter_case():
+    db = Mock(spec=Session)
+    set_sell_listing_results(
+        db,
+        product_name="ROSE ROISE CUBE",
+        rows=[
+            (
+                market_sell_listing(sell_listing_id=3, market_product_id=9, price=42000),
+                market_cube(cube_id=9, product_name="ROSE ROISE CUBE"),
+                "로제짱",
+                1,
+            ),
+            (
+                market_sell_listing(sell_listing_id=2, market_product_id=3, price=35000),
+                market_cube(cube_id=3, product_name="rose roise cube"),
+                "로제짱",
+                1,
+            ),
+        ],
+    )
+
+    response = read_market_sell_listings_request(db)
+
+    assert response.status_code == 200
+    assert [item["sellListingId"] for item in response.json()["sellListings"]] == [3]
+
+
+def test_read_market_sell_listings_allows_minimum_representative_cube_id():
+    db = Mock(spec=Session)
+    set_sell_listing_results(db, product_name="JENNIE RUBY CUBE", rows=[])
+
+    response = read_market_sell_listings_request(db, representative_cube_id=1)
+
+    assert response.status_code == 200
+    assert response.json() == {"sellListings": []}
+
+
+def test_read_market_sell_listings_returns_400_when_cube_id_is_zero():
+    db = Mock(spec=Session)
+
+    response = read_market_sell_listings_request(db, representative_cube_id=0)
+
+    assert response.status_code == 400
+    assert response.json() == INVALID_REQUEST_RESPONSE
+    db.scalar.assert_not_called()
+
+
+def test_read_market_sell_listings_returns_400_when_cube_id_is_not_a_number():
+    db = Mock(spec=Session)
+
+    response = read_market_sell_listings_request(db, representative_cube_id="abc")
+
+    assert response.status_code == 400
+    assert response.json() == INVALID_REQUEST_RESPONSE
+    db.scalar.assert_not_called()
+
+
+def test_read_market_sell_listings_returns_404_when_representative_cube_not_found():
+    db = Mock(spec=Session)
+    set_sell_listing_results(db, product_name=None)
+
+    response = read_market_sell_listings_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == MARKET_PRODUCT_NOT_FOUND_RESPONSE
+    db.execute.assert_not_called()
+
+
+def test_read_market_sell_listings_requires_active_representative_cube_and_product():
+    db = Mock(spec=Session)
+    set_sell_listing_results(db, product_name="ROSE ROISE CUBE", rows=[])
+
+    read_market_sell_listings_request(db)
+
+    query = compiled_query(db.scalar.call_args)
+    assert "cube.product_name" in query
+    assert "cube.id = 3" in query
+    assert "cube.deleted_at IS NULL" in query
+    assert "cube.status != 'DISABLED'" in query
+    assert "market_product.deleted_at IS NULL" in query
+
+
+def test_read_market_sell_listings_returns_only_active_listings_ordered_by_id_desc():
+    db = Mock(spec=Session)
+    set_sell_listing_results(db, product_name="ROSE ROISE CUBE", rows=[])
+
+    read_market_sell_listings_request(db)
+
+    query = compiled_query(db.execute.call_args)
+    assert "sell_listing.status = 'ACTIVE'" in query
+    assert "sell_listing.deleted_at IS NULL" in query
+    assert "cube.product_name = 'ROSE ROISE CUBE'" in query
+    assert "cube.deleted_at IS NULL" in query
+    assert "cube.status != 'DISABLED'" in query
+    assert "ORDER BY sell_listing.id DESC" in query
+
+
+def test_read_market_sell_listings_counts_only_liked_rows():
+    db = Mock(spec=Session)
+    set_sell_listing_results(db, product_name="ROSE ROISE CUBE", rows=[])
+
+    read_market_sell_listings_request(db)
+
+    query = compiled_query(db.execute.call_args)
+    assert "count(selling_list_like.id)" in query
+    assert "selling_list_like.is_liked IS true" in query
+    assert "selling_list_like.selling_list_id = sell_listing.id" in query
+
+
+def test_read_market_sell_listings_swagger_contract():
+    operation = app.openapi()["paths"][
+        "/api/v1/users/me/market/products/{representativeCubeId}/sell-listings"
+    ]["get"]
+
+    assert set(operation["responses"]) == {"200", "404"}
     assert "security" not in operation

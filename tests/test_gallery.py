@@ -1,17 +1,15 @@
 """갤러리 조회 API 테스트."""
 
-from collections.abc import Iterator
 from datetime import date, datetime
 from unittest.mock import Mock
 
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.main import app
 from app.models.avatar import AvatarInteractionPicture
 from app.models.stage import Stage, StageCapture, StageSession
 from app.models.track import Track, TrackCapture, TrackSession
+from tests.conftest import api_client
 
 
 def delete_gallery_item_request(
@@ -20,20 +18,13 @@ def delete_gallery_item_request(
     gallery_item_id: int = 1,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(
-            app,
-            raise_server_exceptions=raise_server_exceptions,
-        ) as client:
-            return client.delete(
-                f"/api/v1/users/me/gallery/{source_type}/{gallery_item_id}"
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.delete(
+            f"/api/v1/users/me/gallery/{source_type}/{gallery_item_id}"
+        )
 
 
 def request_gallery_ar_experience(
@@ -41,30 +32,16 @@ def request_gallery_ar_experience(
     source_type: str = "STAGE_CAPTURE",
     gallery_item_id: int = 1,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.get(
-                "/api/v1/users/me/gallery/"
-                f"{source_type}/{gallery_item_id}/ar-experience"
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.get(
+            "/api/v1/users/me/gallery/"
+            f"{source_type}/{gallery_item_id}/ar-experience"
+        )
 
 
 def request_gallery(db: Mock, query: str = ""):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.get(f"/api/v1/users/me/gallery{query}")
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.get(f"/api/v1/users/me/gallery{query}")
 
 
 def gallery_rows(*rows: dict):

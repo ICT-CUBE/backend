@@ -94,6 +94,42 @@ def verify_cube_code(
     return CubeVerificationResponse(cube_ownership_id=cube_ownership.id)
 
 
+def save_avatar_nickname(
+    *,
+    db: Session,
+    current_user_id: int,
+    cube_ownership_id: int,
+    avatar_nickname: str,
+) -> None:
+    """현재 사용자의 활성 마지막 접근 소유권에 아바타 닉네임을 저장합니다."""
+    # 소유권 행을 잠가 같은 소유권에 대한 동시 변경 요청을 직렬화합니다.
+    cube_ownership = db.scalar(
+        select(CubeOwnership)
+        .where(
+            CubeOwnership.id == cube_ownership_id,
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
+        )
+        .limit(1)
+        .with_for_update()
+    )
+    if cube_ownership is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_OWNERSHIP_NOT_FOUND",
+            message="큐브 소유권 정보를 찾을 수 없습니다.",
+        )
+
+    cube_ownership.avatar_nickname = avatar_nickname
+    try:
+        # 조회한 ORM 객체의 변경 사항은 commit 시 UPDATE로 반영됩니다.
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
 def _raise_cube_not_registrable() -> None:
     raise ApiError(
         status_code=409,

@@ -9,6 +9,8 @@ from app.core.auth import get_current_user_id
 from app.core.database import get_db
 from app.schemas.common import ErrorResponse
 from app.schemas.market import (
+    MarketResponse,
+    MarketSellListingsResponse,
     SellableCubesResponse,
     SellListingCreateRequest,
     SellListingCreateResponse,
@@ -21,11 +23,95 @@ from app.services.market import (
     create_sell_listing,
     create_trade,
     delete_sell_listing,
+    get_market,
+    get_market_product_sell_listings,
     get_sellable_cubes,
     get_trade_detail,
 )
 
 router = APIRouter()
+
+
+@router.get(
+    "/market",
+    response_model=MarketResponse,
+    summary="마켓 조회",
+    description=(
+        "현재 사용자의 마켓 프로필과 제품명별 대표 마켓 상품 목록을 "
+        "최근 체결가와 함께 조회합니다."
+    ),
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "큐브 소유권 또는 친밀도 정보가 없음",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "cubeOwnershipNotFound": {
+                            "summary": "큐브 소유권 없음",
+                            "value": {
+                                "code": "CUBE_OWNERSHIP_NOT_FOUND",
+                                "message": "큐브 소유권 정보를 찾을 수 없습니다.",
+                            },
+                        },
+                        "cubeAffinityNotFound": {
+                            "summary": "큐브 친밀도 정보 없음",
+                            "value": {
+                                "code": "CUBE_AFFINITY_NOT_FOUND",
+                                "message": "큐브 친밀도 정보를 찾을 수 없습니다.",
+                            },
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
+def read_market(
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> MarketResponse:
+    """GET /api/v1/users/me/market"""
+    return get_market(db=db, current_user_id=current_user_id)
+
+
+@router.get(
+    "/market/products/{representativeCubeId}/sell-listings",
+    response_model=MarketSellListingsResponse,
+    summary="마켓 세부 상품 조회",
+    description=(
+        "대표 큐브와 제품명이 같은 시리얼 큐브를 판매 중인 판매글 전체를 "
+        "판매글 id 내림차순으로 조회합니다."
+    ),
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "대표 큐브 또는 마켓 상품이 없거나 조회할 수 없는 상태",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "MARKET_PRODUCT_NOT_FOUND",
+                        "message": "마켓 제품 정보를 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def read_market_product_sell_listings(
+    representative_cube_id: Annotated[
+        int,
+        Path(alias="representativeCubeId", ge=1),
+    ],
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> MarketSellListingsResponse:
+    """GET /api/v1/users/me/market/products/{representativeCubeId}/sell-listings"""
+    return get_market_product_sell_listings(
+        db=db,
+        current_user_id=current_user_id,
+        representative_cube_id=representative_cube_id,
+    )
 
 
 @router.get(

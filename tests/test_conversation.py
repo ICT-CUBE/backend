@@ -1,13 +1,10 @@
 """텍스트 및 음성 대화 조회 API 테스트."""
 
-from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock, patch
 
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.main import app
 from app.models.conversation import (
     AvatarConversationMessage,
@@ -22,6 +19,7 @@ from app.models.enums import (
     ConversationReportReason,
     ConversationType,
 )
+from tests.conftest import api_client
 
 
 def create_conversation_session_request(
@@ -29,35 +27,21 @@ def create_conversation_session_request(
     body: dict | None = None,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(
-            app,
-            raise_server_exceptions=raise_server_exceptions,
-        ) as client:
-            return client.post(
-                "/api/v1/users/me/conversation-sessions",
-                json=body if body is not None else {"conversationType": "TEXT"},
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.post(
+            "/api/v1/users/me/conversation-sessions",
+            json=body if body is not None else {"conversationType": "TEXT"},
+        )
 
 
 def request_conversation_session_detail(db: Mock, conversation_session_id: int = 1001):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.get(
-                f"/api/v1/users/me/conversation-sessions/{conversation_session_id}"
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.get(
+            f"/api/v1/users/me/conversation-sessions/{conversation_session_id}"
+        )
 
 
 def delete_conversation_session_request(
@@ -65,20 +49,13 @@ def delete_conversation_session_request(
     conversation_session_id: int = 1001,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(
-            app,
-            raise_server_exceptions=raise_server_exceptions,
-        ) as client:
-            return client.delete(
-                f"/api/v1/users/me/conversation-sessions/{conversation_session_id}"
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.delete(
+            f"/api/v1/users/me/conversation-sessions/{conversation_session_id}"
+        )
 
 
 def save_conversation_message_request(
@@ -86,20 +63,13 @@ def save_conversation_message_request(
     conversation_message_id: int = 5006,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(
-            app,
-            raise_server_exceptions=raise_server_exceptions,
-        ) as client:
-            return client.patch(
-                f"/api/v1/users/me/conversation-messages/{conversation_message_id}/save"
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.patch(
+            f"/api/v1/users/me/conversation-messages/{conversation_message_id}/save"
+        )
 
 
 def create_conversation_report_request(
@@ -108,29 +78,22 @@ def create_conversation_report_request(
     body: dict | None = None,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(
-            app,
-            raise_server_exceptions=raise_server_exceptions,
-        ) as client:
-            return client.post(
-                f"/api/v1/users/me/conversation-messages/"
-                f"{conversation_message_id}/reports",
-                json=(
-                    body
-                    if body is not None
-                    else {
-                        "reason": "INCORRECT_PERSONA",
-                        "detailReason": "아티스트 설정과 다른 답변입니다.",
-                    }
-                ),
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.post(
+            f"/api/v1/users/me/conversation-messages/"
+            f"{conversation_message_id}/reports",
+            json=(
+                body
+                if body is not None
+                else {
+                    "reason": "INCORRECT_PERSONA",
+                    "detailReason": "아티스트 설정과 다른 답변입니다.",
+                }
+            ),
+        )
 
 
 def reply_conversation_message_request(
@@ -139,22 +102,15 @@ def reply_conversation_message_request(
     body: dict | None = None,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(
-            app,
-            raise_server_exceptions=raise_server_exceptions,
-        ) as client:
-            return client.post(
-                f"/api/v1/users/me/conversation-sessions/"
-                f"{conversation_session_id}/messages",
-                json=body if body is not None else {"content": "오늘 뭐 하고 있었어?"},
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.post(
+            f"/api/v1/users/me/conversation-sessions/"
+            f"{conversation_session_id}/messages",
+            json=body if body is not None else {"content": "오늘 뭐 하고 있었어?"},
+        )
 
 
 def update_conversation_session_request(
@@ -164,46 +120,25 @@ def update_conversation_session_request(
     files: dict | None = None,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(
-            app,
-            raise_server_exceptions=raise_server_exceptions,
-        ) as client:
-            return client.patch(
-                f"/api/v1/users/me/conversation-sessions/{conversation_session_id}",
-                data=data,
-                files=files,
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.patch(
+            f"/api/v1/users/me/conversation-sessions/{conversation_session_id}",
+            data=data,
+            files=files,
+        )
 
 
 def request_conversation_sessions(db: Mock, query: str = "?conversationType=TEXT"):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.get(f"/api/v1/users/me/conversation-sessions{query}")
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.get(f"/api/v1/users/me/conversation-sessions{query}")
 
 
 def request_conversation_archive(db: Mock):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.get("/api/v1/users/me/conversation-archive")
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.get("/api/v1/users/me/conversation-archive")
 
 
 def delete_conversation_archive_message_request(
@@ -211,21 +146,14 @@ def delete_conversation_archive_message_request(
     conversation_message_id: int = 5006,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(
-            app,
-            raise_server_exceptions=raise_server_exceptions,
-        ) as client:
-            return client.delete(
-                f"/api/v1/users/me/conversation-messages/"
-                f"{conversation_message_id}/unsave"
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.delete(
+            f"/api/v1/users/me/conversation-messages/"
+            f"{conversation_message_id}/unsave"
+        )
 
 
 def conversation_result(*rows: tuple[AvatarConversationSession, AvatarConversationMessage]):

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
         UserSetting,
     )
     from app.models.community import Comment, CommentLike, Post, PostLike
-    from app.models.market import SellListing, Trade
+    from app.models.market import SellingListLike, SellListing, Trade
 
 
 class User(Base):
@@ -74,6 +74,9 @@ class User(Base):
     post_likes: Mapped[list[PostLike]] = relationship(back_populates="user")
     comment_likes: Mapped[list[CommentLike]] = relationship(back_populates="user")
     sell_listings: Mapped[list[SellListing]] = relationship(back_populates="user")
+    selling_list_likes: Mapped[list[SellingListLike]] = relationship(
+        back_populates="user"
+    )
     bought_trades: Mapped[list[Trade]] = relationship(back_populates="buyer")
 
 

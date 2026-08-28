@@ -5,6 +5,41 @@ from datetime import datetime
 from app.schemas.base import ApiSchema
 
 
+class MarketProfileResponse(ApiSchema):
+    profile_character_img_url: str | None
+    avatar_nickname: str | None
+    level: int
+    level_name: str
+    total_trade_count: int
+
+
+class MarketProductItemResponse(ApiSchema):
+    representative_cube_id: int
+    market_product_id: int
+    product_name: str
+    artist_name: str
+    product_image_url: str | None
+    latest_trade_price: int | None
+
+
+class MarketResponse(ApiSchema):
+    profile: MarketProfileResponse
+    products: list[MarketProductItemResponse]
+
+
+class MarketSellListingItemResponse(ApiSchema):
+    sell_listing_id: int
+    product_name: str
+    serial_number: str
+    seller_nickname: str | None
+    price: int
+    like_count: int
+
+
+class MarketSellListingsResponse(ApiSchema):
+    sell_listings: list[MarketSellListingItemResponse]
+
+
 class SellableCubeItemResponse(ApiSchema):
     cube_id: int
     market_product_id: int

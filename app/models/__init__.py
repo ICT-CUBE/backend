@@ -19,6 +19,7 @@ from app.models.market import (
     DigitalCertificate,
     ListingMedia,
     MarketProduct,
+    SellingListLike,
     SellListing,
     Trade,
 )
@@ -54,6 +55,7 @@ __all__ = [
     "PostMedia",
     "RewardItem",
     "SellListing",
+    "SellingListLike",
     "Stage",
     "StageCapture",
     "StageSession",
