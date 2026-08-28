@@ -594,7 +594,7 @@ Status Code : 404
 
 ### API 설명
 
-사용자가 대화 세션 안에서 아바타에게 메시지를 전송했을 때 호출한다.
+사용자가 텍스트 또는 음성 대화 세션 안에서 아바타에게 메시지를 전송했을 때 호출한다.
 
 백엔드는 사용자 메시지를 저장하고, OpenAI GPT로 아바타 응답을 생성한 뒤 아바타 메시지도 함께 저장해 반환한다.
 
@@ -610,8 +610,10 @@ Status Code : 404
 - `content`가 빈 문자열이거나 `imageUrls`가 6개 이상이면 공통 400: INVALID_REQUEST를 반환한다.
 - `conversationSessionId`에 해당하는 대화 세션이 현재 사용자의 `ACTIVE` 큐브 소유권에 속한 경우에만 메시지를 전송할 수 있다.
 - 대화 세션이 존재하지 않거나, 현재 사용자의 활성 큐브 소유권에 속하지 않거나, 삭제된 세션이면 404: CONVERSATION_SESSION_NOT_FOUND를 반환한다.
+- `ACTIVE` 상태의 텍스트 또는 음성 대화 세션에서 메시지를 전송할 수 있다.
+- 음성 대화 세션에서는 사용자 음성 인식 결과를 `content`에 담아 텍스트와 동일한 형식으로 요청한다.
 - 텍스트 대화 세션이 `NOT_ACTIVE` 상태이면 `ACTIVE` 상태로 변경한 뒤 메시지 전송을 진행한다.
-- 음성 대화 세션으로 메시지 전송을 요청하면 404: CONVERSATION_SESSION_NOT_FOUND를 반환한다.
+- 음성 대화 세션이 `NOT_ACTIVE` 상태이면 404: CONVERSATION_SESSION_NOT_FOUND를 반환한다.
 - 프론트는 갤러리 조회 API로 받은 Blob URL만 전송한다.
 - 백엔드는 이미지 URL의 갤러리 소유 여부를 별도로 검증하지 않는다.
 - 삭제된 갤러리 이미지 URL이 전송된 것으로 확인되면 404: CONVERSATION_IMAGE_NOT_FOUND를 반환한다.
