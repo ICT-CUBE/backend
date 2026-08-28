@@ -503,7 +503,7 @@ def reply_to_conversation_message(
     conversation_session_id: int,
     body: ConversationMessageReplyRequest,
 ) -> ConversationMessageReplyResponse:
-    """사용자 발화를 GPT로 처리하고 USER/AVATAR 메시지를 함께 저장합니다."""
+    """텍스트·음성 사용자 발화를 처리해 USER/AVATAR 메시지를 저장합니다."""
     conversation_session = db.scalar(
         select(AvatarConversationSession)
         .join(
@@ -528,9 +528,6 @@ def reply_to_conversation_message(
         .limit(1)
     )
     if conversation_session is None:
-        _raise_conversation_session_not_found()
-
-    if conversation_session.conversation_type == ConversationType.VOICE:
         _raise_conversation_session_not_found()
 
     if conversation_session.status == AvatarConversationSessionStatus.NOT_ACTIVE:

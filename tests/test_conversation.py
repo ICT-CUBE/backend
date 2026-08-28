@@ -1273,22 +1273,59 @@ def test_reply_conversation_message_allows_not_active_session() -> None:
     )
 
 
-def test_reply_conversation_message_returns_404_for_voice_session() -> None:
+def test_reply_conversation_message_allows_active_voice_session() -> None:
     db = Mock(spec=Session)
-    db.scalar.return_value = session(
-        id=1001,
+    conversation_session = session(
+        id=12,
         conversation_type=ConversationType.VOICE,
     )
+    db.scalar.side_effect = [conversation_session, 0]
+    db.flush.side_effect = lambda: [
+        setattr(call.args[0], "id", index)
+        for index, call in enumerate(db.add.call_args_list, start=1)
+    ]
 
-    with patch("app.services.conversation.generate_avatar_reply") as generate_reply:
-        response = reply_conversation_message_request(db)
+    with patch(
+        "app.services.conversation.generate_avatar_reply",
+        return_value="안녕! 오늘 기분은 어때?",
+    ) as generate_reply:
+        response = reply_conversation_message_request(
+            db,
+            conversation_session_id=12,
+            body={"content": "안녕"},
+        )
+
+    assert response.status_code == 201
+    generate_reply.assert_called_once_with("안녕", [])
+    assert response.json()["userMessage"]["content"] == "안녕"
+    assert response.json()["avatarMessage"]["content"] == (
+        "안녕! 오늘 기분은 어때?"
+    )
+    assert all(
+        call.args[0].conversation_session_id == 12
+        for call in db.add.call_args_list
+    )
+    db.commit.assert_called_once()
+
+
+def test_reply_conversation_message_returns_404_for_not_active_voice_session() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = reply_conversation_message_request(
+        db,
+        conversation_session_id=12,
+        body={"content": "안녕"},
+    )
 
     assert response.status_code == 404
     assert response.json() == {
         "code": "CONVERSATION_SESSION_NOT_FOUND",
         "message": "대화 세션을 찾을 수 없습니다.",
     }
-    generate_reply.assert_not_called()
+    query = str(db.scalar.call_args.args[0])
+    assert "avatar_conversation_session.conversation_type" in query
+    assert "avatar_conversation_session.status" in query
     db.add.assert_not_called()
     db.commit.assert_not_called()
 
