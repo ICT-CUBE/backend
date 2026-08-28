@@ -11,7 +11,10 @@ INSERT INTO `auth_session` (`id`, `user_id`, `token_jti`, `status`, `issued_at`,
 INSERT INTO `cube` (`id`, `serial_number`, `product_name`, `ownership_code_hash`, `artist_name`, `status`) VALUES
 (1, 'NO.0026', 'JENNIE RUBY CUBE', '9999', 'Jennie', 'OWNED'),
 (2, 'NO.0031', 'BIGBANG MADE CUBE', '1111', 'Big Bang', 'OWNED'),
-(3, 'NO.0022', 'ROSE ROISE CUBE', '2222', 'ROSE', 'OWNED');
+(3, 'NO.0022', 'ROSE ROISE CUBE', '2222', 'ROSE', 'OWNED'),
+(4, 'NO.0044', 'JENNIE SOLO CUBE', '4444', 'Jennie', 'UNREGISTERED'),
+(5, 'NO.0055', 'BIGBANG STILL LIFE CUBE', '5555', 'Big Bang', 'UNREGISTERED'),
+(6, 'NO.0066', 'ROSE ROSIE CUBE', '6666', 'ROSE', 'UNREGISTERED');
 
 INSERT INTO `cube_verification` (`id`, `user_id`, `cube_id`, `verification_status`, `code_expires_at`, `verified_at`) VALUES
 (1, 1, 1, 'SUCCESS', '2025-03-14 19:25:00', '2025-03-07 19:25:00');
@@ -158,16 +161,50 @@ INSERT INTO `album_image` (`id`, `album_id`, `title`, `image_type`, `album_conte
 
 
 INSERT INTO `avatar_conversation_session` (`id`, `cube_ownership_id`, `conversation_type`, `started_at`, `ended_at`, `audio_url`, `audio_duration_seconds`, `conversation_title`, `status`) VALUES
-(1, 1, 'TEXT', '2025-03-10 12:00:00', NULL, NULL, NULL, '오늘의 인사', 'NOT_ACTIVE'),
-(2, 1, 'VOICE', '2025-03-29 21:10:00', '2025-03-29 21:12:00', NULL, 120, '음성 대화', 'NOT_ACTIVE'),
-(3, 1, 'TEXT', '2025-04-12 20:20:00', '2025-04-12 20:31:00', NULL, NULL, 'Ruby 앨범 이야기', 'NOT_ACTIVE');
+(1, 1, 'TEXT', '2025-03-10 12:00:00', '2025-03-10 12:04:00', NULL, NULL, '오늘의 인사', 'NOT_ACTIVE'),
+(2, 1, 'VOICE', '2025-03-29 21:10:00', '2025-03-29 21:14:00', 'https://haniumstorage.blob.core.windows.net/hanium/conversation_audio/1/6/e916cdb7-5ade-4ac2-b083-5c12fade1106.m4a', 240, '저녁 메뉴 추천', 'NOT_ACTIVE'),
+(3, 1, 'TEXT', '2025-04-12 20:20:00', '2025-04-12 20:31:00', NULL, NULL, 'Ruby 앨범 이야기', 'NOT_ACTIVE'),
+(4, 1, 'VOICE', '2025-04-18 18:30:00', '2025-04-18 18:35:00', 'https://haniumstorage.blob.core.windows.net/hanium/conversation_audio/1/4/7e3a479e-5727-47df-95d7-721671c972b7.m4a', 300, '자연과의 만남', 'NOT_ACTIVE'),
+(5, 1, 'TEXT', '2025-04-22 14:00:00', '2025-04-22 14:06:00', NULL, NULL, '여행의 추억과 친구들', 'NOT_ACTIVE'),
+(6, 1, 'VOICE', '2025-04-28 09:00:00', '2025-04-28 09:05:00', 'https://haniumstorage.blob.core.windows.net/hanium/conversation_audio/1/2/9cbca527-7970-4851-b3d2-bdb527356573.m4a', 300, '운동과 건강 관리', 'NOT_ACTIVE');
 
 INSERT INTO `avatar_conversation_message` (`id`, `conversation_session_id`, `sender_type`, `content`, `sequence_number`, `is_text_saved`, `status`, `violation_type`, `sent_at`) VALUES
 (1, 1, 'USER', '안녕, 오늘 기분 어때?', 1, FALSE, 'ALLOWED', NULL, '2025-03-10 12:00:10'),
 (2, 1, 'AVATAR', '좋아! 오늘은 like JENNIE 들어볼까?', 2, TRUE, 'ALLOWED', NULL, '2025-03-10 12:00:12'),
-(3, 1, 'USER', '뭐해?', 3, FALSE, 'ALLOWED', NULL, '2025-03-10 12:00:12'),
-(4, 1, 'AVATAR', '몰라', 4, TRUE, 'ALLOWED', NULL, '2025-03-10 12:00:12'),
-(5, 3, 'USER', 'Ruby 앨범 콘셉트 설명해줘.', 1, FALSE, 'ALLOWED', NULL, '2025-04-12 20:20:10');
+(3, 1, 'USER', '좋아, 가장 추천하는 곡은 뭐야?', 3, FALSE, 'ALLOWED', NULL, '2025-03-10 12:01:00'),
+(4, 1, 'AVATAR', '나는 Like JENNIE를 먼저 추천할게.', 4, TRUE, 'ALLOWED', NULL, '2025-03-10 12:01:05'),
+(5, 1, 'USER', '그럼 지금 바로 들어볼게.', 5, FALSE, 'ALLOWED', NULL, '2025-03-10 12:02:00'),
+(6, 1, 'AVATAR', '좋아! 듣고 나서 감상도 알려줘.', 6, FALSE, 'ALLOWED', NULL, '2025-03-10 12:02:05'),
+(7, 2, 'USER', '오늘 저녁은 뭘 먹을까?', 1, FALSE, 'ALLOWED', NULL, '2025-03-29 21:10:10'),
+(8, 2, 'AVATAR', '따뜻한 파스타는 어때?', 2, FALSE, 'ALLOWED', NULL, '2025-03-29 21:10:15'),
+(9, 2, 'USER', '조금 더 매콤한 게 먹고 싶어.', 3, FALSE, 'ALLOWED', NULL, '2025-03-29 21:11:00'),
+(10, 2, 'AVATAR', '그러면 매콤한 떡볶이를 추천할게.', 4, FALSE, 'ALLOWED', NULL, '2025-03-29 21:11:05'),
+(11, 2, 'USER', '좋아, 튀김도 같이 먹어야겠다.', 5, FALSE, 'ALLOWED', NULL, '2025-03-29 21:12:00'),
+(12, 2, 'AVATAR', '완벽한 조합이네. 맛있게 먹어!', 6, FALSE, 'ALLOWED', NULL, '2025-03-29 21:12:05'),
+(13, 3, 'USER', 'Ruby 앨범 콘셉트 설명해줘.', 1, FALSE, 'ALLOWED', NULL, '2025-04-12 20:20:10'),
+(14, 3, 'AVATAR', '강렬함과 솔직한 내 모습을 담은 앨범이야.', 2, TRUE, 'ALLOWED', NULL, '2025-04-12 20:20:15'),
+(15, 3, 'USER', '가장 애착이 가는 곡은 뭐야?', 3, FALSE, 'ALLOWED', NULL, '2025-04-12 20:21:00'),
+(16, 3, 'AVATAR', '모든 곡이 소중하지만 타이틀곡에 특히 애착이 가.', 4, FALSE, 'ALLOWED', NULL, '2025-04-12 20:21:05'),
+(17, 3, 'USER', '무대도 정말 기대하고 있어.', 5, FALSE, 'ALLOWED', NULL, '2025-04-12 20:22:00'),
+(18, 3, 'AVATAR', '기대해도 좋아. 멋진 모습 보여줄게!', 6, FALSE, 'ALLOWED', NULL, '2025-04-12 20:22:05'),
+(19, 4, 'USER', '요즘 산책하기 좋은 곳이 있을까?', 1, FALSE, 'ALLOWED', NULL, '2025-04-18 18:30:10'),
+(20, 4, 'AVATAR', '강변 공원에서 천천히 걷는 건 어때?', 2, FALSE, 'ALLOWED', NULL, '2025-04-18 18:30:15'),
+(21, 4, 'USER', '노을도 볼 수 있으면 좋겠어.', 3, FALSE, 'ALLOWED', NULL, '2025-04-18 18:31:00'),
+(22, 4, 'AVATAR', '해 질 무렵에 가면 멋진 노을도 볼 수 있어.', 4, FALSE, 'ALLOWED', NULL, '2025-04-18 18:31:05'),
+(23, 4, 'USER', '이번 주말에 꼭 가봐야겠다.', 5, FALSE, 'ALLOWED', NULL, '2025-04-18 18:32:00'),
+(24, 4, 'AVATAR', '좋은 생각이야. 사진도 많이 찍어 와!', 6, FALSE, 'ALLOWED', NULL, '2025-04-18 18:32:05'),
+(25, 5, 'USER', '친구들과 갔던 여행이 생각나.', 1, FALSE, 'ALLOWED', NULL, '2025-04-22 14:00:10'),
+(26, 5, 'AVATAR', '어떤 순간이 가장 기억에 남아?', 2, FALSE, 'ALLOWED', NULL, '2025-04-22 14:00:15'),
+(27, 5, 'USER', '바닷가에서 함께 본 일몰이 기억나.', 3, FALSE, 'ALLOWED', NULL, '2025-04-22 14:01:00'),
+(28, 5, 'AVATAR', '친구들과 본 일몰이라 더 특별했겠다.', 4, FALSE, 'ALLOWED', NULL, '2025-04-22 14:01:05'),
+(29, 5, 'USER', '다음에도 다 같이 여행하고 싶어.', 5, FALSE, 'ALLOWED', NULL, '2025-04-22 14:02:00'),
+(30, 5, 'AVATAR', '다음 여행도 분명 좋은 추억이 될 거야.', 6, FALSE, 'ALLOWED', NULL, '2025-04-22 14:02:05'),
+(31, 6, 'USER', '요즘 운동을 시작해 보려고 해.', 1, FALSE, 'ALLOWED', NULL, '2025-04-28 09:00:10'),
+(32, 6, 'AVATAR', '가벼운 걷기부터 시작해 보는 건 어때?', 2, FALSE, 'ALLOWED', NULL, '2025-04-28 09:00:15'),
+(33, 6, 'USER', '일주일에 몇 번 정도가 좋을까?', 3, FALSE, 'ALLOWED', NULL, '2025-04-28 09:01:00'),
+(34, 6, 'AVATAR', '처음에는 일주일에 세 번 정도가 좋아.', 4, FALSE, 'ALLOWED', NULL, '2025-04-28 09:01:05'),
+(35, 6, 'USER', '무리하지 않고 꾸준히 해볼게.', 5, FALSE, 'ALLOWED', NULL, '2025-04-28 09:02:00'),
+(36, 6, 'AVATAR', '좋아! 꾸준함이 가장 중요해.', 6, FALSE, 'ALLOWED', NULL, '2025-04-28 09:02:05');
 
 INSERT INTO `conversation_report` (`id`, `conversation_message_id`, `reason`, `detail_reason`) VALUES
 (1, 1, 'INCORRECT_PERSONA', '페르소나 응답이 부정확한 예시'),
@@ -207,7 +244,10 @@ INSERT INTO `comment_like` (`id`, `comment_id`, `user_id`, `is_liked`) VALUES
 INSERT INTO `market_product` (`id`, `cube_id`, `product_image_url`) VALUES
 (1, 1, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png'),
 (2, 2, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
-(3, 3, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png');
+(3, 3, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
+(4, 4, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png'),
+(5, 5, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
+(6, 6, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png');
 
 INSERT INTO `sell_listing` (`id`, `market_product_id`, `user_id`, `product_status`, `title`, `description`, `price`, `status`) VALUES
 (1, 2, 2, '좋음', '빅뱅 메이드 큐브 31번', '상태 좋은 큐브 판매합니다.', 35000, 'ACTIVE'),
