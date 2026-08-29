@@ -6,24 +6,10 @@ erDiagram
         varchar_255 password_hash "NULL"
         varchar_20 login_provider "NOT NULL, Enum: EMAIL | GOOGLE | APPLE"
         varchar_255 provider_user_id "NULL"
-        varchar_8 nickname "NULL"
+        varchar_20 nickname "NULL"
         varchar_500 profile_character_img_url "NULL"
         int chat_violation_count "NOT NULL, DEFAULT: 0"
         varchar_20 status "NOT NULL, Enum: ACTIVE | WITHDRAWN | SUSPENDED"
-        datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-        datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-        datetime deleted_at "NULL"
-    }
-
-    AUTH_SESSION {
-        bigint id PK
-        bigint user_id FK "NOT NULL"
-        varchar_64 token_jti "NOT NULL, UNIQUE"
-        varchar_20 status "NOT NULL, Enum: ACTIVE | REVOKED"
-        datetime issued_at "NOT NULL"
-        datetime expires_at "NOT NULL"
-        datetime revoked_at "NULL"
-        varchar_255 device_id "NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime deleted_at "NULL"
@@ -442,7 +428,6 @@ erDiagram
     }
 
 
-    USER ||--o{ AUTH_SESSION : "has"
     USER ||--o{ CUBE_VERIFICATION : "requests"
     CUBE ||--o{ CUBE_VERIFICATION : "is verified through"
     USER ||--o{ CUBE_OWNERSHIP : "owns"

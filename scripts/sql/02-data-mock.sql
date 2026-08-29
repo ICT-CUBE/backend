@@ -1,39 +1,46 @@
 SET NAMES utf8mb4;
 
 INSERT INTO `user` (`id`, `email`, `password_hash`, `login_provider`, `provider_user_id`, `nickname`, `profile_character_img_url`, `chat_violation_count`, `status`) VALUES
-(1, 'cube@arzone.com', 'abcdef12!', 'EMAIL', 'jennylover', '블링크', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
-(2, 'cubelove@arzone.com', 'afkfkf!', 'EMAIL', 'GDlover', '지드래곤짱', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
-(3, 'cubelove2323@arzone.com', 'afkfkf!', 'EMAIL', 'ROSElover', '로제짱', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
-(4, 'blink04@arzone.com', 'mock_password', 'EMAIL', 'blink04', '한강블링크', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
-(5, 'rubycollector@arzone.com', 'mock_password', 'EMAIL', 'rubycollector', '루비수집가', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
-(6, 'jendeukfan@arzone.com', 'mock_password', 'EMAIL', 'jendeukfan', '젠득이팬', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
-(7, 'concertlover@arzone.com', 'mock_password', 'EMAIL', 'concertlover', '콘서트러버', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
-(8, 'arzoneexplorer@arzone.com', 'mock_password', 'EMAIL', 'arzoneexplorer', '아르존탐험가', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
-(9, 'cubemaster@arzone.com', 'mock_password', 'EMAIL', 'cubemaster', '큐브마스터', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
-(10, 'jenniesupport@arzone.com', 'mock_password', 'EMAIL', 'jenniesupport', '제니응원단', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE');
-
-INSERT INTO `auth_session` (`id`, `user_id`, `token_jti`, `status`, `issued_at`, `expires_at`, `device_id`) VALUES
-(1, 1, 'jti-mock-0001', 'ACTIVE', '2025-03-07 19:20:00', '2030-03-07 19:20:00', 'ios-jennylover');
+(1, 'user1@arzone.com', '$argon2id$v=19$m=65536,t=3,p=4$e5rwJadaTZWYqHcAyaYlgw$NLj5gR1MqWDcNcFk4qOANuLkPKjN126Thk4xVjfKfZ4', 'EMAIL', 'jennylover', '블링크', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(2, 'user2@arzone.com', '$argon2id$v=19$m=65536,t=3,p=4$8TZ6+YYxwqiFBaVnMCNDYA$w2QekRkz1xjBZ35BFTeC+tPlUNkMVxO3wdIUa4MXCjI', 'EMAIL', 'GDlover', '지드래곤짱', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(3, 'user3@arzone.com', '$argon2id$v=19$m=65536,t=3,p=4$2wCJpZVvwEchjNil+r8xlg$qjCecKV0HkZ1oYFZLZ28j4jv1A9jYv/zJLOhx0scsVo', 'EMAIL', 'ROSElover', '로제짱', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(4, 'user4@arzone.com', '$argon2id$v=19$m=65536,t=3,p=4$Go04umJUR+j2PHFJdYjDRA$Ly221dEUOOsdU7vyvdsNaLnKr5bqWUwRuwkT+B7YMkc', 'EMAIL', 'blink04', '한강블링크', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(5, 'user5@arzone.com', '$argon2id$v=19$m=65536,t=3,p=4$Zu0ezQU872GI7T/A92rTVw$8yZFlLs3U7W+q1wc87Rrd1D+hKNBAnwkrMsA+LiOTx0', 'EMAIL', 'rubycollector', '루비수집가', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(6, 'user6@arzone.com', '$argon2id$v=19$m=65536,t=3,p=4$PncV/BsL0VTZ2D7G90AGJw$3a0j4XX91RRSMdE3ijGmq4JuFf+CdUVj/Q6YHCAnAK8', 'EMAIL', 'jendeukfan', '젠득이팬', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(7, 'user7@arzone.com', '$argon2id$v=19$m=65536,t=3,p=4$IEaDzTfBiEl+C6mRyBgLqg$FHxflpZNCt8PK4fNwXQPWq9GnFoyNvBaRYWUd1V0fFA', 'EMAIL', 'concertlover', '콘서트러버', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(8, 'user8@arzone.com', '$argon2id$v=19$m=65536,t=3,p=4$yBTAfLwfOtYt5Jx44mFa5g$iRI1tnNbxNEZThiQo3SPNX+a1HFeYwax3cmwHFkxA3g', 'EMAIL', 'arzoneexplorer', '아르존탐험가', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(9, 'user9@arzone.com', '$argon2id$v=19$m=65536,t=3,p=4$bXU1E7/2HjUNj87O5VJVRg$E9G5cPMlc2oiQQwQLPmd2z9KPNengCi1Oi1AdE2HTO0', 'EMAIL', 'cubemaster', '큐브마스터', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
+(10, 'user10@arzone.com', '$argon2id$v=19$m=65536,t=3,p=4$0g1TVF6arqDamTNG7UTj5g$rrBARIFw7lBp/DBwrJ2wRnqFprsVPQbX3+Lgct21r40', 'EMAIL', 'jenniesupport', '제니응원단', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE');
 
 INSERT INTO `cube` (`id`, `serial_number`, `product_name`, `ownership_code_hash`, `artist_name`, `status`) VALUES
 (1, 'NO.0026', 'JENNIE RUBY CUBE', '9999', 'Jennie', 'OWNED'),
-(2, 'NO.0031', 'BIGBANG MADE CUBE', '1111', 'Big Bang', 'OWNED'),
+(2, 'NO.0031', 'BIGBANG MADE CUBE', '1111', 'Big Bang', 'TRADE_PENDING'),
 (3, 'NO.0022', 'ROSE ROISE CUBE', '2222', 'ROSE', 'OWNED'),
 (4, 'NO.0044', 'JENNIE SOLO CUBE', '4444', 'Jennie', 'UNREGISTERED'),
 (5, 'NO.0055', 'BIGBANG STILL LIFE CUBE', '5555', 'Big Bang', 'UNREGISTERED'),
 (6, 'NO.0066', 'ROSE ROSIE CUBE', '6666', 'ROSE', 'UNREGISTERED'),
-(7, 'NO.0077', 'JENNIE RUBY CUBE', '7777', 'Jennie', 'UNREGISTERED'),
-(8, 'NO.0088', 'AESPA ARMAGEDDON CUBE', '8888', 'AESPA', 'UNREGISTERED'),
+(7, 'NO.0077', 'JENNIE RUBY CUBE', '7777', 'Jennie', 'OWNED'),
+(8, 'NO.0088', 'AESPA ARMAGEDDON CUBE', '8888', 'AESPA', 'OWNED'),
 (9, 'NO.0099', 'ROSE ROISE CUBE', '9990', 'ROSE', 'OWNED'),
 (10, 'NO.0100', 'IU THE WINNING CUBE', '1010', 'IU', 'OWNED');
 
 INSERT INTO `cube_verification` (`id`, `user_id`, `cube_id`, `verification_status`, `code_expires_at`, `verified_at`) VALUES
-(1, 1, 1, 'SUCCESS', '2025-03-14 19:25:00', '2025-03-07 19:25:00');
+(1, 1, 1, 'SUCCESS', '2025-03-14 19:25:00', '2025-03-07 19:25:00'),
+(2, 2, 2, 'SUCCESS', '2025-03-14 19:25:00', '2025-03-07 19:25:00'),
+(3, 3, 3, 'SUCCESS', '2025-03-14 19:25:00', '2025-03-07 19:25:00'),
+(4, 4, 7, 'SUCCESS', '2025-04-08 17:55:00', '2025-04-01 17:55:00'),
+(5, 5, 8, 'SUCCESS', '2025-04-09 17:55:00', '2025-04-02 17:55:00'),
+(6, 6, 9, 'SUCCESS', '2025-04-10 17:55:00', '2025-04-03 17:55:00'),
+(7, 7, 10, 'SUCCESS', '2025-04-11 17:55:00', '2025-04-04 17:55:00');
 
 INSERT INTO `cube_ownership` (`id`, `user_id`, `cube_id`, `avatar_nickname`, `ownership_status`, `is_last_accessed`, `acquired_at`) VALUES
 (1, 1, 1, '젠득이', 'ACTIVE', TRUE, '2025-03-07 19:30:00'),
 (2, 2, 2, '지디득이', 'ACTIVE', TRUE, '2025-03-07 19:30:00'),
-(3, 3, 3, '로제득이', 'ACTIVE', TRUE, '2025-03-07 19:30:00');
+(3, 3, 3, '로제득이', 'ACTIVE', TRUE, '2025-03-07 19:30:00'),
+(4, 4, 7, '루비득이', 'ACTIVE', TRUE, '2025-04-01 18:00:00'),
+(5, 5, 8, '아마겟돈', 'ACTIVE', TRUE, '2025-04-02 18:00:00'),
+(6, 6, 9, '로지득이', 'ACTIVE', TRUE, '2025-04-03 18:00:00'),
+(7, 7, 10, '아이유득이', 'ACTIVE', TRUE, '2025-04-04 18:00:00');
 
 INSERT INTO `reward_item` (`id`, `name`, `reward_type`, `description`, `reward_count`, `reward_level`) VALUES
 (1, '친밀도 포인트', 'AFFINITY_POINT', '친밀도 3포인트 제공', 3, NULL),
@@ -60,7 +67,13 @@ INSERT INTO `level` (`id`, `level`, `level_xp`, `level_name`) VALUES
 (4, 4, 2000, 'Special');
 
 INSERT INTO `affinity` (`id`, `cube_ownership_id`, `level_id`, `current_xp`) VALUES
-(1, 1, 3, 1245);
+(1, 1, 3, 1245),
+(2, 2, 1, 0),
+(3, 3, 1, 0),
+(4, 4, 1, 0),
+(5, 5, 1, 0),
+(6, 6, 1, 0),
+(7, 7, 1, 0);
 
 INSERT INTO `mission` (`id`, `reward_item_id`, `mission_type`, `title`, `description`, `mission_info`, `target_action`, `target_count`, `start_at`, `end_at`, `is_active`) VALUES
 (1, 2, 'DAILY', '홈 화면 방문하기', 'AR ZONE 접속', 'home_view=1', 'HOME_VIEW', 1, NULL, NULL, TRUE),
@@ -69,7 +82,7 @@ INSERT INTO `mission` (`id`, `reward_item_id`, `mission_type`, `title`, `descrip
 (4, 5, 'DAILY', '아바타 현실 소환하기', 'AR 카메라 3회 사용', 'summon_avatar=3', 'SUMMON_AVATAR', 3, NULL, NULL, TRUE),
 (5, 4, 'DAILY', '갤러리 둘러보기', '아무 사진 5회 열람', 'open_gallery=5', 'OPEN_GALLERY', 5, NULL, NULL, TRUE),
 (6, 3, 'DAILY', '커뮤니티 글 업로드하기', '게시물 1회 업로드', 'write_post=1', 'COMMUNITY_POST', 1, NULL, NULL, TRUE),
-(7, 14, 'EVENT', '[RUBY] 콘서트 인증 이벤트', '아무 뮤직 비디오 5회 시청', 'watch_music_video=5', 'PLAY_MUSIC_VIDEO', 5, '2026-06-12 00:00:00', '2025-09-18 23:59:59', TRUE);
+(7, 14, 'EVENT', '[RUBY] 콘서트 인증 이벤트', '아무 뮤직 비디오 5회 시청', 'watch_music_video=5', 'PLAY_MUSIC_VIDEO', 5, '2026-06-12 00:00:00', '2026-09-18 23:59:59', TRUE);
 
 INSERT INTO `mission_progress` (`id`, `cube_ownership_id`, `mission_id`, `current_count`, `status`, `reward_claimed`, `completed_at`, `claimed_at`) VALUES
 (1, 1, 1, 1, 'REWARDED', TRUE, '2025-03-24 10:00:00', '2025-03-24 10:02:00'),
@@ -91,7 +104,19 @@ INSERT INTO `user_reward` (`id`, `cube_ownership_id`, `reward_item_id`, `acquire
 (8, 1, 8, '2025-03-23 20:45:00'),
 (9, 1, 12, '2025-03-23 20:45:00'),
 (10, 1, 13, '2025-03-23 20:45:00'),
-(11, 1, 15, '2025-03-23 20:45:00');
+(11, 1, 15, '2025-03-23 20:45:00'),
+(12, 2, 6, '2025-03-07 19:30:00'),
+(13, 2, 10, '2025-03-07 19:30:00'),
+(14, 3, 6, '2025-03-07 19:30:00'),
+(15, 3, 10, '2025-03-07 19:30:00'),
+(16, 4, 6, '2025-04-01 18:00:00'),
+(17, 4, 10, '2025-04-01 18:00:00'),
+(18, 5, 6, '2025-04-02 18:00:00'),
+(19, 5, 10, '2025-04-02 18:00:00'),
+(20, 6, 6, '2025-04-03 18:00:00'),
+(21, 6, 10, '2025-04-03 18:00:00'),
+(22, 7, 6, '2025-04-04 18:00:00'),
+(23, 7, 10, '2025-04-04 18:00:00');
 
 INSERT INTO `notification` (`id`, `user_id`, `notification_type`, `title`, `content`, `is_read`, `sent_at`, `read_at`) VALUES
 (1, 1, 'MISSION', '미션 완료', '홈 화면 조회 미션 보상을 받았어요.', TRUE, '2025-03-24 10:01:00', '2025-03-24 10:02:00'),
@@ -100,23 +125,32 @@ INSERT INTO `notification` (`id`, `user_id`, `notification_type`, `title`, `cont
 (4, 1, 'MARKET', '거래 알림', '거래 제안이 도착했어요.', FALSE, '2025-04-08 14:45:00', NULL);
 
 INSERT INTO `user_setting` (`id`, `user_id`, `push_enabled`, `new_conversation_enabled`, `affinity_change_enabled`, `daily_mission_refresh_enabled`, `trade_completed_enabled`, `trade_offer_enabled`, `community_comment_notice_enabled`) VALUES
-(1, 1, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE);
+(1, 1, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+(2, 2, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+(3, 3, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+(4, 4, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+(5, 5, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+(6, 6, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+(7, 7, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+(8, 8, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+(9, 9, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+(10, 10, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE);
 
 INSERT INTO `album` (`id`, `title`, `artist_name`, `artist_company`, `track_count`, `track_total_second`, `description`, `cover_image_url`, `release_date`) VALUES
 (1, 'Ruby', 'Jennie', 'Odd Atelier', 15, 2498, '제니 정규 1집 루비 앨범', 'https://haniumstorage.blob.core.windows.net/hanium/album_cover_img/RUBY_cover_img.jpeg', '2025-03-07');
 
 INSERT INTO `stage` (`id`, `album_id`, `title`, `description`, `video_url`, `video_type`, `thumbnail_url`, `duration_seconds`, `recorded_at`, `is_active`, `is_title_video`) VALUES
-(1, 1, 'Mantra MV', 'Mantra 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_mantra.mp4', 'MUSIC_VIDEO', NULL, 136, '2024-10-11 13:00:00', TRUE, FALSE),
-(2, 1, 'ZEN MV', 'ZEN 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_zen.mp4', 'MUSIC_VIDEO', NULL, 201, '2025-01-25 13:00:00', TRUE, FALSE),
-(3, 1, 'Love Hangover MV', 'Love Hangover (feat. Dominic Fike) 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_lovehangover.mp4', 'MUSIC_VIDEO', NULL, 180, '2025-01-31 13:00:00', TRUE, FALSE),
-(4, 1, 'ExtraL MV', 'ExtraL (feat. Doechii) 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_extral.mp4', 'MUSIC_VIDEO', NULL, 168, '2025-02-21 13:00:00', TRUE, FALSE),
-(5, 1, 'like JENNIE MV', 'like JENNIE 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_likejennie.mp4', 'MUSIC_VIDEO', NULL, 124, '2025-03-07 13:00:00', TRUE, TRUE),
-(6, 1, 'Handlebars MV', 'Handlebars (feat. Dua Lipa) 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_handlebars.mp4', 'MUSIC_VIDEO', NULL, 185, '2025-03-10 13:00:00', TRUE, FALSE),
-(7, 1, 'Seoul City MV', 'Seoul City 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_seoul city.mp4', 'MUSIC_VIDEO', NULL, 164, '2025-04-26 13:00:00', TRUE, FALSE),
-(8, 1, 'start a war Live Performance', 'start a war 콘서트 영상', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_concert_video/concert_zen.mp4', 'CONCERT_VIDEO', NULL, 165, '2025-03-28 13:00:00', TRUE, FALSE),
-(9, 1, 'Love Hangover Live Performance', 'Love Hangover 콘서트 영상', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_concert_video/concert_lovehangover.mp4', 'CONCERT_VIDEO', NULL, 180, '2025-02-12 13:00:00', TRUE, FALSE),
-(10, 1, 'like JENNIE Live Performance', 'like JENNIE 콘서트 영상', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_concert_video/concert_likejennie.mp4', 'CONCERT_VIDEO', NULL, 124, '2025-03-12 13:00:00', TRUE, FALSE),
-(11, 1, 'Handlebars Live Performance', 'Handlebars 콘서트 영상', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_concert_video/concert_handlebars.mp4', 'CONCERT_VIDEO', NULL, 185, '2025-03-12 13:00:00', TRUE, FALSE);
+(1, 1, 'Mantra MV', 'Mantra 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_mantra.mp4', 'MUSIC_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/music_video_thumbnail/mv_mantra.jpg', 136, '2024-10-11 13:00:00', TRUE, FALSE),
+(2, 1, 'ZEN MV', 'ZEN 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_zen.mp4', 'MUSIC_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/music_video_thumbnail/mv_zen.jpg', 201, '2025-01-25 13:00:00', TRUE, FALSE),
+(3, 1, 'Love Hangover MV', 'Love Hangover (feat. Dominic Fike) 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_lovehangover.mp4', 'MUSIC_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/music_video_thumbnail/mv_lovehangover.jpg', 180, '2025-01-31 13:00:00', TRUE, FALSE),
+(4, 1, 'ExtraL MV', 'ExtraL (feat. Doechii) 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_extral.mp4', 'MUSIC_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/music_video_thumbnail/mv_extral.jpg', 168, '2025-02-21 13:00:00', TRUE, FALSE),
+(5, 1, 'like JENNIE MV', 'like JENNIE 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_likejennie.mp4', 'MUSIC_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/music_video_thumbnail/mv_likejennie.jpg', 124, '2025-03-07 13:00:00', TRUE, TRUE),
+(6, 1, 'Handlebars MV', 'Handlebars (feat. Dua Lipa) 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_handlebars.mp4', 'MUSIC_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/music_video_thumbnail/mv_handlebars.jpg', 185, '2025-03-10 13:00:00', TRUE, FALSE),
+(7, 1, 'Seoul City MV', 'Seoul City 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_seoul city.mp4', 'MUSIC_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/music_video_thumbnail/mv_seoul%20city.jpg', 164, '2025-04-26 13:00:00', TRUE, FALSE),
+(8, 1, 'start a war Live Performance', 'start a war 콘서트 영상', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_concert_video/concert_zen.mp4', 'CONCERT_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/concert_video_thumbnail/concert_zen.jpg', 165, '2025-03-28 13:00:00', TRUE, FALSE),
+(9, 1, 'Love Hangover Live Performance', 'Love Hangover 콘서트 영상', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_concert_video/concert_lovehangover.mp4', 'CONCERT_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/concert_video_thumbnail/concert_mantra.jpg', 180, '2025-02-12 13:00:00', TRUE, FALSE),
+(10, 1, 'like JENNIE Live Performance', 'like JENNIE 콘서트 영상', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_concert_video/concert_likejennie.mp4', 'CONCERT_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/concert_video_thumbnail/concert_likejennie.jpg', 124, '2025-03-12 13:00:00', TRUE, FALSE),
+(11, 1, 'Handlebars Live Performance', 'Handlebars 콘서트 영상', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_concert_video/concert_handlebars.mp4', 'CONCERT_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/concert_video_thumbnail/concert_handlebars.jpg', 185, '2025-03-12 13:00:00', TRUE, FALSE);
 
 INSERT INTO `stage_session` (`id`, `cube_ownership_id`, `stage_id`, `started_at`, `ended_at`, `last_position_seconds`, `viewed_seconds`, `view_mode`, `status`) VALUES
 (1, 1, 5, '2025-03-07 19:30:00', '2025-03-07 19:32:04', 124, 124, 'AR', 'COMPLETED'),
@@ -148,37 +182,6 @@ INSERT INTO `track_session` (`id`, `cube_ownership_id`, `track_id`, `started_at`
 (3, 1, 15, '2025-05-01 11:20:00', '2025-05-01 11:21:00', 60, 60, 'NORMAL', 'CANCELLED');
 
 -- INSERT INTO `track_capture` (`id`, `track_session_id`, `track_capture_img_url`, `captured_position_seconds`, `captured_at`) VALUES
-
-INSERT INTO `album_image` (`id`, `album_id`, `title`, `image_type`, `album_contents_img_url`) VALUES
-(1, 1, 'ZEN 무대 01', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/ZEN(1).jpeg'),
-(2, 1, 'ZEN 무대 02', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/ZEN(2).jpeg'),
-(3, 1, 'ZEN 무대 03', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/ZEN(3).jpeg'),
-(4, 1, 'ZEN 무대 04', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/ZEN(4).jpeg'),
-(5, 1, 'ZEN 무대 05', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/ZEN(5).jpeg'),
-(6, 1, 'ZEN 무대 06', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/ZEN(6).jpeg'),
-(7, 1, 'ZEN 무대 07', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/ZEN(7).jpeg'),
-(8, 1, 'ZEN 무대 08', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/ZEN(8).jpeg'),
-(9, 1, 'like JENNIE 무대 01', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/like JENNIE(1).jpeg'),
-(10, 1, 'like JENNIE 무대 02', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/like JENNIE(2).jpeg'),
-(11, 1, 'like JENNIE 무대 03', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/like JENNIE(3).jpeg'),
-(12, 1, 'Seoul City 무대 01', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/Seoul City(1).jpeg'),
-(13, 1, 'Seoul City 무대 02', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/Seoul City(2).jpeg'),
-(14, 1, 'Seoul City 무대 03', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/Seoul City(3).jpeg'),
-(15, 1, 'Seoul City 무대 04', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/Seoul City(4).jpeg'),
-(16, 1, '2025 MMA 무대 01', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/20251220MMA(1).jpeg'),
-(17, 1, '2025 MMA 무대 02', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/251220MMA(3).jpeg'),
-(18, 1, '2025 MMA 무대 03', 'CONCERT_STILLCUT', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_concert_stillcut/251220MMA.jpeg'),
-(19, 1, 'chromehearts', 'YEZUL_FRAME', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_yezul_frame/chromehearts.png'),
-(20, 1, 'color_pencil', 'YEZUL_FRAME', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_yezul_frame/color_pencil.png'),
-(21, 1, 'concert', 'YEZUL_FRAME', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_yezul_frame/concert.png'),
-(22, 1, 'film_camera', 'YEZUL_FRAME', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_yezul_frame/film_camera.png'),
-(23, 1, 'icecream', 'YEZUL_FRAME', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_yezul_frame/icecream.png'),
-(24, 1, 'minimal_camera', 'YEZUL_FRAME', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_yezul_frame/minimal_camera.png'),
-(25, 1, 'polaroid', 'YEZUL_FRAME', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_yezul_frame/polaroid.png'),
-(26, 1, 'pudding', 'YEZUL_FRAME', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_yezul_frame/pudding.png'),
-(27, 1, 'scrap_book', 'YEZUL_FRAME', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_yezul_frame/scrap_book.png'),
-(28, 1, 'stars', 'YEZUL_FRAME', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_yezul_frame/stars.png'),
-(29, 1, 'sticker', 'YEZUL_FRAME', 'https://haniumstorage.blob.core.windows.net/hanium/album/album_yezul_frame/sticker.png');
 
 
 INSERT INTO `avatar_conversation_session` (`id`, `cube_ownership_id`, `conversation_type`, `started_at`, `ended_at`, `audio_url`, `audio_duration_seconds`, `conversation_title`, `status`) VALUES
@@ -233,7 +236,7 @@ INSERT INTO `conversation_report` (`id`, `conversation_message_id`, `reason`, `d
 (3, 3, 'INAPPROPRIATE_EXPRESSION', '부적절한 표현 감지');
 
 INSERT INTO `avatar_interaction_session` (`id`, `cube_ownership_id`, `started_at`, `ended_at`, `status`) VALUES
-(1, 1, '2025-03-10 13:00:00', NULL, 'COMPLETED'),
+(1, 1, '2025-03-10 13:00:00', '2025-03-10 13:05:00', 'COMPLETED'),
 (2, 1, '2025-03-18 19:20:00', '2025-03-18 19:24:00', 'COMPLETED'),
 (3, 1, '2025-03-20 21:00:00', '2025-03-20 21:05:00', 'COMPLETED');
 
@@ -378,10 +381,11 @@ INSERT INTO `market_product` (`id`, `cube_id`, `product_image_url`) VALUES
 (10, 10, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png');
 
 INSERT INTO `sell_listing` (`id`, `market_product_id`, `user_id`, `product_status`, `title`, `description`, `price`, `status`) VALUES
-(1, 2, 2, '좋음', '빅뱅 메이드 큐브 31번', '상태 좋은 큐브 판매합니다.', 35000, 'ACTIVE'),
+(1, 2, 2, '좋음', '빅뱅 메이드 큐브 31번', '상태 좋은 큐브 판매합니다.', 35000, 'SOLD'),
 (2, 3, 3, '좋음', '로제 큐브 판매', '상태 좋은 큐브 판매합니다.', 35000, 'ACTIVE'),
-(3, 9, 3, '미개봉', '로제 ROISE 큐브 99번', '미개봉 상태로 보관한 로제 큐브입니다.', 42000, 'ACTIVE'),
-(4, 10, 2, '새상품', '아이유 THE WINNING 큐브', '구성품을 모두 포함한 새상품입니다.', 45000, 'ACTIVE');
+(3, 9, 6, '미개봉', '로제 ROISE 큐브 99번', '미개봉 상태로 보관한 로제 큐브입니다.', 42000, 'ACTIVE'),
+(4, 10, 7, '새상품', '아이유 THE WINNING 큐브', '구성품을 모두 포함한 새상품입니다.', 45000, 'ACTIVE'),
+(5, 7, 4, '좋음', '제니 루비 큐브 77번', '구성품을 모두 보관한 제니 루비 큐브입니다.', 39000, 'ACTIVE');
 
 INSERT INTO `selling_list_like` (`id`, `selling_list_id`, `user_id`, `is_liked`) VALUES
 (1, 1, 3, TRUE),
@@ -392,7 +396,7 @@ INSERT INTO `selling_list_like` (`id`, `selling_list_id`, `user_id`, `is_liked`)
 (6, 4, 3, TRUE);
 
 INSERT INTO `trade` (`id`, `sell_listing_id`, `buyer_user_id`, `buyer_phone_number`, `buyer_address`, `total_price`, `paid_time`, `sent_time`, `shipped_time`, `delivered_time`, `completed_time`, `status`) VALUES
-(1, 1, 1, '010-1234-5678', '서울특별시 강남구 테헤란로 1', 36250, '2025-04-08 14:30:00', '2025-04-09 10:00:00', '2025-04-09 15:30:00', '2025-05-09 15:30:00', NULL, 'DELIVERED');
+(1, 1, 1, '010-1234-5678', '서울특별시 강남구 테헤란로 1', 36750, '2025-04-08 14:30:00', '2025-04-09 10:00:00', '2025-04-09 15:30:00', '2025-05-09 15:30:00', NULL, 'DELIVERED');
 
 INSERT INTO `listing_media` (`id`, `sell_listing_id`, `image_url`) VALUES
 (1, 1, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card-2.png');

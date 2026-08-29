@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="")
     openai_model: str = Field(default="gpt-4.1-mini")
 
+    # JWT Access Token 설정입니다. 비밀키는 Git에 올리지 않고
+    # 로컬/배포 환경 변수로만 주입합니다.
+    jwt_secret_key: str = Field(default="")
+    jwt_algorithm: str = Field(default="HS256")
+    jwt_access_token_expire_days: int = Field(default=365)
+
     # Azure Blob Storage 설정입니다. 실제 연결 문자열은 Git에 올리지 않고
     # 로컬/배포 환경 변수로만 주입합니다.
     azure_storage_connection_string: str = Field(default="")

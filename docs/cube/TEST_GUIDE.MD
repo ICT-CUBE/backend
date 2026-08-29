@@ -2,7 +2,7 @@
 
 테스트 파일: `tests/test_cube.py`
 실행: `.venv\Scripts\python.exe -m pytest tests/test_cube.py -q`
-최종 실행 결과: 27 passed (2026-08-28)
+최종 실행 결과: 35 passed (2026-08-29)
 
 DB는 `unittest.mock.Mock` 으로 대체하고 `app.dependency_overrides[get_db]` 로 주입합니다.
 실제 MySQL에는 접속하지 않습니다.
@@ -51,13 +51,22 @@ DB는 `unittest.mock.Mock` 으로 대체하고 `app.dependency_overrides[get_db]
 
 ## 큐브 코드 인증 — `POST /api/v1/cubes/verification`
 
-기존에 작성되어 있던 테스트입니다. (이번 작업에서 내용 변경 없음)
+`set_verification_results()` 헬퍼로 `db.scalar` 호출 순서(큐브 → 기존 소유권 → 1레벨)와
+`db.scalars` 의 1레벨 보상 목록을 지정하고, `db.add` 로 저장된 ORM 객체를 모아 검증합니다.
 
 | 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
 |---|---|---|---|---|
 | 정상 | test_create_cube_verification_success_creates_ownership | 인증번호 일치, 미등록 큐브 | 201 + `{"cubeOwnershipId": 4}`, 인증·소유권 생성 | PASS |
+| 정상 | test_create_cube_verification_success_creates_first_level_affinity | 인증번호 일치, 1레벨 데이터 존재 | 친밀도 1건 생성(`cube_ownership_id=4`, `level_id=7`, `current_xp=0`), commit 1회 | PASS |
+| 정책 | test_create_cube_verification_queries_first_level_row | 1레벨 조회 SQL 검증 | `FROM level`, `level.level = 1` | PASS |
+| 정상 | test_create_cube_verification_success_grants_first_level_rewards | 1레벨 보상 2건 존재 | `UserReward` 2건 생성(`reward_item_id=[6, 10]`, `cube_ownership_id=4`), commit 1회 | PASS |
+| 정상 | test_create_cube_verification_uses_same_acquired_at_for_rewards | 인증 성공 | 보상의 `acquired_at` 이 소유권 `acquired_at` 과 동일 | PASS |
+| 정책 | test_create_cube_verification_queries_only_first_level_rewards | 보상 조회 SQL 검증 | `reward_item.reward_level = 1`, `deleted_at IS NULL`, `ORDER BY reward_item.id ASC` | PASS |
+| 예외 | test_create_cube_verification_rolls_back_when_reward_query_fails | 보상 조회·저장 실패 | 500 + 보상 미생성, rollback 1회, commit 없음 | PASS |
+| 예외 | test_create_cube_verification_rolls_back_when_first_level_is_missing | `level = 1` 데이터 없음 | 500 INTERNAL_SERVER_ERROR, 친밀도 미생성, rollback 1회, commit 없음 | PASS |
+| 예외 | test_create_cube_verification_rolls_back_when_commit_fails | commit이 예외 발생 | 500 + rollback 1회 | PASS |
 | 오류 | test_create_cube_verification_returns_404_when_cube_not_found | 큐브 없음 | 404 CUBE_NOT_FOUND | PASS |
 | 오류 | test_create_cube_verification_returns_409_when_cube_already_owned | 이미 소유권 존재 | 409 CUBE_NOT_REGISTRABLE | PASS |
 | 오류 | test_create_cube_verification_returns_409_when_cube_status_is_not_unregistered | status=OWNED | 409 CUBE_NOT_REGISTRABLE | PASS |
-| 오류 | test_create_cube_verification_returns_400_when_code_invalid | 인증번호 불일치 | 400 INVALID_CUBE_CODE, FAILED 이력 저장 | PASS |
+| 오류 | test_create_cube_verification_returns_400_when_code_invalid | 인증번호 불일치 | 400 INVALID_CUBE_CODE, FAILED 이력만 저장(소유권·친밀도·보상 미생성) | PASS |
 | 요청 검증 | test_create_cube_verification_returns_400_when_required_body_missing | ownershipCode 누락 | 400 INVALID_REQUEST | PASS |

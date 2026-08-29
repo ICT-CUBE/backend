@@ -119,4 +119,4 @@ def test_home_swagger_contains_only_endpoint_specific_errors() -> None:
     operation = app.openapi()["paths"]["/api/v1/users/me/home"]["get"]
 
     assert set(operation["responses"]) == {"200", "403", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]

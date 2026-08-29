@@ -36,7 +36,6 @@ DROP TABLE IF EXISTS `reward_item`;
 DROP TABLE IF EXISTS `cube_ownership`;
 DROP TABLE IF EXISTS `cube_verification`;
 DROP TABLE IF EXISTS `cube`;
-DROP TABLE IF EXISTS `auth_session`;
 DROP TABLE IF EXISTS `user`;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -47,7 +46,7 @@ CREATE TABLE `user` (
     `password_hash` VARCHAR(255) NULL,
     `login_provider` VARCHAR(20) NOT NULL,
     `provider_user_id` VARCHAR(255) NULL,
-    `nickname` VARCHAR(8) NULL,
+    `nickname` VARCHAR(20) NULL,
     `profile_character_img_url` VARCHAR(500) NULL,
     `chat_violation_count` INT NOT NULL DEFAULT 0,
     `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
@@ -59,25 +58,6 @@ CREATE TABLE `user` (
     KEY `idx_user_status` (`status`),
     CONSTRAINT `ck_user_login_provider` CHECK (`login_provider` IN ('EMAIL', 'GOOGLE', 'APPLE')),
     CONSTRAINT `ck_user_status` CHECK (`status` IN ('ACTIVE', 'WITHDRAWN', 'SUSPENDED'))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE `auth_session` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `user_id` BIGINT NOT NULL,
-    `token_jti` VARCHAR(64) NOT NULL,
-    `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-    `issued_at` DATETIME NOT NULL,
-    `expires_at` DATETIME NOT NULL,
-    `revoked_at` DATETIME NULL,
-    `device_id` VARCHAR(255) NULL,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    `deleted_at` DATETIME NULL,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_auth_session_token_jti` (`token_jti`),
-    KEY `idx_auth_session_user_id` (`user_id`),
-    CONSTRAINT `fk_auth_session_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`),
-    CONSTRAINT `ck_auth_session_status` CHECK (`status` IN ('ACTIVE', 'REVOKED'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `cube` (

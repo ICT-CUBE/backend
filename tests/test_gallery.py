@@ -223,7 +223,7 @@ def test_gallery_swagger_contract() -> None:
     operation = app.openapi()["paths"]["/api/v1/users/me/gallery"]["get"]
 
     assert set(operation["responses"]) == {"200"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_gallery_stage_ar_experience_returns_origin_stage() -> None:
@@ -334,7 +334,7 @@ def test_gallery_ar_experience_swagger_contract() -> None:
     ]["get"]
 
     assert set(operation["responses"]) == {"200", "400", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_delete_gallery_stage_capture_soft_deletes_item() -> None:
@@ -430,4 +430,4 @@ def test_delete_gallery_item_swagger_contract() -> None:
     ]["delete"]
 
     assert set(operation["responses"]) == {"204", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]

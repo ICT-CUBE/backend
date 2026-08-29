@@ -174,7 +174,7 @@ def test_track_session_swagger_responses() -> None:
     operation = app.openapi()["paths"]["/api/v1/tracks/{trackId}/sessions"]["post"]
 
     assert set(operation["responses"]) == {"201", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_save_track_session_updates_playing_orm_model() -> None:
@@ -266,7 +266,7 @@ def test_save_track_session_swagger_responses() -> None:
     ]["patch"]
 
     assert set(operation["responses"]) == {"204", "404", "409"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_save_track_capture_uploads_image_and_adds_orm_model() -> None:
@@ -383,4 +383,4 @@ def test_save_track_capture_swagger_contract() -> None:
 
     assert set(operation["responses"]) == {"204", "400", "404"}
     assert "multipart/form-data" in operation["requestBody"]["content"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]

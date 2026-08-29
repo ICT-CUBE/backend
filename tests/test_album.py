@@ -115,7 +115,7 @@ def test_read_album_swagger_responses() -> None:
 
     assert set(operation["responses"]) == {"200", "404"}
     assert operation["tags"] == ["album"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_read_album_track_returns_track_playback_data() -> None:
@@ -170,7 +170,7 @@ def test_read_album_track_swagger_responses() -> None:
 
     assert set(operation["responses"]) == {"200", "404"}
     assert operation["tags"] == ["album"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def ruby_track() -> Track:

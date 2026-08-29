@@ -1,4 +1,4 @@
-"""큐브 코드 인증과 큐브 소유권 생성 로직."""
+"""큐브 코드 인증과 큐브 소유권·친밀도·해금 보상 생성 로직."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -7,11 +7,15 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ApiError
 from app.models.account import CubeVerification
-from app.models.cube import Cube, CubeOwnership
+from app.models.cube import Affinity, Cube, CubeOwnership, Level
 from app.models.enums import CubeStatus, CubeVerificationStatus, OwnershipStatus
+from app.models.reward import RewardItem, UserReward
 from app.schemas.cube import CubeVerificationRequest, CubeVerificationResponse
 
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
+# 새 큐브 소유권은 항상 1레벨에서 시작하며, 1레벨 해금 보상도 함께 지급합니다.
+INITIAL_LEVEL = 1
+INITIAL_AFFINITY_XP = 0
 
 
 def verify_cube_code(
@@ -88,10 +92,70 @@ def verify_cube_code(
         transferred_at=None,
     )
     db.add(cube_ownership)
-    db.flush()
-    db.commit()
+    try:
+        # 친밀도에 넣을 소유권 id를 먼저 발급받습니다.
+        db.flush()
+        cube_ownership_id = cube_ownership.id
+        db.add(_create_initial_affinity(db=db, cube_ownership_id=cube_ownership_id))
+        for user_reward in _create_initial_rewards(
+            db=db,
+            cube_ownership_id=cube_ownership_id,
+            acquired_at=now,
+        ):
+            db.add(user_reward)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
-    return CubeVerificationResponse(cube_ownership_id=cube_ownership.id)
+    return CubeVerificationResponse(cube_ownership_id=cube_ownership_id)
+
+
+def _create_initial_affinity(*, db: Session, cube_ownership_id: int) -> Affinity:
+    """새 큐브 소유권의 1레벨·경험치 0 친밀도를 만듭니다."""
+    level = db.scalar(
+        select(Level)
+        .where(Level.level == INITIAL_LEVEL)
+        .limit(1)
+    )
+    if level is None:
+        # 레벨 기준 데이터가 없는 것은 서버 데이터 구성 오류이므로 공통 500으로 반환합니다.
+        raise ApiError(
+            status_code=500,
+            code="INTERNAL_SERVER_ERROR",
+            message="서버 내부 오류가 발생했습니다.",
+        )
+
+    return Affinity(
+        cube_ownership_id=cube_ownership_id,
+        level_id=level.id,
+        current_xp=INITIAL_AFFINITY_XP,
+    )
+
+
+def _create_initial_rewards(
+    *,
+    db: Session,
+    cube_ownership_id: int,
+    acquired_at: datetime,
+) -> list[UserReward]:
+    """1레벨에 해금되는 보상을 새 큐브 소유권에 지급할 데이터로 만듭니다."""
+    reward_items = db.scalars(
+        select(RewardItem)
+        .where(
+            RewardItem.reward_level == INITIAL_LEVEL,
+            RewardItem.deleted_at.is_(None),
+        )
+        .order_by(RewardItem.id.asc())
+    )
+    return [
+        UserReward(
+            cube_ownership_id=cube_ownership_id,
+            reward_item_id=reward_item.id,
+            acquired_at=acquired_at,
+        )
+        for reward_item in reward_items
+    ]
 
 
 def save_avatar_nickname(

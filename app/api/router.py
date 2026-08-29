@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     affinity,
     album,
+    auth,
     avatar,
     community,
     conversation,
@@ -11,10 +12,12 @@ from app.api.routes import (
     home,
     market,
     mission,
+    mypage,
     stage,
 )
 
 api_router = APIRouter()
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(affinity.router, prefix="/users/me", tags=["affinity"])
 api_router.include_router(avatar.router, prefix="/users/me", tags=["avatar"])
 api_router.include_router(conversation.router, prefix="/users/me", tags=["conversation"])
@@ -22,6 +25,7 @@ api_router.include_router(gallery.router, prefix="/users/me", tags=["gallery"])
 api_router.include_router(home.router, prefix="/users/me", tags=["home"])
 api_router.include_router(market.router, prefix="/users/me", tags=["market"])
 api_router.include_router(mission.router, prefix="/users/me", tags=["mission"])
+api_router.include_router(mypage.router, prefix="/users/me", tags=["mypage"])
 api_router.include_router(cube.router, prefix="/cubes", tags=["cube"])
 api_router.include_router(community.router, prefix="/community", tags=["community"])
 api_router.include_router(stage.router, prefix="/stages", tags=["stage"])

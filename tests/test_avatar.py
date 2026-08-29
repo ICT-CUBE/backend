@@ -165,7 +165,7 @@ def test_create_avatar_interaction_session_swagger_contract() -> None:
     ]["post"]
 
     assert set(operation["responses"]) == {"201"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_yezul_frames_return_all_frames_ordered_by_id() -> None:
@@ -217,6 +217,7 @@ def test_yezul_frames_swagger_contract() -> None:
     operation = app.openapi()["paths"]["/api/v1/users/me/album/yezul-frames"]["get"]
 
     assert set(operation["responses"]) == {"200"}
+    # 사용자 데이터가 아닌 공용 프레임 목록이라 인증 의존성이 없습니다.
     assert "security" not in operation
 
 
@@ -314,7 +315,7 @@ def test_save_avatar_interaction_session_swagger_contract() -> None:
     ]["patch"]
 
     assert set(operation["responses"]) == {"204", "404", "409"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_save_avatar_interaction_picture_uploads_image_and_adds_orm_model() -> None:
@@ -470,4 +471,4 @@ def test_save_avatar_interaction_picture_swagger_contract() -> None:
     ]["post"]
 
     assert set(operation["responses"]) == {"204", "400", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]

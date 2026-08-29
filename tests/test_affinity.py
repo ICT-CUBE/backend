@@ -466,7 +466,7 @@ def test_read_affinity_swagger_contract():
     operation = app.openapi()["paths"]["/api/v1/users/me/affinity"]["get"]
 
     assert set(operation["responses"]) == {"200", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def compiled_where(statement) -> str:

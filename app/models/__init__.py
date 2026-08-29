@@ -1,7 +1,6 @@
 """서비스에서 사용하는 SQLAlchemy ORM 모델."""
 
 from app.models.account import (
-    AuthSession,
     CubeVerification,
     Notification,
     UserSetting,
@@ -32,7 +31,6 @@ __all__ = [
     "Affinity",
     "Album",
     "AlbumImage",
-    "AuthSession",
     "AvatarConversationMessage",
     "AvatarConversationSession",
     "AvatarInteractionPicture",

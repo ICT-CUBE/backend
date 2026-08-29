@@ -230,7 +230,7 @@ def test_read_sellable_cubes_swagger_responses() -> None:
 
     assert set(operation["responses"]) == {"200"}
     assert operation["tags"] == ["market"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_create_sell_listing_saves_listing_from_json_body() -> None:
@@ -369,7 +369,7 @@ def test_create_sell_listing_swagger_contract() -> None:
     }
     assert "productStatus" not in body_schema["required"]
     assert operation["tags"] == ["market"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_delete_sell_listing_soft_deletes_current_user_listing() -> None:
@@ -416,7 +416,7 @@ def test_delete_sell_listing_swagger_contract() -> None:
     assert set(operation["responses"]) == {"204", "404"}
     assert operation["tags"] == ["market"]
     assert "requestBody" not in operation
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_create_trade_saves_trade_and_marks_sell_listing_sold() -> None:
@@ -509,7 +509,7 @@ def test_create_trade_swagger_responses() -> None:
     operation = app.openapi()["paths"]["/api/v1/users/me/trades"]["post"]
 
     assert set(operation["responses"]) == {"204", "404", "409"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_read_trade_detail_returns_trade_product_and_timeline() -> None:
@@ -584,7 +584,7 @@ def test_read_trade_detail_swagger_responses() -> None:
     operation = app.openapi()["paths"]["/api/v1/users/me/trades/{tradeId}"]["get"]
 
     assert set(operation["responses"]) == {"200", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_complete_trade_updates_trade_and_creates_certificate(monkeypatch) -> None:
@@ -672,7 +672,7 @@ def test_complete_trade_swagger_responses() -> None:
     ]
 
     assert set(operation["responses"]) == {"200", "404", "409"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 # --- 마켓 조회: GET /api/v1/users/me/market ---
@@ -1099,7 +1099,7 @@ def test_read_market_swagger_contract():
     operation = app.openapi()["paths"]["/api/v1/users/me/market"]["get"]
 
     assert set(operation["responses"]) == {"200", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def compiled_query(call) -> str:
@@ -1376,7 +1376,7 @@ def test_read_market_sell_listings_swagger_contract():
     ]["get"]
 
     assert set(operation["responses"]) == {"200", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 # --- 마켓 검색 결과 조회: GET /api/v1/users/me/market/search ---
@@ -1708,7 +1708,7 @@ def test_search_market_swagger_contract():
     operation = app.openapi()["paths"]["/api/v1/users/me/market/search"]["get"]
 
     assert set(operation["responses"]) == {"200", "400"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 # --- 판매글 상세 조회: GET /api/v1/users/me/sell-listings/{sellListingId} ---
 
 SELL_LISTING_NOT_FOUND_RESPONSE = {
@@ -1920,7 +1920,7 @@ def test_read_sell_listing_detail_swagger_contract():
     ]["get"]
 
     assert set(operation["responses"]) == {"200", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 # --- 내 거래 내역 조회: GET /api/v1/users/me/trades ---
 
 
@@ -2117,4 +2117,4 @@ def test_read_trade_history_swagger_contract():
     operation = app.openapi()["paths"]["/api/v1/users/me/trades"]["get"]
 
     assert set(operation["responses"]) == {"200"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]

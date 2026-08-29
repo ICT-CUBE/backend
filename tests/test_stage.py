@@ -229,7 +229,7 @@ def test_read_stage_list_swagger_responses() -> None:
 
     assert set(operation["responses"]) == {"200", "404"}
     assert operation["parameters"][0]["name"] == "videoType"
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_read_stage_video_returns_playback_fields_only() -> None:
@@ -292,7 +292,7 @@ def test_read_stage_video_swagger_responses() -> None:
     operation = app.openapi()["paths"]["/api/v1/stages/{stageId}"]["get"]
 
     assert set(operation["responses"]) == {"200", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_create_stage_session_adds_orm_model_with_initial_values() -> None:
@@ -366,7 +366,7 @@ def test_stage_session_swagger_responses() -> None:
     operation = app.openapi()["paths"]["/api/v1/stages/{stageId}/sessions"]["post"]
 
     assert set(operation["responses"]) == {"201", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def stage_session_result(db: Mock, session: StageSession | None) -> None:
@@ -471,7 +471,7 @@ def test_save_stage_session_swagger_responses() -> None:
     ]["patch"]
 
     assert set(operation["responses"]) == {"204", "404", "409"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_save_stage_capture_uploads_image_and_adds_orm_model() -> None:
@@ -589,4 +589,4 @@ def test_save_stage_capture_swagger_contract() -> None:
 
     assert set(operation["responses"]) == {"204", "400", "404"}
     assert "multipart/form-data" in operation["requestBody"]["content"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]

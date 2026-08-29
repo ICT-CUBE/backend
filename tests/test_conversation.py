@@ -354,7 +354,7 @@ def test_conversation_sessions_swagger_contract() -> None:
     ]["get"]
 
     assert set(operation["responses"]) == {"200", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_conversation_sessions_return_404_without_last_active_ownership() -> None:
@@ -449,7 +449,7 @@ def test_conversation_archive_swagger_contract() -> None:
     ]["get"]
 
     assert set(operation["responses"]) == {"200", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_delete_conversation_archive_message_sets_is_text_saved_false() -> None:
@@ -525,7 +525,7 @@ def test_delete_conversation_archive_message_swagger_contract() -> None:
     ]["delete"]
 
     assert set(operation["responses"]) == {"204", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_create_conversation_session_adds_initial_orm_model() -> None:
@@ -610,7 +610,7 @@ def test_create_conversation_session_swagger_contract() -> None:
     ]["post"]
 
     assert set(operation["responses"]) == {"201"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_delete_text_conversation_session_sets_deleted_at() -> None:
@@ -715,7 +715,7 @@ def test_delete_conversation_session_swagger_contract() -> None:
     ]["delete"]
 
     assert set(operation["responses"]) == {"204", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_save_conversation_message_toggles_false_to_true() -> None:
@@ -865,7 +865,7 @@ def test_save_conversation_message_swagger_contract() -> None:
     ]["patch"]
 
     assert set(operation["responses"]) == {"200", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_create_conversation_report_saves_orm_model_and_returns_204() -> None:
@@ -998,7 +998,7 @@ def test_create_conversation_report_swagger_contract() -> None:
 
     assert set(operation["responses"]) == {"204", "404"}
     assert operation["tags"] == ["conversation"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_conversation_session_detail_returns_messages_descending() -> None:
@@ -1107,7 +1107,7 @@ def test_conversation_session_detail_swagger_contract() -> None:
     ]["get"]
 
     assert set(operation["responses"]) == {"200", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_reply_conversation_message_saves_user_and_avatar_messages() -> None:
@@ -1418,7 +1418,7 @@ def test_reply_conversation_message_swagger_contract() -> None:
     ]["post"]
 
     assert set(operation["responses"]) == {"201", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_update_text_conversation_session_sets_title_and_ends_session() -> None:
@@ -1625,4 +1625,4 @@ def test_update_conversation_session_swagger_contract() -> None:
     ]["patch"]
 
     assert set(operation["responses"]) == {"204", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]

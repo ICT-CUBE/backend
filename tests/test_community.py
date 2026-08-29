@@ -459,7 +459,7 @@ def test_read_community_posts_swagger_contract() -> None:
         "size",
     }
     assert operation["tags"] == ["community"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 # --- 커뮤니티 상세 조회: GET /api/v1/community/posts/{postId} ---
 
 POST_NOT_FOUND_RESPONSE = {
@@ -766,7 +766,7 @@ def test_read_community_post_detail_swagger_contract() -> None:
 
     assert set(operation["responses"]) == {"200", "404"}
     assert operation["tags"] == ["community"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 # --- 커뮤니티 게시글 작성: POST /api/v1/community/posts ---
 
 BLOB_URL = "https://haniumstorage.blob.core.windows.net/hanium/community_post/1/1"
@@ -1092,7 +1092,7 @@ def test_create_post_swagger_contract() -> None:
     ]
     assert set(response_schema["properties"]) == {"postId"}
     assert operation["tags"] == ["community"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 # --- 커뮤니티 게시글 삭제: DELETE /api/v1/community/posts/{postId} ---
 
 
@@ -1206,4 +1206,4 @@ def test_delete_post_swagger_contract() -> None:
     assert set(operation["responses"]) == {"204", "404"}
     assert "requestBody" not in operation
     assert operation["tags"] == ["community"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
