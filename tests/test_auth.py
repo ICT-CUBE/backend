@@ -821,3 +821,70 @@ def test_authenticated_endpoint_declares_bearer_security_scheme() -> None:
     }
     operation = openapi_schema["paths"][AUTHENTICATED_PATH]["get"]
     assert operation["security"] == [{"HTTPBearer": []}]
+
+
+YEZUL_FRAMES_PATH = "/api/v1/users/me/album/yezul-frames"
+
+
+def yezul_frames_request(db: Mock, *, headers: dict[str, str] | None = None):
+    with api_client(db, authenticate=False) as client:
+        return client.get(YEZUL_FRAMES_PATH, headers=headers)
+
+
+def test_yezul_frames_returns_frames_with_valid_access_token() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = 7
+    db.scalars.return_value.all.return_value = []
+
+    response = yezul_frames_request(
+        db,
+        headers={"Authorization": f"Bearer {issue_token()}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"yezulFrames": []}
+    db.scalars.assert_called_once()
+
+
+def test_yezul_frames_returns_401_without_access_token() -> None:
+    db = Mock(spec=Session)
+
+    response = yezul_frames_request(db)
+
+    assert response.status_code == 401
+    assert response.json() == INVALID_ACCESS_TOKEN_RESPONSE
+    db.scalar.assert_not_called()
+    db.scalars.assert_not_called()
+
+
+def test_yezul_frames_returns_401_for_expired_token() -> None:
+    db = Mock(spec=Session)
+
+    response = yezul_frames_request(
+        db,
+        headers={"Authorization": f"Bearer {issue_token(expires_in_seconds=-60)}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == INVALID_ACCESS_TOKEN_RESPONSE
+    db.scalars.assert_not_called()
+
+
+def test_yezul_frames_returns_401_when_user_is_missing_or_inactive() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = yezul_frames_request(
+        db,
+        headers={"Authorization": f"Bearer {issue_token()}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == INVALID_ACCESS_TOKEN_RESPONSE
+    db.scalars.assert_not_called()
+
+
+def test_yezul_frames_declares_bearer_security_scheme() -> None:
+    operation = app.openapi()["paths"][YEZUL_FRAMES_PATH]["get"]
+
+    assert operation["security"] == [{"HTTPBearer": []}]
