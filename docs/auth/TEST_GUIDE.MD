@@ -2,7 +2,7 @@
 
 테스트 파일: `tests/test_auth.py`
 실행: `.venv\Scripts\python.exe -m pytest tests/test_auth.py -q`
-최종 실행 결과: 45 passed (2026-08-29)
+최종 실행 결과: 50 passed (2026-08-29)
 
 DB는 `Mock(spec=Session)` 으로 대체하고 `app.dependency_overrides[get_db]` 로 주입합니다.
 실제 MySQL에는 접속하지 않습니다.
@@ -110,5 +110,35 @@ Argon2id 해시를 가진 사용자를 만들어, 비밀번호 검증도 모킹 
   을 넘겨 라이브러리가 거부하므로 별도 테스트를 만들지 않았습니다.
 - **각 도메인 API의 401 응답**은 공통 의존성이 처리하므로 도메인 테스트에서는 다루지 않고,
   Swagger 계약 테스트에서 `security` 선언 여부만 확인합니다.
-- `GET /api/v1/users/me/album/yezul-frames` 는 사용자 데이터가 아닌 공용 프레임 목록이라
-  인증 의존성이 없습니다(기존 구현 유지).
+- `GET /api/v1/users/me/album/yezul-frames` 는 로그인한 사용자만 호출할 수 있습니다.
+  프레임 목록 자체는 사용자별로 다르지 않아 큐브 소유권은 검증하지 않고, 인증 의존성만
+  통과하면 동일한 목록을 반환합니다. 전용 테스트는 아래 절에 정리했습니다.
+
+---
+
+## 예절샷 프레임 조회 인증 — `GET /api/v1/users/me/album/yezul-frames`
+
+로그인한 사용자만 호출할 수 있고, 큐브 소유권은 검증하지 않습니다.
+`api_client(db, authenticate=False)` 로 인증 의존성을 살린 뒤 `issue_token()` 으로 만든
+토큰을 붙여 호출합니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_yezul_frames_returns_frames_with_valid_access_token | 유효 토큰 + ACTIVE 사용자 | 200 + 프레임 목록, 소유권 조회 없이 프레임 쿼리 1회 | PASS |
+| 오류 | test_yezul_frames_returns_401_without_access_token | Authorization 헤더 없음 | 401 INVALID_ACCESS_TOKEN, DB 조회 없음 | PASS |
+| 오류 | test_yezul_frames_returns_401_for_expired_token | `exp` 가 과거 | 401 INVALID_ACCESS_TOKEN, 프레임 쿼리 미실행 | PASS |
+| 오류 | test_yezul_frames_returns_401_when_user_is_missing_or_inactive | 사용자 조회 결과 없음 | 401 INVALID_ACCESS_TOKEN, 프레임 쿼리 미실행 | PASS |
+| 문서 | test_yezul_frames_declares_bearer_security_scheme | OpenAPI 스키마 | `security` 에 `HTTPBearer` 선언 | PASS |
+
+`tests/test_avatar.py` 에도 도메인 쪽 테스트가 있습니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 오류 | test_yezul_frames_returns_401_without_access_token | 토큰 없음 | 401 INVALID_ACCESS_TOKEN, 프레임 쿼리 미실행 | PASS |
+| 문서 | test_yezul_frames_swagger_contract | OpenAPI 스키마 | 응답 코드 `{200}`, `security` 에 `HTTPBearer` 선언 | PASS |
+
+### 검증하지 않은 항목
+
+- **큐브 소유권 없는 사용자**는 이 API가 소유권을 보지 않으므로 별도 케이스를 만들지 않았습니다.
+- **잘못된 서명·비Bearer 스킴 등 나머지 토큰 오류**는 공통 인증 의존성 테스트에서 이미
+  검증하므로 이 API에서는 반복하지 않습니다.

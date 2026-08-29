@@ -213,12 +213,26 @@ def test_yezul_frames_return_empty_list() -> None:
     assert response.json() == {"yezulFrames": []}
 
 
+def test_yezul_frames_returns_401_without_access_token() -> None:
+    db = Mock(spec=Session)
+
+    with api_client(db, authenticate=False) as client:
+        response = client.get("/api/v1/users/me/album/yezul-frames")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "code": "INVALID_ACCESS_TOKEN",
+        "message": "유효하지 않거나 만료된 액세스 토큰입니다.",
+    }
+    db.scalars.assert_not_called()
+
+
 def test_yezul_frames_swagger_contract() -> None:
     operation = app.openapi()["paths"]["/api/v1/users/me/album/yezul-frames"]["get"]
 
     assert set(operation["responses"]) == {"200"}
-    # 사용자 데이터가 아닌 공용 프레임 목록이라 인증 의존성이 없습니다.
-    assert "security" not in operation
+    # 로그인한 사용자만 호출할 수 있습니다.
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_save_avatar_interaction_session_updates_active_session() -> None:

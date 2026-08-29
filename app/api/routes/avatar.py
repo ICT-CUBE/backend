@@ -52,8 +52,10 @@ def create_interaction_session(
 )
 def read_yezul_frames(
     db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
 ) -> YezulFramesResponse:
     """GET /api/v1/users/me/album/yezul-frames"""
+    # 프레임 목록은 사용자별로 다르지 않아 로그인 여부만 확인하고 소유권은 검증하지 않습니다.
     return get_yezul_frames(db=db)
 
 
