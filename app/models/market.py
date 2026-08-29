@@ -1,8 +1,17 @@
-"""마켓 상품, 판매글, 거래, 거래 이미지, 디지털 인증서 ORM 매핑."""
+"""마켓 상품, 판매글, 판매글 찜, 거래, 거래 이미지, 디지털 인증서 ORM 매핑."""
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, String, func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -63,6 +72,27 @@ class SellListing(Base):
     user: Mapped[User] = relationship(back_populates="sell_listings")
     trades: Mapped[list["Trade"]] = relationship(back_populates="sell_listing")
     media: Mapped[list["ListingMedia"]] = relationship(back_populates="sell_listing")
+    likes: Mapped[list["SellingListLike"]] = relationship(
+        back_populates="sell_listing"
+    )
+
+
+class SellingListLike(Base):
+    __tablename__ = "selling_list_like"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    selling_list_id: Mapped[int] = mapped_column(ForeignKey("sell_listing.id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
+    is_liked: Mapped[bool] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    sell_listing: Mapped[SellListing] = relationship(back_populates="likes")
+    user: Mapped[User] = relationship(back_populates="selling_list_likes")
 
 
 class Trade(Base):

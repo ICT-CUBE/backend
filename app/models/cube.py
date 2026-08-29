@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from app.models.avatar import AvatarInteractionSession
     from app.models.conversation import AvatarConversationSession
     from app.models.market import MarketProduct
-    from app.models.reward import MissionProgress, RewardItem, UserReward
+    from app.models.reward import MissionProgress, UserReward
     from app.models.stage import StageSession
     from app.models.track import TrackSession
     from app.models.user import User
@@ -122,7 +122,6 @@ class Level(Base):
     __tablename__ = "level"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    reward_item_id: Mapped[int] = mapped_column(ForeignKey("reward_item.id"))
     level: Mapped[int] = mapped_column(Integer)
     level_xp: Mapped[int] = mapped_column(Integer)
     level_name: Mapped[LevelName] = mapped_column(
@@ -141,7 +140,6 @@ class Level(Base):
     )
 
     affinities: Mapped[list["Affinity"]] = relationship(back_populates="level_info")
-    reward_item: Mapped["RewardItem"] = relationship(back_populates="levels")
 
 
 class Affinity(Base):

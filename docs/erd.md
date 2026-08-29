@@ -6,24 +6,10 @@ erDiagram
         varchar_255 password_hash "NULL"
         varchar_20 login_provider "NOT NULL, Enum: EMAIL | GOOGLE | APPLE"
         varchar_255 provider_user_id "NULL"
-        varchar_8 nickname "NULL"
+        varchar_20 nickname "NULL"
         varchar_500 profile_character_img_url "NULL"
         int chat_violation_count "NOT NULL, DEFAULT: 0"
         varchar_20 status "NOT NULL, Enum: ACTIVE | WITHDRAWN | SUSPENDED"
-        datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-        datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-        datetime deleted_at "NULL"
-    }
-
-    AUTH_SESSION {
-        bigint id PK
-        bigint user_id FK "NOT NULL"
-        varchar_64 token_jti "NOT NULL, UNIQUE"
-        varchar_20 status "NOT NULL, Enum: ACTIVE | REVOKED"
-        datetime issued_at "NOT NULL"
-        datetime expires_at "NOT NULL"
-        datetime revoked_at "NULL"
-        varchar_255 device_id "NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime deleted_at "NULL"
@@ -76,7 +62,6 @@ erDiagram
 
     LEVEL {
         bigint id PK
-        bigint reward_item_id FK "NOT NULL"
         int level "NOT NULL"
         int level_xp "NOT NULL"
         varchar_30 level_name "NOT NULL, Enum: Intro | Friend | Close | Special"
@@ -90,6 +75,7 @@ erDiagram
         varchar_30 reward_type "NOT NULL, Enum: AFFINITY_POINT | CONVERSATION_COUNT | COMMENT_TYPE | SPECIAL_COMMENT | AVATAR_FIRST_TALK | BADGE"
         varchar_255 description "NULL"
         int reward_count "NULL"
+        int reward_level "NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime deleted_at "NULL"
@@ -386,6 +372,15 @@ erDiagram
         datetime deleted_at "NULL"
     }
 
+     SELLING_LIST_LIKE {
+        bigint id PK
+        bigint selling_list_id FK "NOT NULL, UNIQUE"
+        bigint user_id FK "NOT NULL, UNIQUE"
+        boolean is_liked "NOT NULL, DEFAULT: true"
+        datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
+        datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
+    }
+
     TRADE {
         bigint id PK
         bigint sell_listing_id FK "NOT NULL"
@@ -433,14 +428,12 @@ erDiagram
     }
 
 
-    USER ||--o{ AUTH_SESSION : "has"
     USER ||--o{ CUBE_VERIFICATION : "requests"
     CUBE ||--o{ CUBE_VERIFICATION : "is verified through"
     USER ||--o{ CUBE_OWNERSHIP : "owns"
     CUBE ||--o{ CUBE_OWNERSHIP : "has ownership records"
     CUBE_OWNERSHIP ||--|| AFFINITY : "has"
     LEVEL ||--o{ AFFINITY : "current level"
-    REWARD_ITEM ||--o{ LEVEL : "level reward"
     REWARD_ITEM ||--o{ MISSION : "mission reward"
     MISSION ||--o| MISSION_PROGRESS : "has progress"
     CUBE_OWNERSHIP ||--o{ MISSION_PROGRESS : "performs"
@@ -470,6 +463,8 @@ erDiagram
     USER ||--o{ POST_LIKE : "creates"
     COMMENT ||--o{ COMMENT_LIKE : "receives"
     USER ||--o{ COMMENT_LIKE : "creates"
+    SELL_LISTING ||--o{ SELLING_LIST_LIKE : "receives"
+    USER ||--o{ SELLING_LIST_LIKE : "creates"
     SELL_LISTING ||--o| TRADE : "creates"
     CUBE ||--o| MARKET_PRODUCT : "has"
     SELL_LISTING ||--o{ LISTING_MEDIA : "contains"

@@ -13,14 +13,9 @@ from app.models.cube import enum_values
 from app.models.enums import LoginProvider, UserStatus
 
 if TYPE_CHECKING:
-    from app.models.account import (
-        AuthSession,
-        CubeVerification,
-        Notification,
-        UserSetting,
-    )
+    from app.models.account import CubeVerification, Notification, UserSetting
     from app.models.community import Comment, CommentLike, Post, PostLike
-    from app.models.market import SellListing, Trade
+    from app.models.market import SellingListLike, SellListing, Trade
 
 
 class User(Base):
@@ -40,7 +35,7 @@ class User(Base):
         )
     )
     provider_user_id: Mapped[str | None] = mapped_column(String(255))
-    nickname: Mapped[str | None] = mapped_column(String(8))
+    nickname: Mapped[str | None] = mapped_column(String(20))
     # 프로필 캐릭터 이미지의 접근 URL입니다.
     profile_character_img_url: Mapped[str | None] = mapped_column(String(500))
     chat_violation_count: Mapped[int] = mapped_column(Integer)
@@ -63,7 +58,6 @@ class User(Base):
     cube_ownerships: Mapped[list[CubeOwnership]] = relationship(
         back_populates="user"
     )
-    auth_sessions: Mapped[list[AuthSession]] = relationship(back_populates="user")
     cube_verifications: Mapped[list[CubeVerification]] = relationship(
         back_populates="user"
     )
@@ -74,6 +68,9 @@ class User(Base):
     post_likes: Mapped[list[PostLike]] = relationship(back_populates="user")
     comment_likes: Mapped[list[CommentLike]] = relationship(back_populates="user")
     sell_listings: Mapped[list[SellListing]] = relationship(back_populates="user")
+    selling_list_likes: Mapped[list[SellingListLike]] = relationship(
+        back_populates="user"
+    )
     bought_trades: Mapped[list[Trade]] = relationship(back_populates="buyer")
 
 

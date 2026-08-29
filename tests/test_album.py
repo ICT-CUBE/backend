@@ -1,40 +1,24 @@
 """앨범 조회 API 테스트."""
 
-from collections.abc import Iterator
 from datetime import date
 from unittest.mock import Mock
 
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.main import app
 from app.models.album import Album
 from app.models.track import Track
+from tests.conftest import api_client
 
 
 def request_album(db: Mock):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.get("/api/v1/album")
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.get("/api/v1/album")
 
 
 def request_album_track(db: Mock, track_id: int = 1):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.get(f"/api/v1/tracks/{track_id}")
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.get(f"/api/v1/tracks/{track_id}")
 
 
 def ruby_album() -> Album:
@@ -131,7 +115,7 @@ def test_read_album_swagger_responses() -> None:
 
     assert set(operation["responses"]) == {"200", "404"}
     assert operation["tags"] == ["album"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_read_album_track_returns_track_playback_data() -> None:
@@ -186,7 +170,7 @@ def test_read_album_track_swagger_responses() -> None:
 
     assert set(operation["responses"]) == {"200", "404"}
     assert operation["tags"] == ["album"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def ruby_track() -> Track:

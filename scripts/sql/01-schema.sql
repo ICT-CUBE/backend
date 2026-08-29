@@ -4,6 +4,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS `listing_media`;
 DROP TABLE IF EXISTS `digital_certificate`;
 DROP TABLE IF EXISTS `trade`;
+DROP TABLE IF EXISTS `selling_list_like`;
 DROP TABLE IF EXISTS `sell_listing`;
 DROP TABLE IF EXISTS `market_product`;
 DROP TABLE IF EXISTS `comment_like`;
@@ -35,7 +36,6 @@ DROP TABLE IF EXISTS `reward_item`;
 DROP TABLE IF EXISTS `cube_ownership`;
 DROP TABLE IF EXISTS `cube_verification`;
 DROP TABLE IF EXISTS `cube`;
-DROP TABLE IF EXISTS `auth_session`;
 DROP TABLE IF EXISTS `user`;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -46,7 +46,7 @@ CREATE TABLE `user` (
     `password_hash` VARCHAR(255) NULL,
     `login_provider` VARCHAR(20) NOT NULL,
     `provider_user_id` VARCHAR(255) NULL,
-    `nickname` VARCHAR(8) NULL,
+    `nickname` VARCHAR(20) NULL,
     `profile_character_img_url` VARCHAR(500) NULL,
     `chat_violation_count` INT NOT NULL DEFAULT 0,
     `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
@@ -58,25 +58,6 @@ CREATE TABLE `user` (
     KEY `idx_user_status` (`status`),
     CONSTRAINT `ck_user_login_provider` CHECK (`login_provider` IN ('EMAIL', 'GOOGLE', 'APPLE')),
     CONSTRAINT `ck_user_status` CHECK (`status` IN ('ACTIVE', 'WITHDRAWN', 'SUSPENDED'))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE `auth_session` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `user_id` BIGINT NOT NULL,
-    `token_jti` VARCHAR(64) NOT NULL,
-    `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-    `issued_at` DATETIME NOT NULL,
-    `expires_at` DATETIME NOT NULL,
-    `revoked_at` DATETIME NULL,
-    `device_id` VARCHAR(255) NULL,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    `deleted_at` DATETIME NULL,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_auth_session_token_jti` (`token_jti`),
-    KEY `idx_auth_session_user_id` (`user_id`),
-    CONSTRAINT `fk_auth_session_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`),
-    CONSTRAINT `ck_auth_session_status` CHECK (`status` IN ('ACTIVE', 'REVOKED'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `cube` (
@@ -136,6 +117,7 @@ CREATE TABLE `reward_item` (
     `reward_type` VARCHAR(30) NOT NULL,
     `description` VARCHAR(255) NULL,
     `reward_count` INT NULL,
+    `reward_level` INT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted_at` DATETIME NULL,
@@ -145,16 +127,13 @@ CREATE TABLE `reward_item` (
 
 CREATE TABLE `level` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `reward_item_id` BIGINT NOT NULL,
     `level` INT NOT NULL,
     `level_xp` INT NOT NULL,
     `level_name` VARCHAR(30) NOT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_level_reward_item_id` (`reward_item_id`),
     UNIQUE KEY `uk_level_level` (`level`),
-    CONSTRAINT `fk_level_reward_item` FOREIGN KEY (`reward_item_id`) REFERENCES `reward_item` (`id`),
     CONSTRAINT `ck_level_name` CHECK (`level_name` IN ('Intro', 'Friend', 'Close', 'Special'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -583,6 +562,20 @@ CREATE TABLE `sell_listing` (
     CONSTRAINT `fk_sell_listing_market_product` FOREIGN KEY (`market_product_id`) REFERENCES `market_product` (`id`),
     CONSTRAINT `fk_sell_listing_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`),
     CONSTRAINT `ck_sell_listing_status` CHECK (`status` IN ('ACTIVE', 'SOLD', 'DELETED'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `selling_list_like` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `selling_list_id` BIGINT NOT NULL,
+    `user_id` BIGINT NOT NULL,
+    `is_liked` BOOLEAN NOT NULL DEFAULT TRUE,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_selling_list_like_selling_list_user` (`selling_list_id`, `user_id`),
+    KEY `idx_selling_list_like_user_id` (`user_id`),
+    CONSTRAINT `fk_selling_list_like_sell_listing` FOREIGN KEY (`selling_list_id`) REFERENCES `sell_listing` (`id`),
+    CONSTRAINT `fk_selling_list_like_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `trade` (

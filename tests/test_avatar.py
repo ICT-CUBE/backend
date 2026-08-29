@@ -1,13 +1,10 @@
 """아바타 소환 세션 API 테스트."""
 
-from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock, patch
 
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.main import app
 from app.models.album import AlbumImage
 from app.models.avatar import AvatarInteractionPicture, AvatarInteractionSession
@@ -17,6 +14,7 @@ from app.models.enums import (
     AvatarInteractionSessionStatus,
     OwnershipStatus,
 )
+from tests.conftest import api_client
 
 
 def create_avatar_interaction_session_request(
@@ -24,30 +22,16 @@ def create_avatar_interaction_session_request(
     *,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(
-            app,
-            raise_server_exceptions=raise_server_exceptions,
-        ) as client:
-            return client.post("/api/v1/users/me/avatar-interaction-sessions")
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.post("/api/v1/users/me/avatar-interaction-sessions")
 
 
 def request_yezul_frames(db: Mock):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.get("/api/v1/users/me/album/yezul-frames")
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.get("/api/v1/users/me/album/yezul-frames")
 
 
 def save_avatar_interaction_session_request(
@@ -56,21 +40,14 @@ def save_avatar_interaction_session_request(
     avatar_interaction_session_id: int = 1101,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(
-            app,
-            raise_server_exceptions=raise_server_exceptions,
-        ) as client:
-            return client.patch(
-                "/api/v1/users/me/avatar-interaction-sessions/"
-                f"{avatar_interaction_session_id}"
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.patch(
+            "/api/v1/users/me/avatar-interaction-sessions/"
+            f"{avatar_interaction_session_id}"
+        )
 
 
 def save_avatar_interaction_picture_request(
@@ -82,30 +59,21 @@ def save_avatar_interaction_picture_request(
     include_image: bool = True,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        files = (
-            {"image": ("picture.png", b"fake-image", content_type)}
-            if include_image
-            else None
+    files = (
+        {"image": ("picture.png", b"fake-image", content_type)}
+        if include_image
+        else None
+    )
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.post(
+            "/api/v1/users/me/avatar-interaction-sessions/"
+            f"{avatar_interaction_session_id}/pictures",
+            files=files,
+            data=data if data is not None else {"picturedAt": "2026-07-29T15:05:20"},
         )
-        with TestClient(
-            app,
-            raise_server_exceptions=raise_server_exceptions,
-        ) as client:
-            return client.post(
-                "/api/v1/users/me/avatar-interaction-sessions/"
-                f"{avatar_interaction_session_id}/pictures",
-                files=files,
-                data=data
-                if data is not None
-                else {"picturedAt": "2026-07-29T15:05:20"},
-            )
-    finally:
-        app.dependency_overrides.clear()
 
 
 def active_ownership() -> CubeOwnership:
@@ -197,7 +165,7 @@ def test_create_avatar_interaction_session_swagger_contract() -> None:
     ]["post"]
 
     assert set(operation["responses"]) == {"201"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_yezul_frames_return_all_frames_ordered_by_id() -> None:
@@ -249,6 +217,7 @@ def test_yezul_frames_swagger_contract() -> None:
     operation = app.openapi()["paths"]["/api/v1/users/me/album/yezul-frames"]["get"]
 
     assert set(operation["responses"]) == {"200"}
+    # 사용자 데이터가 아닌 공용 프레임 목록이라 인증 의존성이 없습니다.
     assert "security" not in operation
 
 
@@ -346,7 +315,7 @@ def test_save_avatar_interaction_session_swagger_contract() -> None:
     ]["patch"]
 
     assert set(operation["responses"]) == {"204", "404", "409"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_save_avatar_interaction_picture_uploads_image_and_adds_orm_model() -> None:
@@ -502,4 +471,4 @@ def test_save_avatar_interaction_picture_swagger_contract() -> None:
     ]["post"]
 
     assert set(operation["responses"]) == {"204", "400", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]

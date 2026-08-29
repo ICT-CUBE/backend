@@ -7,37 +7,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 from app.models.cube import Cube, enum_values
-from app.models.enums import AuthSessionStatus, CubeVerificationStatus, NotificationType
+from app.models.enums import CubeVerificationStatus, NotificationType
 from app.models.user import User
-
-
-class AuthSession(Base):
-    __tablename__ = "auth_session"
-
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
-    token_jti: Mapped[str] = mapped_column(String(64))
-    status: Mapped[AuthSessionStatus] = mapped_column(
-        Enum(
-            AuthSessionStatus,
-            values_callable=enum_values,
-            native_enum=False,
-            create_constraint=False,
-        )
-    )
-    issued_at: Mapped[datetime] = mapped_column(DateTime)
-    expires_at: Mapped[datetime] = mapped_column(DateTime)
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
-    device_id: Mapped[str | None] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
-    )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
-
-    user: Mapped[User] = relationship(back_populates="auth_sessions")
 
 
 class CubeVerification(Base):

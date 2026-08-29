@@ -1,13 +1,10 @@
 """트랙 재생 세션 생성 API 테스트."""
 
-from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock, patch
 
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.main import app
 from app.models.cube import CubeOwnership
 from app.models.enums import (
@@ -16,6 +13,7 @@ from app.models.enums import (
     TrackSessionStatus,
 )
 from app.models.track import Track, TrackCapture, TrackSession
+from tests.conftest import api_client
 
 
 def request_track_session(
@@ -24,18 +22,11 @@ def request_track_session(
     track_id: int = 1,
     body: dict[str, str] | None = None,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.post(
-                f"/api/v1/tracks/{track_id}/sessions",
-                json=body if body is not None else {"playMode": "NORMAL"},
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.post(
+            f"/api/v1/tracks/{track_id}/sessions",
+            json=body if body is not None else {"playMode": "NORMAL"},
+        )
 
 
 def save_track_session_request(
@@ -44,24 +35,17 @@ def save_track_session_request(
     track_session_id: int = 601,
     body: dict[str, str | int] | None = None,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            return client.patch(
-                f"/api/v1/users/me/track-sessions/{track_session_id}",
-                json=body
-                if body is not None
-                else {
-                    "status": "CANCELLED",
-                    "lastPositionSeconds": 74,
-                    "viewedSeconds": 62,
-                },
-            )
-    finally:
-        app.dependency_overrides.clear()
+    with api_client(db) as client:
+        return client.patch(
+            f"/api/v1/users/me/track-sessions/{track_session_id}",
+            json=body
+            if body is not None
+            else {
+                "status": "CANCELLED",
+                "lastPositionSeconds": 74,
+                "viewedSeconds": 62,
+            },
+        )
 
 
 def save_track_capture_request(
@@ -73,31 +57,25 @@ def save_track_capture_request(
     include_image: bool = True,
     raise_server_exceptions: bool = True,
 ):
-    def override_get_db() -> Iterator[Session]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        files = (
-            {"image": ("capture.jpg", b"fake-image", content_type)}
-            if include_image
-            else None
+    files = (
+        {"image": ("capture.jpg", b"fake-image", content_type)}
+        if include_image
+        else None
+    )
+    with api_client(
+        db,
+        raise_server_exceptions=raise_server_exceptions,
+    ) as client:
+        return client.post(
+            f"/api/v1/users/me/track-sessions/{track_session_id}/captures",
+            files=files,
+            data=data
+            if data is not None
+            else {
+                "capturedPositionSeconds": "74",
+                "capturedAt": "2026-07-29T15:05:20",
+            },
         )
-        with TestClient(
-            app, raise_server_exceptions=raise_server_exceptions
-        ) as client:
-            return client.post(
-                f"/api/v1/users/me/track-sessions/{track_session_id}/captures",
-                files=files,
-                data=data
-                if data is not None
-                else {
-                    "capturedPositionSeconds": "74",
-                    "capturedAt": "2026-07-29T15:05:20",
-                },
-            )
-    finally:
-        app.dependency_overrides.clear()
 
 
 def track() -> Track:
@@ -196,7 +174,7 @@ def test_track_session_swagger_responses() -> None:
     operation = app.openapi()["paths"]["/api/v1/tracks/{trackId}/sessions"]["post"]
 
     assert set(operation["responses"]) == {"201", "404"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_save_track_session_updates_playing_orm_model() -> None:
@@ -288,7 +266,7 @@ def test_save_track_session_swagger_responses() -> None:
     ]["patch"]
 
     assert set(operation["responses"]) == {"204", "404", "409"}
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_save_track_capture_uploads_image_and_adds_orm_model() -> None:
@@ -405,4 +383,4 @@ def test_save_track_capture_swagger_contract() -> None:
 
     assert set(operation["responses"]) == {"204", "400", "404"}
     assert "multipart/form-data" in operation["requestBody"]["content"]
-    assert "security" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]

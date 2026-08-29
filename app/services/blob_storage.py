@@ -129,6 +129,35 @@ def upload_avatar_interaction_picture(
     return blob.url
 
 
+def upload_community_post_image(
+    *,
+    file: BinaryIO,
+    content_type: str,
+    user_id: int,
+    post_id: int,
+) -> str:
+    """커뮤니티 게시글 이미지를 Azure에 업로드하고 공개 Blob URL을 반환합니다."""
+    settings = get_settings()
+    service = BlobServiceClient.from_connection_string(
+        settings.azure_storage_connection_string
+    )
+    extension = IMAGE_EXTENSIONS[content_type]
+    blob_name = (
+        f"{settings.azure_storage_community_post_prefix}/"
+        f"{user_id}/{post_id}/{uuid4()}.{extension}"
+    )
+    blob = service.get_blob_client(
+        container=settings.azure_storage_container_name,
+        blob=blob_name,
+    )
+    blob.upload_blob(
+        file,
+        overwrite=False,
+        content_settings=ContentSettings(content_type=content_type),
+    )
+    return blob.url
+
+
 def upload_conversation_audio(
     *,
     file: BinaryIO,

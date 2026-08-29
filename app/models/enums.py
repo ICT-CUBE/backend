@@ -18,11 +18,6 @@ class UserStatus(StrEnum):
     SUSPENDED = "SUSPENDED"
 
 
-class AuthSessionStatus(StrEnum):
-    ACTIVE = "ACTIVE"
-    REVOKED = "REVOKED"
-
-
 class CubeStatus(StrEnum):
     UNREGISTERED = "UNREGISTERED"
     OWNED = "OWNED"

@@ -39,6 +39,7 @@ class RewardItem(Base):
     )
     description: Mapped[str | None] = mapped_column(String(255))
     reward_count: Mapped[int | None] = mapped_column(Integer)
+    reward_level: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )
@@ -47,7 +48,6 @@ class RewardItem(Base):
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
 
-    levels: Mapped[list["Level"]] = relationship(back_populates="reward_item")
     missions: Mapped[list["Mission"]] = relationship(back_populates="reward_item")
     user_rewards: Mapped[list["UserReward"]] = relationship(
         back_populates="reward_item"
@@ -147,6 +147,3 @@ class UserReward(Base):
         back_populates="user_rewards"
     )
     reward_item: Mapped[RewardItem] = relationship(back_populates="user_rewards")
-
-
-from app.models.cube import Level
