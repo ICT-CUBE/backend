@@ -91,6 +91,7 @@ class ConversationReportCreateRequest(ApiSchema):
 
 
 class ConversationMessageReplyRequest(ApiSchema):
+    conversation_type: ConversationType
     content: str
     image_urls: list[str] = Field(default_factory=list, max_length=5)
 
@@ -102,15 +103,25 @@ class ConversationMessageReplyRequest(ApiSchema):
         return value
 
 
-class ConversationMessageReplyItemResponse(ApiSchema):
+class ConversationMessageReplyUserResponse(ApiSchema):
     id: int
     sender_type: str
     content: str
-    image_urls: list[str] | None = None
+    image_urls: list[str]
+    sequence_number: int
+    sent_at: datetime
+
+
+class ConversationMessageReplyAvatarResponse(ApiSchema):
+    id: int
+    sender_type: str
+    content: str
+    # 텍스트 대화에서는 음성을 만들지 않으므로 null로 반환합니다.
+    audio_url: str | None
     sequence_number: int
     sent_at: datetime
 
 
 class ConversationMessageReplyResponse(ApiSchema):
-    user_message: ConversationMessageReplyItemResponse
-    avatar_message: ConversationMessageReplyItemResponse
+    user_message: ConversationMessageReplyUserResponse
+    avatar_message: ConversationMessageReplyAvatarResponse

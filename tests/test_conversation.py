@@ -96,6 +96,12 @@ def create_conversation_report_request(
         )
 
 
+VOICE_AUDIO_URL = (
+    "https://haniumstorage.blob.core.windows.net/hanium/"
+    "conversation_audio/1/12/550e8400-e29b-41d4-a716-446655440000.mp3"
+)
+
+
 def reply_conversation_message_request(
     db: Mock,
     conversation_session_id: int = 1001,
@@ -109,7 +115,9 @@ def reply_conversation_message_request(
         return client.post(
             f"/api/v1/users/me/conversation-sessions/"
             f"{conversation_session_id}/messages",
-            json=body if body is not None else {"content": "오늘 뭐 하고 있었어?"},
+            json=body
+            if body is not None
+            else {"conversationType": "TEXT", "content": "오늘 뭐 하고 있었어?"},
         )
 
 
@@ -1145,6 +1153,7 @@ def test_reply_conversation_message_saves_user_and_avatar_messages() -> None:
         "id": 5026,
         "senderType": "AVATAR",
         "content": "오늘 연습하고 있었어! 너는 오늘 하루 어땠어?",
+        "audioUrl": None,
         "sequenceNumber": 14,
         "sentAt": body["avatarMessage"]["sentAt"],
     }
@@ -1186,7 +1195,10 @@ def test_reply_conversation_message_allows_not_active_session() -> None:
         response = reply_conversation_message_request(
             db,
             conversation_session_id=1001,
-            body={"content": "다시 이어서 얘기하자"},
+            body={
+                "conversationType": "TEXT",
+                "content": "다시 이어서 얘기하자",
+            },
         )
 
     assert response.status_code == 201
@@ -1213,14 +1225,24 @@ def test_reply_conversation_message_allows_active_voice_session() -> None:
         for index, call in enumerate(db.add.call_args_list, start=1)
     ]
 
-    with patch(
-        "app.services.conversation.generate_avatar_reply",
-        return_value="안녕! 오늘 기분은 어때?",
-    ) as generate_reply:
+    with (
+        patch(
+            "app.services.conversation.generate_avatar_reply",
+            return_value="안녕! 오늘 기분은 어때?",
+        ) as generate_reply,
+        patch(
+            "app.services.conversation.generate_avatar_reply_audio",
+            return_value=b"fake-mp3",
+        ),
+        patch(
+            "app.services.conversation.upload_conversation_audio",
+            return_value=VOICE_AUDIO_URL,
+        ),
+    ):
         response = reply_conversation_message_request(
             db,
             conversation_session_id=12,
-            body={"content": "안녕"},
+            body={"conversationType": "VOICE", "content": "안녕"},
         )
 
     assert response.status_code == 201
@@ -1229,6 +1251,7 @@ def test_reply_conversation_message_allows_active_voice_session() -> None:
     assert response.json()["avatarMessage"]["content"] == (
         "안녕! 오늘 기분은 어때?"
     )
+    assert response.json()["avatarMessage"]["audioUrl"] == VOICE_AUDIO_URL
     assert all(
         call.args[0].conversation_session_id == 12
         for call in db.add.call_args_list
@@ -1243,7 +1266,7 @@ def test_reply_conversation_message_returns_404_for_not_active_voice_session() -
     response = reply_conversation_message_request(
         db,
         conversation_session_id=12,
-        body={"content": "안녕"},
+        body={"conversationType": "VOICE", "content": "안녕"},
     )
 
     assert response.status_code == 404
@@ -1263,7 +1286,7 @@ def test_reply_conversation_message_rejects_blank_content_with_common_400() -> N
 
     response = reply_conversation_message_request(
         db,
-        body={"content": "   \n"},
+        body={"conversationType": "TEXT", "content": "   \n"},
     )
 
     assert response.status_code == 400
@@ -1298,7 +1321,11 @@ def test_reply_conversation_message_passes_image_urls_to_gpt() -> None:
     ) as generate_reply:
         response = reply_conversation_message_request(
             db,
-            body={"content": "이 사진들 봐줘", "imageUrls": image_urls},
+            body={
+                "conversationType": "TEXT",
+                "content": "이 사진들 봐줘",
+                "imageUrls": image_urls,
+            },
         )
 
     assert response.status_code == 201
@@ -1316,6 +1343,7 @@ def test_reply_conversation_message_rejects_more_than_five_images() -> None:
     response = reply_conversation_message_request(
         db,
         body={
+            "conversationType": "TEXT",
             "content": "사진이 많아",
             "imageUrls": [f"https://example.com/{index}.jpg" for index in range(6)],
         },
@@ -1340,6 +1368,7 @@ def test_reply_conversation_message_returns_404_for_deleted_image_url() -> None:
         response = reply_conversation_message_request(
             db,
             body={
+                "conversationType": "TEXT",
                 "content": "삭제된 사진이야?",
                 "imageUrls": [
                     "https://haniumstorage.blob.core.windows.net/hanium/stage_capture/1/1/deleted.jpg"
@@ -1410,6 +1439,199 @@ def test_reply_conversation_message_does_not_save_when_gpt_fails() -> None:
     db.add.assert_not_called()
     db.commit.assert_not_called()
     db.rollback.assert_not_called()
+
+
+def test_reply_conversation_message_uploads_voice_audio_to_blob_storage() -> None:
+    db = Mock(spec=Session)
+    conversation_session = session(
+        id=12,
+        conversation_type=ConversationType.VOICE,
+    )
+    db.scalar.side_effect = [conversation_session, 0]
+    db.flush.side_effect = lambda: [
+        setattr(call.args[0], "id", index)
+        for index, call in enumerate(db.add.call_args_list, start=1)
+    ]
+
+    with (
+        patch(
+            "app.services.conversation.generate_avatar_reply",
+            return_value="안녕! 오늘 기분은 어때?",
+        ),
+        patch(
+            "app.services.conversation.generate_avatar_reply_audio",
+            return_value=b"fake-mp3",
+        ) as generate_audio,
+        patch(
+            "app.services.conversation.upload_conversation_audio",
+            return_value=VOICE_AUDIO_URL,
+        ) as upload_audio,
+    ):
+        response = reply_conversation_message_request(
+            db,
+            conversation_session_id=12,
+            body={"conversationType": "VOICE", "content": "안녕"},
+        )
+
+    assert response.status_code == 201
+    # GPT가 만든 아바타 응답 텍스트를 그대로 음성으로 합성합니다.
+    generate_audio.assert_called_once_with("안녕! 오늘 기분은 어때?")
+    upload_kwargs = upload_audio.call_args.kwargs
+    assert upload_kwargs["content_type"] == "audio/mpeg"
+    assert upload_kwargs["user_id"] == 1
+    assert upload_kwargs["conversation_session_id"] == 12
+    assert upload_kwargs["file"].read() == b"fake-mp3"
+
+
+def test_reply_conversation_message_does_not_save_when_voice_synthesis_fails() -> None:
+    db = Mock(spec=Session)
+    db.scalar.side_effect = [
+        session(id=12, conversation_type=ConversationType.VOICE),
+        0,
+    ]
+
+    with (
+        patch(
+            "app.services.conversation.generate_avatar_reply",
+            return_value="안녕! 오늘 기분은 어때?",
+        ),
+        patch(
+            "app.services.conversation.generate_avatar_reply_audio",
+            side_effect=RuntimeError("tts failed"),
+        ),
+    ):
+        response = reply_conversation_message_request(
+            db,
+            conversation_session_id=12,
+            body={"conversationType": "VOICE", "content": "안녕"},
+            raise_server_exceptions=False,
+        )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "code": "INTERNAL_SERVER_ERROR",
+        "message": "서버 내부 오류가 발생했습니다.",
+    }
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_reply_conversation_message_does_not_save_when_audio_upload_fails() -> None:
+    db = Mock(spec=Session)
+    db.scalar.side_effect = [
+        session(id=12, conversation_type=ConversationType.VOICE),
+        0,
+    ]
+
+    with (
+        patch(
+            "app.services.conversation.generate_avatar_reply",
+            return_value="안녕! 오늘 기분은 어때?",
+        ),
+        patch(
+            "app.services.conversation.generate_avatar_reply_audio",
+            return_value=b"fake-mp3",
+        ),
+        patch(
+            "app.services.conversation.upload_conversation_audio",
+            side_effect=RuntimeError("blob failed"),
+        ),
+    ):
+        response = reply_conversation_message_request(
+            db,
+            conversation_session_id=12,
+            body={"conversationType": "VOICE", "content": "안녕"},
+            raise_server_exceptions=False,
+        )
+
+    assert response.status_code == 500
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_reply_conversation_message_does_not_generate_audio_for_text_session() -> None:
+    db = Mock(spec=Session)
+    db.scalar.side_effect = [
+        session(id=1001, conversation_type=ConversationType.TEXT),
+        0,
+    ]
+    db.flush.side_effect = lambda: [
+        setattr(call.args[0], "id", index)
+        for index, call in enumerate(db.add.call_args_list, start=1)
+    ]
+
+    with (
+        patch(
+            "app.services.conversation.generate_avatar_reply",
+            return_value="오늘 연습하고 있었어!",
+        ),
+        patch(
+            "app.services.conversation.generate_avatar_reply_audio",
+        ) as generate_audio,
+        patch(
+            "app.services.conversation.upload_conversation_audio",
+        ) as upload_audio,
+    ):
+        response = reply_conversation_message_request(db)
+
+    assert response.status_code == 201
+    assert response.json()["avatarMessage"]["audioUrl"] is None
+    generate_audio.assert_not_called()
+    upload_audio.assert_not_called()
+
+
+def test_reply_conversation_message_returns_404_when_conversation_type_differs() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    with patch("app.services.conversation.generate_avatar_reply") as generate_reply:
+        response = reply_conversation_message_request(
+            db,
+            conversation_session_id=12,
+            body={"conversationType": "TEXT", "content": "안녕"},
+        )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "CONVERSATION_SESSION_NOT_FOUND",
+        "message": "대화 세션을 찾을 수 없습니다.",
+    }
+    # 요청 유형이 조회 조건에 포함되어 세션 유형이 다르면 조회되지 않습니다.
+    where_clause = str(
+        db.scalar.call_args.args[0].compile(compile_kwargs={"literal_binds": True})
+    ).split("WHERE")[1]
+    assert "avatar_conversation_session.conversation_type = 'TEXT'" in where_clause
+    generate_reply.assert_not_called()
+    db.add.assert_not_called()
+
+
+def test_reply_conversation_message_returns_400_without_conversation_type() -> None:
+    db = Mock(spec=Session)
+
+    response = reply_conversation_message_request(db, body={"content": "안녕"})
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "code": "INVALID_REQUEST",
+        "message": "요청값이 올바르지 않습니다.",
+    }
+    db.scalar.assert_not_called()
+
+
+def test_reply_conversation_message_returns_400_for_unknown_conversation_type() -> None:
+    db = Mock(spec=Session)
+
+    response = reply_conversation_message_request(
+        db,
+        body={"conversationType": "VIDEO", "content": "안녕"},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "code": "INVALID_REQUEST",
+        "message": "요청값이 올바르지 않습니다.",
+    }
+    db.scalar.assert_not_called()
 
 
 def test_reply_conversation_message_swagger_contract() -> None:

@@ -4,7 +4,7 @@ from sqlalchemy import case, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.exceptions import ApiError
-from app.models.cube import Affinity, CubeOwnership
+from app.models.cube import Affinity, CubeOwnership, Level
 from app.models.enums import OwnershipStatus
 from app.schemas.home import (
     HomeAffinityResponse,
@@ -62,6 +62,12 @@ def get_home(*, db: Session, current_user_id: int) -> HomeResponse:
             message="큐브 친밀도 정보를 찾을 수 없습니다.",
         )
     level = affinity.level_info
+    next_level_xp = db.scalar(
+        select(Level.level_xp)
+        .where(Level.level > level.level)
+        .order_by(Level.level.asc())
+        .limit(1)
+    )
 
     return HomeResponse(
         user=HomeUserResponse(
@@ -81,7 +87,9 @@ def get_home(*, db: Session, current_user_id: int) -> HomeResponse:
                 id=level.id,
                 level=level.level,
                 level_name=level.level_name.value,
-                level_xp=level.level_xp,
+                level_xp=(
+                    next_level_xp if next_level_xp is not None else level.level_xp
+                ),
             ),
         ),
     )

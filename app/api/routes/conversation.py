@@ -381,13 +381,13 @@ def read_conversation_session_detail(
 @router.post(
     "/conversation-sessions/{conversationSessionId}/messages",
     response_model=ConversationMessageReplyResponse,
-    response_model_exclude_none=True,
     status_code=status.HTTP_201_CREATED,
     summary="대화 메시지 응답",
     description=(
-        "현재 사용자의 텍스트 또는 음성 대화 세션에 사용자 메시지를 받고, "
+        "요청의 대화 유형과 같은 유형의 대화 세션에 사용자 메시지를 받고, "
         "OpenAI GPT로 아바타 응답을 생성한 뒤 USER/AVATAR 메시지를 함께 "
-        "저장해 반환합니다."
+        "저장해 반환합니다. 음성 대화에서는 아바타 응답을 음성으로 합성해 "
+        "Azure Blob Storage에 올린 오디오 URL도 함께 반환합니다."
     ),
     responses={
         status.HTTP_404_NOT_FOUND: {

@@ -21,12 +21,12 @@ def make_ownership(status: OwnershipStatus) -> CubeOwnership:
     user = User(id=1, profile_character_img_url="CHAR_MINA")
     cube = Cube(id=1, artist_name="ARZONE")
     level = Level(
-        id=2,
-        level=2,
-        level_name=LevelName.FRIEND,
-        level_xp=300,
+        id=3,
+        level=3,
+        level_name=LevelName.CLOSE,
+        level_xp=800,
     )
-    affinity = Affinity(id=1, current_xp=120, level_info=level)
+    affinity = Affinity(id=1, current_xp=1245, level_info=level)
     return CubeOwnership(
         id=1,
         user_id=1,
@@ -45,6 +45,7 @@ def test_home_returns_orm_values_in_korea_time() -> None:
     db.scalars.return_value.first.return_value = make_ownership(
         OwnershipStatus.ACTIVE
     )
+    db.scalar.return_value = 2000
 
     response = request_home(db)
 
@@ -59,16 +60,17 @@ def test_home_returns_orm_values_in_korea_time() -> None:
         "cube": {"id": 1, "artistName": "ARZONE"},
         "affinity": {
             "id": 1,
-            "currentXp": 120,
+            "currentXp": 1245,
             "level": {
-                "id": 2,
-                "level": 2,
-                "levelName": "Friend",
-                "levelXp": 300,
+                "id": 3,
+                "level": 3,
+                "levelName": "Close",
+                "levelXp": 2000,
             },
         },
     }
     db.scalars.assert_called_once()
+    db.scalar.assert_called_once()
     db.execute.assert_not_called()
 
 

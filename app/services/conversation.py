@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 from typing import BinaryIO, NoReturn, cast
 
 from openai import OpenAI
@@ -39,9 +40,10 @@ from app.schemas.conversation import (
     ConversationDetailResponse,
     ConversationDetailSessionResponse,
     ConversationLastMessageResponse,
-    ConversationMessageReplyItemResponse,
+    ConversationMessageReplyAvatarResponse,
     ConversationMessageReplyRequest,
     ConversationMessageReplyResponse,
+    ConversationMessageReplyUserResponse,
     ConversationMessageSaveItemResponse,
     ConversationMessageSaveResponse,
     ConversationPaginationResponse,
@@ -68,6 +70,17 @@ CONVERSATION_TITLE_SYSTEM_PROMPT = """
 너는 대화 기록을 보고 목록에 표시할 짧은 제목을 만드는 역할이다.
 제목은 한국어로 20자 이내, 따옴표 없이 한 줄로만 답한다.
 대화의 핵심 상황이나 주제를 자연스럽게 요약한다.
+""".strip()
+# 실존 인물의 음성을 복제하지 않고 OpenAI가 제공하는 여성 음성을 그대로 사용합니다.
+AVATAR_TTS_MODEL = "gpt-4o-mini-tts"
+AVATAR_TTS_VOICE = "shimmer"
+AVATAR_TTS_AUDIO_CONTENT_TYPE = "audio/mpeg"
+AVATAR_TTS_INSTRUCTIONS = """
+20대 여성 아티스트가 팬에게 1대1로 말을 거는 것처럼 자연스럽고 친근하게 읽는다.
+주어진 문장의 의미와 표현을 바꾸지 않고 그대로 발화한다.
+평소 대화 속도를 유지하고 문장 끝은 부드럽게 마무리한다.
+맥락에 맞는 가벼운 감정 표현은 허용하되 과장된 연기, 노래하듯 말하기,
+효과음은 사용하지 않는다.
 """.strip()
 
 
@@ -515,6 +528,7 @@ def reply_to_conversation_message(
             CubeOwnership.user_id == current_user_id,
             CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
             AvatarConversationSession.deleted_at.is_(None),
+            AvatarConversationSession.conversation_type == body.conversation_type,
             or_(
                 AvatarConversationSession.status
                 == AvatarConversationSessionStatus.ACTIVE,
@@ -564,6 +578,14 @@ def reply_to_conversation_message(
         sent_at=now,
     )
 
+    # 음성 생성이나 업로드가 실패하면 메시지를 저장하지 않도록 커밋 전에 처리합니다.
+    audio_url = _avatar_reply_audio_url(
+        conversation_type=body.conversation_type,
+        content=avatar_reply,
+        current_user_id=current_user_id,
+        conversation_session_id=conversation_session.id,
+    )
+
     try:
         db.add(user_message)
         db.add(avatar_message)
@@ -574,11 +596,22 @@ def reply_to_conversation_message(
         raise
 
     return ConversationMessageReplyResponse(
-        user_message=_conversation_reply_message_response(
-            user_message,
+        user_message=ConversationMessageReplyUserResponse(
+            id=user_message.id,
+            sender_type=user_message.sender_type.value,
+            content=user_message.content,
             image_urls=body.image_urls,
+            sequence_number=user_message.sequence_number,
+            sent_at=user_message.sent_at,
         ),
-        avatar_message=_conversation_reply_message_response(avatar_message),
+        avatar_message=ConversationMessageReplyAvatarResponse(
+            id=avatar_message.id,
+            sender_type=avatar_message.sender_type.value,
+            content=avatar_message.content,
+            audio_url=audio_url,
+            sequence_number=avatar_message.sequence_number,
+            sent_at=avatar_message.sent_at,
+        ),
     )
 
 
@@ -659,6 +692,20 @@ def generate_avatar_reply(user_content: str, image_urls: list[str] | None = None
         input=response_input,
     )
     return response.output_text.strip()
+
+
+def generate_avatar_reply_audio(content: str) -> bytes:
+    """OpenAI 음성 합성으로 아바타 응답 텍스트를 mp3 바이트로 변환합니다."""
+    settings = get_settings()
+    client = OpenAI(api_key=settings.openai_api_key)
+    response = client.audio.speech.create(
+        model=AVATAR_TTS_MODEL,
+        voice=AVATAR_TTS_VOICE,
+        input=content,
+        instructions=AVATAR_TTS_INSTRUCTIONS,
+        response_format="mp3",
+    )
+    return response.content
 
 
 def _conversation_audio_values(
@@ -873,16 +920,28 @@ def _has_deleted_conversation_image_url(
     return deleted_interaction_picture_id is not None
 
 
-def _conversation_reply_message_response(
-    message: AvatarConversationMessage,
+def _avatar_reply_audio_url(
     *,
-    image_urls: list[str] | None = None,
-) -> ConversationMessageReplyItemResponse:
-    return ConversationMessageReplyItemResponse(
-        id=message.id,
-        sender_type=message.sender_type.value,
-        content=message.content,
-        image_urls=image_urls,
-        sequence_number=message.sequence_number,
-        sent_at=message.sent_at,
-    )
+    conversation_type: ConversationType,
+    content: str,
+    current_user_id: int,
+    conversation_session_id: int,
+) -> str | None:
+    """음성 대화면 아바타 응답을 합성해 업로드하고 Blob URL을 반환합니다."""
+    if conversation_type != ConversationType.VOICE:
+        return None
+
+    try:
+        audio = generate_avatar_reply_audio(content)
+        return upload_conversation_audio(
+            file=BytesIO(audio),
+            content_type=AVATAR_TTS_AUDIO_CONTENT_TYPE,
+            user_id=current_user_id,
+            conversation_session_id=conversation_session_id,
+        )
+    except Exception as exc:
+        raise ApiError(
+            status_code=500,
+            code="INTERNAL_SERVER_ERROR",
+            message="서버 내부 오류가 발생했습니다.",
+        ) from exc
