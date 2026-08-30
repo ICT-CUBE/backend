@@ -1,6 +1,6 @@
 """큐브 도메인 API 테스트."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from sqlalchemy.orm import Session
 
@@ -22,8 +22,13 @@ def request_cube_verification(
     *,
     body: dict[str, int | str] | None = None,
     raise_server_exceptions: bool = True,
+    mint: Mock | None = None,
 ):
-    with api_client(db, raise_server_exceptions=raise_server_exceptions) as client:
+    """인증 API를 호출합니다. NFT 발행은 기본적으로 Mock으로 대체합니다."""
+    with (
+        patch("app.services.cube.mint_cube_nft", mint or Mock()),
+        api_client(db, raise_server_exceptions=raise_server_exceptions) as client,
+    ):
         return client.post(
             "/api/v1/cubes/verification",
             json=body
@@ -256,6 +261,41 @@ def test_create_cube_verification_rolls_back_when_reward_query_fails():
     assert not any(isinstance(item, UserReward) for item in added_objects)
     db.rollback.assert_called_once()
     db.commit.assert_not_called()
+
+
+def test_create_cube_verification_requests_mint_after_commit():
+    db = Mock(spec=Session)
+    set_verification_results(
+        db,
+        cube=make_cube(),
+        level=make_first_level(),
+        reward_items=make_first_level_rewards(),
+    )
+    mint = Mock()
+
+    response = request_cube_verification(db, mint=mint)
+
+    assert response.status_code == 201
+    mint.assert_called_once()
+    assert mint.call_args.kwargs["user_id"] == 1
+    assert mint.call_args.kwargs["cube_id"] == 2
+    assert mint.call_args.kwargs["serial_number"] == "ARZ-CUBE-0002"
+    db.commit.assert_called_once()
+
+
+def test_create_cube_verification_does_not_request_mint_when_code_invalid():
+    db = Mock(spec=Session)
+    set_verification_results(db, cube=make_cube(), level=make_first_level())
+    mint = Mock()
+
+    response = request_cube_verification(
+        db,
+        body={"cubeId": 2, "ownershipCode": "9999"},
+        mint=mint,
+    )
+
+    assert response.status_code == 400
+    mint.assert_not_called()
 
 
 def test_create_cube_verification_returns_404_when_cube_not_found():

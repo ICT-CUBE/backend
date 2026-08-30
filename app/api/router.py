@@ -5,6 +5,7 @@ from app.api.routes import (
     album,
     auth,
     avatar,
+    blockchain,
     community,
     conversation,
     cube,
@@ -28,6 +29,11 @@ api_router.include_router(mission.router, prefix="/users/me", tags=["mission"])
 api_router.include_router(mypage.router, prefix="/users/me", tags=["mypage"])
 api_router.include_router(cube.router, prefix="/cubes", tags=["cube"])
 api_router.include_router(community.router, prefix="/community", tags=["community"])
+api_router.include_router(
+    blockchain.router,
+    prefix="/internal/blockchain",
+    tags=["blockchain"],
+)
 api_router.include_router(stage.router, prefix="/stages", tags=["stage"])
 api_router.include_router(album.album_router, prefix="/album", tags=["album"])
 api_router.include_router(album.router, prefix="/tracks", tags=["album"])

@@ -409,6 +409,23 @@ erDiagram
         varchar_200 metadata_url "NOT NULL"
     }
 
+    BLOCKCHAIN_OPERATION {
+        bigint id PK
+        varchar_20 operation_type "NOT NULL, Enum: MINT | TRANSFER"
+        varchar_20 status "NOT NULL, DEFAULT: REQUESTED, Enum: REQUESTED | CONFIRMED | FAILED"
+        int token_id "NULL"
+        bigint cube_id FK "NULL"
+        bigint trade_id FK "NULL"
+        char_36 idempotency_key "NOT NULL, UNIQUE"
+        char_36 operation_id "NULL, UNIQUE"
+        char_36 notification_id "NULL, UNIQUE"
+        varchar_200 tx_hash "NULL"
+        varchar_42 final_owner_address "NULL"
+        varchar_255 failure_reason "NULL"
+        datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
+        datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
+    }
+
     MARKET_PRODUCT {
         bigint id PK
         bigint cube_id FK "NOT NULL, UNIQUE"
@@ -469,4 +486,6 @@ erDiagram
     CUBE ||--o| MARKET_PRODUCT : "has"
     SELL_LISTING ||--o{ LISTING_MEDIA : "contains"
     TRADE ||--o| DIGITAL_CERTIFICATE : "contains"
+    CUBE ||--o{ BLOCKCHAIN_OPERATION : "is minted through"
+    TRADE ||--o{ BLOCKCHAIN_OPERATION : "is transferred through"
 ```

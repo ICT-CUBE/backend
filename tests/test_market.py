@@ -1,13 +1,17 @@
 """마켓 도메인 API 테스트."""
 
 from datetime import datetime
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.main import app
+from app.models.blockchain import BlockchainOperation
 from app.models.cube import Affinity, Cube, CubeOwnership, Level
 from app.models.enums import (
+    BlockchainOperationStatus,
+    BlockchainOperationType,
     CubeStatus,
     LevelName,
     OwnershipStatus,
@@ -21,6 +25,7 @@ from app.models.market import (
     Trade,
 )
 from app.models.user import User
+from app.services.blockchain.errors import BlockchainError
 from tests.conftest import api_client
 
 
@@ -91,13 +96,54 @@ def read_trade_detail_request(
         return client.get(f"/api/v1/users/me/trades/{trade_id}")
 
 
+CERTIFICATE_VALUES = {
+    "token_id": "44",
+    "token_standard": "ERC-721",
+    "contract_address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    "metadata_url": "ipfs://fakecid1503b032",
+    "tx_hash": "0x54aa5bda988138fb1858592ac5cd88859592fa3a",
+}
+
+
 def complete_trade_request(
     db: Mock,
     *,
     trade_id: int = 1,
+    transfer: Mock | None = None,
+    raise_server_exceptions: bool = True,
 ):
-    with api_client(db) as client:
+    """구매 확정 API를 호출합니다. NFT 이전은 기본적으로 Mock으로 대체합니다."""
+    with (
+        patch(
+            "app.services.market.transfer_cube_nft",
+            transfer or Mock(return_value=dict(CERTIFICATE_VALUES)),
+        ),
+        api_client(db, raise_server_exceptions=raise_server_exceptions) as client,
+    ):
         return client.patch(f"/api/v1/users/me/trades/{trade_id}/complete")
+
+
+def set_complete_trade_results(
+    db: Mock,
+    *,
+    status: TradeStatus = TradeStatus.DELIVERED,
+    seller_user_id: int = 2,
+    serial_number: str = "NO.0044",
+):
+    """거래 조회와 이전 대상 조회 결과를 순서대로 지정합니다."""
+    trade, buyer = complete_trade_row(status=status)
+    # 확정된 NFT 이전 작업이 없는 상태를 기본으로 둡니다.
+    db.scalar.return_value = None
+    db.execute.side_effect = [
+        Mock(first=Mock(return_value=(trade, buyer))),
+        Mock(first=Mock(return_value=(seller_user_id, serial_number))),
+    ]
+
+    def assign_certificate_id() -> None:
+        db.add.call_args.args[0].id = 1
+
+    db.flush.side_effect = assign_certificate_id
+    return trade, buyer
 
 
 def active_sell_listing(*, user_id: int = 2) -> SellListing:
@@ -594,14 +640,7 @@ def test_complete_trade_updates_trade_and_creates_certificate(monkeypatch) -> No
         lambda: completed_time,
     )
     db = Mock(spec=Session)
-    trade, buyer = complete_trade_row()
-    db.execute.return_value.first.return_value = trade, buyer
-
-    def assign_certificate_id() -> None:
-        certificate = db.add.call_args.args[0]
-        certificate.id = 1
-
-    db.flush.side_effect = assign_certificate_id
+    trade, buyer = set_complete_trade_results(db)
 
     response = complete_trade_request(db, trade_id=23)
 
@@ -611,27 +650,175 @@ def test_complete_trade_updates_trade_and_creates_certificate(monkeypatch) -> No
     inserted = db.add.call_args.args[0]
     assert isinstance(inserted, DigitalCertificate)
     assert inserted.trade_id == 23
-    assert inserted.network == "example_network"
-    assert inserted.token_standard == "example_token_standard"
-    assert inserted.token_id == "example_token_id"
-    assert inserted.contract_address == "example_contract_address"
-    assert inserted.tx_hash == "example_tx_hash"
-    assert inserted.metadata_url == "example_metadata_url"
+    assert inserted.network == get_settings().blockchain_network
+    assert inserted.token_standard == "ERC-721"
+    assert inserted.token_id == "44"
+    assert inserted.contract_address == CERTIFICATE_VALUES["contract_address"]
+    assert inserted.tx_hash == CERTIFICATE_VALUES["tx_hash"]
+    assert inserted.metadata_url == CERTIFICATE_VALUES["metadata_url"]
     assert response.json() == {
         "certificate": {
             "id": 1,
             "tradeId": 23,
             "ownerNickname": buyer.nickname,
             "completedTime": "2026-08-10T18:43:00",
-            "network": "example_network",
-            "tokenStandard": "example_token_standard",
-            "tokenId": "example_token_id",
-            "contractAddress": "example_contract_address",
-            "txHash": "example_tx_hash",
-            "metadataUrl": "example_metadata_url",
+            "network": get_settings().blockchain_network,
+            "tokenStandard": "ERC-721",
+            "tokenId": "44",
+            "contractAddress": CERTIFICATE_VALUES["contract_address"],
+            "txHash": CERTIFICATE_VALUES["tx_hash"],
+            "metadataUrl": CERTIFICATE_VALUES["metadata_url"],
         }
     }
     db.commit.assert_called_once()
+
+
+def test_complete_trade_requests_transfer_with_seller_and_serial_number() -> None:
+    db = Mock(spec=Session)
+    set_complete_trade_results(db, seller_user_id=7, serial_number="NO.0055")
+    transfer = Mock(return_value=dict(CERTIFICATE_VALUES))
+
+    response = complete_trade_request(db, trade_id=23, transfer=transfer)
+
+    assert response.status_code == 200
+    assert transfer.call_args.kwargs["trade_id"] == 23
+    assert transfer.call_args.kwargs["seller_user_id"] == 7
+    assert transfer.call_args.kwargs["buyer_user_id"] == 1
+    assert transfer.call_args.kwargs["serial_number"] == "NO.0055"
+
+
+def test_complete_trade_releases_trade_lock_before_transfer() -> None:
+    db = Mock(spec=Session)
+    set_complete_trade_results(db)
+    order: list[str] = []
+    db.rollback.side_effect = lambda: order.append("rollback")
+    transfer = Mock(
+        side_effect=lambda **_: order.append("transfer") or dict(CERTIFICATE_VALUES)
+    )
+
+    complete_trade_request(db, trade_id=23, transfer=transfer)
+
+    # 수십 초 걸리는 외부 호출 전에 거래 행 잠금을 풀어야 합니다.
+    assert order == ["rollback", "transfer"]
+
+
+def test_complete_trade_reuses_confirmed_transfer_operation() -> None:
+    db = Mock(spec=Session)
+    set_complete_trade_results(db)
+    db.scalar.return_value = BlockchainOperation(
+        id=5,
+        operation_type=BlockchainOperationType.TRANSFER,
+        status=BlockchainOperationStatus.CONFIRMED,
+        token_id=31,
+        trade_id=23,
+        idempotency_key="key-9",
+        tx_hash=CERTIFICATE_VALUES["tx_hash"],
+    )
+    transfer = Mock()
+
+    with patch(
+        "app.services.market.certificate_values",
+        return_value=dict(CERTIFICATE_VALUES),
+    ) as values:
+        response = complete_trade_request(db, trade_id=23, transfer=transfer)
+
+    assert response.status_code == 200
+    # 완료 알림으로 이미 확정된 거래는 다시 이전을 요청하지 않습니다.
+    transfer.assert_not_called()
+    values.assert_called_once_with(token_id=31, tx_hash=CERTIFICATE_VALUES["tx_hash"])
+
+
+def test_complete_trade_returns_409_when_transfer_is_in_progress() -> None:
+    db = Mock(spec=Session)
+    set_complete_trade_results(db)
+    # 확정된 작업은 없고, 아직 대기 중인 이전 작업만 있는 상태입니다.
+    db.scalar.side_effect = [
+        None,
+        BlockchainOperation(
+            id=6,
+            operation_type=BlockchainOperationType.TRANSFER,
+            status=BlockchainOperationStatus.REQUESTED,
+            token_id=31,
+            trade_id=23,
+            idempotency_key="key-8",
+        ),
+    ]
+    transfer = Mock()
+
+    response = complete_trade_request(db, trade_id=23, transfer=transfer)
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "TRADE_CONFIRMATION_TIMEOUT"
+    # 같은 거래에 이전을 중복 접수하지 않습니다.
+    transfer.assert_not_called()
+    db.add.assert_not_called()
+
+
+def test_complete_trade_queries_transfer_operation_by_status() -> None:
+    db = Mock(spec=Session)
+    set_complete_trade_results(db)
+    db.scalar.side_effect = [None, None]
+
+    complete_trade_request(db, trade_id=23)
+
+    confirmed_query = compiled_query(db.scalar.call_args_list[0])
+    requested_query = compiled_query(db.scalar.call_args_list[1])
+    assert "blockchain_operation.trade_id = 23" in confirmed_query
+    assert "blockchain_operation.operation_type = 'TRANSFER'" in confirmed_query
+    assert "blockchain_operation.status = 'CONFIRMED'" in confirmed_query
+    assert "blockchain_operation.status = 'REQUESTED'" in requested_query
+
+
+def test_complete_trade_returns_409_when_transfer_is_rejected() -> None:
+    db = Mock(spec=Session)
+    set_complete_trade_results(db)
+    transfer = Mock(
+        side_effect=BlockchainError(code="TRANSFER_OWNER_MISMATCH", message="mismatch")
+    )
+
+    response = complete_trade_request(db, trade_id=23, transfer=transfer)
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "code": "TRADE_TRANSFER_REJECTED",
+        "message": "NFT 이전 요청이 거절되었습니다.",
+    }
+    db.add.assert_not_called()
+
+
+def test_complete_trade_returns_409_when_confirmation_times_out() -> None:
+    db = Mock(spec=Session)
+    set_complete_trade_results(db)
+    transfer = Mock(
+        side_effect=BlockchainError(code="CONFIRMATION_TIMEOUT", message="timeout")
+    )
+
+    response = complete_trade_request(db, trade_id=23, transfer=transfer)
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "TRADE_CONFIRMATION_TIMEOUT"
+    db.add.assert_not_called()
+
+
+def test_complete_trade_returns_500_when_blockchain_is_unreachable() -> None:
+    db = Mock(spec=Session)
+    set_complete_trade_results(db)
+    transfer = Mock(
+        side_effect=BlockchainError(code="BLOCKCHAIN_UNREACHABLE", message="down")
+    )
+
+    response = complete_trade_request(
+        db,
+        trade_id=23,
+        transfer=transfer,
+        raise_server_exceptions=False,
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "code": "INTERNAL_SERVER_ERROR",
+        "message": "서버 내부 오류가 발생했습니다.",
+    }
 
 
 def test_complete_trade_returns_404_for_unknown_or_other_user_trade() -> None:

@@ -11,6 +11,7 @@ from app.models.cube import Affinity, Cube, CubeOwnership, Level
 from app.models.enums import CubeStatus, CubeVerificationStatus, OwnershipStatus
 from app.models.reward import RewardItem, UserReward
 from app.schemas.cube import CubeVerificationRequest, CubeVerificationResponse
+from app.services.blockchain.mint import mint_cube_nft
 
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
 # 새 큐브 소유권은 항상 1레벨에서 시작하며, 1레벨 해금 보상도 함께 지급합니다.
@@ -108,6 +109,13 @@ def verify_cube_code(
         db.rollback()
         raise
 
+    # 인증·소유권 저장을 마친 뒤 별도로 NFT를 발행합니다. 실패는 기록만 남깁니다.
+    mint_cube_nft(
+        db=db,
+        user_id=current_user_id,
+        cube_id=cube.id,
+        serial_number=cube.serial_number,
+    )
     return CubeVerificationResponse(cube_ownership_id=cube_ownership_id)
 
 
