@@ -152,6 +152,17 @@ class ConversationReportReason(StrEnum):
     INAPPROPRIATE_EXPRESSION = "INAPPROPRIATE_EXPRESSION"
 
 
+class BlockchainOperationType(StrEnum):
+    MINT = "MINT"
+    TRANSFER = "TRANSFER"
+
+
+class BlockchainOperationStatus(StrEnum):
+    REQUESTED = "REQUESTED"
+    CONFIRMED = "CONFIRMED"
+    FAILED = "FAILED"
+
+
 class BoardType(StrEnum):
     FREE = "FREE"
     CERTIFICATION = "CERTIFICATION"

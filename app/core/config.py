@@ -40,6 +40,22 @@ class Settings(BaseSettings):
     )
     azure_storage_community_post_prefix: str = Field(default="community_post")
 
+    # ARZONE Blockchain Server 연동 설정입니다. secret은 Git에 올리지 않고
+    # 로컬/배포 환경 변수로만 주입합니다.
+    blockchain_base_url: str = Field(default="http://127.0.0.1:3100")
+    blockchain_network: str = Field(default="localhost")
+    blockchain_hmac_key_id: str = Field(default="")
+    blockchain_hmac_key_secret: str = Field(default="")
+    blockchain_approval_jwt_secret: str = Field(default="")
+    blockchain_approval_jwt_issuer: str = Field(default="arzone-backend")
+    blockchain_approval_jwt_audience: str = Field(default="arzone-blockchain-server")
+    blockchain_approval_jwt_expire_minutes: int = Field(default=10)
+    blockchain_webhook_hmac_key_id: str = Field(default="")
+    blockchain_webhook_hmac_key_secret: str = Field(default="")
+    blockchain_request_timeout_seconds: int = Field(default=15)
+    blockchain_confirmation_timeout_seconds: int = Field(default=120)
+    blockchain_confirmation_poll_seconds: float = Field(default=2.0)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

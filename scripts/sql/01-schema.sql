@@ -1,6 +1,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS `blockchain_operation`;
 DROP TABLE IF EXISTS `listing_media`;
 DROP TABLE IF EXISTS `digital_certificate`;
 DROP TABLE IF EXISTS `trade`;
@@ -625,4 +626,32 @@ CREATE TABLE `digital_certificate` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_digital_certificate_trade_id` (`trade_id`),
     CONSTRAINT `fk_digital_certificate_trade` FOREIGN KEY (`trade_id`) REFERENCES `trade` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `blockchain_operation` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `operation_type` VARCHAR(20) NOT NULL,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'REQUESTED',
+    `token_id` INT NULL,
+    `cube_id` BIGINT NULL,
+    `trade_id` BIGINT NULL,
+    `idempotency_key` CHAR(36) NOT NULL,
+    `operation_id` CHAR(36) NULL,
+    `notification_id` CHAR(36) NULL,
+    `tx_hash` VARCHAR(200) NULL,
+    `final_owner_address` VARCHAR(42) NULL,
+    `failure_reason` VARCHAR(255) NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_blockchain_operation_idempotency_key` (`idempotency_key`),
+    UNIQUE KEY `uk_blockchain_operation_operation_id` (`operation_id`),
+    UNIQUE KEY `uk_blockchain_operation_notification_id` (`notification_id`),
+    KEY `idx_blockchain_operation_cube_id` (`cube_id`),
+    KEY `idx_blockchain_operation_trade_id` (`trade_id`),
+    KEY `idx_blockchain_operation_status` (`status`),
+    CONSTRAINT `fk_blockchain_operation_cube` FOREIGN KEY (`cube_id`) REFERENCES `cube` (`id`),
+    CONSTRAINT `fk_blockchain_operation_trade` FOREIGN KEY (`trade_id`) REFERENCES `trade` (`id`),
+    CONSTRAINT `ck_blockchain_operation_type` CHECK (`operation_type` IN ('MINT', 'TRANSFER')),
+    CONSTRAINT `ck_blockchain_operation_status` CHECK (`status` IN ('REQUESTED', 'CONFIRMED', 'FAILED'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

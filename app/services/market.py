@@ -1,4 +1,4 @@
-"""마켓 거래 생성·조회·구매 확정 로직."""
+"""마켓 거래 생성·조회·구매 확정과 NFT 이전 연동 로직."""
 
 from datetime import datetime, timedelta, timezone
 from typing import NoReturn
@@ -6,9 +6,13 @@ from typing import NoReturn
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session, aliased, joinedload
 
+from app.core.config import get_settings
 from app.core.exceptions import ApiError
+from app.models.blockchain import BlockchainOperation
 from app.models.cube import Affinity, Cube, CubeOwnership
 from app.models.enums import (
+    BlockchainOperationStatus,
+    BlockchainOperationType,
     CubeStatus,
     OwnershipStatus,
     SellListingStatus,
@@ -45,6 +49,8 @@ from app.schemas.market import (
     TradeHistoryStatus,
     TradeTimelineItemResponse,
 )
+from app.services.blockchain.errors import BlockchainError
+from app.services.blockchain.transfer import certificate_values, transfer_cube_nft
 from app.services.common.search import (
     LIKE_ESCAPE_CHARACTER,
     like_contains_pattern,
@@ -713,14 +719,29 @@ def complete_trade(
 
     trade, buyer = row
     if trade.status != TradeStatus.DELIVERED:
-        raise ApiError(
-            status_code=409,
-            code="TRADE_NOT_DELIVERED",
-            message="배송 완료 상태인 거래만 구매 확정할 수 있습니다.",
-        )
+        _raise_trade_not_delivered()
+
+    transfer_target = _get_transfer_target(db=db, trade=trade)
+    # NFT 이전은 수십 초가 걸릴 수 있어 거래 행 잠금을 먼저 풉니다.
+    db.rollback()
+
+    certificate_values = _transfer_traded_nft(
+        db=db,
+        trade_id=trade_id,
+        buyer_user_id=current_user_id,
+        transfer_target=transfer_target,
+    )
+
+    # 외부 호출 동안 다른 요청이 먼저 확정했을 수 있어 상태를 다시 확인합니다.
+    if trade.status != TradeStatus.DELIVERED:
+        _raise_trade_not_delivered()
 
     completed_time = _kst_now_naive()
-    certificate = _build_example_certificate(trade_id=trade.id)
+    certificate = DigitalCertificate(
+        trade_id=trade.id,
+        network=get_settings().blockchain_network,
+        **certificate_values,
+    )
     trade.status = TradeStatus.COMPLETED
     trade.completed_time = completed_time
 
@@ -785,22 +806,106 @@ def _kst_now_naive() -> datetime:
     return datetime.now(KOREA_TIMEZONE).replace(tzinfo=None, microsecond=0)
 
 
-def _build_example_certificate(*, trade_id: int) -> DigitalCertificate:
-    """블록체인 연동 전까지 DB NOT NULL 컬럼을 채우기 위한 임시 예시값을 만듭니다."""
-    return DigitalCertificate(
+def _get_transfer_target(*, db: Session, trade: Trade) -> tuple[int, str]:
+    """거래에 연결된 판매자 id와 큐브 시리얼 번호를 조회합니다."""
+    row = db.execute(
+        select(SellListing.user_id, Cube.serial_number)
+        .join(MarketProduct, MarketProduct.id == SellListing.market_product_id)
+        .join(Cube, Cube.id == MarketProduct.cube_id)
+        .where(SellListing.id == trade.sell_listing_id)
+        .limit(1)
+    ).first()
+    if row is None:
+        _raise_trade_not_found()
+    seller_user_id, serial_number = row
+    return seller_user_id, serial_number
+
+
+def _transfer_traded_nft(
+    *,
+    db: Session,
+    trade_id: int,
+    buyer_user_id: int,
+    transfer_target: tuple[int, str],
+) -> dict[str, str]:
+    """NFT 이전을 요청하고 실패를 구매 확정 오류로 변환합니다."""
+    confirmed = _get_transfer_operation(
+        db=db,
         trade_id=trade_id,
-        # 실제 블록체인 네트워크 값이 아니며, 연동 시 실제 값으로 교체해야 합니다.
-        network="example_network",
-        # 실제 토큰 표준 값이 아니며, 연동 시 실제 값으로 교체해야 합니다.
-        token_standard="example_token_standard",
-        # 실제 토큰 id가 아니며, 연동 시 실제 값으로 교체해야 합니다.
-        token_id="example_token_id",
-        # 실제 컨트랙트 주소가 아니며, 연동 시 실제 값으로 교체해야 합니다.
-        contract_address="example_contract_address",
-        # 실제 트랜잭션 해시가 아니며, 연동 시 실제 값으로 교체해야 합니다.
-        tx_hash="example_tx_hash",
-        # 실제 메타데이터 URL이 아니며, 연동 시 실제 값으로 교체해야 합니다.
-        metadata_url="example_metadata_url",
+        status=BlockchainOperationStatus.CONFIRMED,
+    )
+    if confirmed is not None:
+        # 확정 대기가 시간을 넘긴 뒤 완료 알림으로 확정된 경우 다시 이전하지 않습니다.
+        return certificate_values(
+            token_id=confirmed.token_id,
+            tx_hash=confirmed.tx_hash,
+        )
+
+    requested = _get_transfer_operation(
+        db=db,
+        trade_id=trade_id,
+        status=BlockchainOperationStatus.REQUESTED,
+    )
+    if requested is not None:
+        # 확정 대기 중 같은 거래가 다시 요청되면 이전을 중복 접수하지 않습니다.
+        _raise_confirmation_pending()
+
+    seller_user_id, serial_number = transfer_target
+    try:
+        return transfer_cube_nft(
+            db=db,
+            trade_id=trade_id,
+            seller_user_id=seller_user_id,
+            buyer_user_id=buyer_user_id,
+            serial_number=serial_number,
+        )
+    except BlockchainError as exc:
+        if exc.code == "CONFIRMATION_TIMEOUT":
+            _raise_confirmation_pending(cause=exc)
+        if exc.code == "BLOCKCHAIN_UNREACHABLE":
+            raise ApiError(
+                status_code=500,
+                code="INTERNAL_SERVER_ERROR",
+                message="서버 내부 오류가 발생했습니다.",
+            ) from exc
+        raise ApiError(
+            status_code=409,
+            code="TRADE_TRANSFER_REJECTED",
+            message="NFT 이전 요청이 거절되었습니다.",
+        ) from exc
+
+
+def _get_transfer_operation(
+    *,
+    db: Session,
+    trade_id: int,
+    status: BlockchainOperationStatus,
+) -> BlockchainOperation | None:
+    """거래의 NFT 이전 작업을 상태별로 조회합니다."""
+    return db.scalar(
+        select(BlockchainOperation)
+        .where(
+            BlockchainOperation.trade_id == trade_id,
+            BlockchainOperation.operation_type == BlockchainOperationType.TRANSFER,
+            BlockchainOperation.status == status,
+        )
+        .limit(1)
+    )
+
+
+def _raise_confirmation_pending(*, cause: Exception | None = None) -> NoReturn:
+    raise ApiError(
+        status_code=409,
+        code="TRADE_CONFIRMATION_TIMEOUT",
+        message="NFT 이전이 아직 확정되지 않았습니다. 잠시 후 다시 확인해 주세요.",
+    ) from cause
+
+
+def _raise_trade_not_delivered() -> NoReturn:
+    raise ApiError(
+        status_code=409,
+        code="TRADE_NOT_DELIVERED",
+        message="배송 완료 상태인 거래만 구매 확정할 수 있습니다.",
     )
 
 

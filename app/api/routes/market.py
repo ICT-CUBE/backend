@@ -410,12 +410,36 @@ def read_trade_detail(
         },
         status.HTTP_409_CONFLICT: {
             "model": ErrorResponse,
-            "description": "거래가 배송 완료 상태가 아니라 구매 확정할 수 없음",
+            "description": "배송 완료 상태가 아니거나 NFT 이전을 마치지 못함",
             "content": {
                 "application/json": {
-                    "example": {
-                        "code": "TRADE_NOT_DELIVERED",
-                        "message": "배송 완료 상태인 거래만 구매 확정할 수 있습니다.",
+                    "examples": {
+                        "tradeNotDelivered": {
+                            "summary": "배송 완료 상태가 아님",
+                            "value": {
+                                "code": "TRADE_NOT_DELIVERED",
+                                "message": (
+                                    "배송 완료 상태인 거래만 구매 확정할 수 있습니다."
+                                ),
+                            },
+                        },
+                        "tradeTransferRejected": {
+                            "summary": "NFT 이전 요청이 거절됨",
+                            "value": {
+                                "code": "TRADE_TRANSFER_REJECTED",
+                                "message": "NFT 이전 요청이 거절되었습니다.",
+                            },
+                        },
+                        "tradeConfirmationTimeout": {
+                            "summary": "제한 시간 안에 이전이 확정되지 않음",
+                            "value": {
+                                "code": "TRADE_CONFIRMATION_TIMEOUT",
+                                "message": (
+                                    "NFT 이전이 아직 확정되지 않았습니다. "
+                                    "잠시 후 다시 확인해 주세요."
+                                ),
+                            },
+                        },
                     }
                 }
             },

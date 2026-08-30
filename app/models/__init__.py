@@ -7,6 +7,7 @@ from app.models.account import (
 )
 from app.models.album import Album, AlbumImage
 from app.models.avatar import AvatarInteractionPicture, AvatarInteractionSession
+from app.models.blockchain import BlockchainOperation
 from app.models.community import Comment, CommentLike, Post, PostLike, PostMedia
 from app.models.conversation import (
     AvatarConversationMessage,
@@ -35,6 +36,7 @@ __all__ = [
     "AvatarConversationSession",
     "AvatarInteractionPicture",
     "AvatarInteractionSession",
+    "BlockchainOperation",
     "Comment",
     "CommentLike",
     "ConversationReport",
