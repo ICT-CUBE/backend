@@ -19,6 +19,7 @@ from app.models.enums import (
     ConversationReportReason,
     ConversationType,
 )
+from app.services.conversation import _avatar_reply_response_input
 from tests.conftest import api_client
 
 
@@ -1126,6 +1127,7 @@ def test_reply_conversation_message_saves_user_and_avatar_messages() -> None:
     )
     conversation_session.cube_ownership_id = 1
     db.scalar.side_effect = [conversation_session, 12]
+    db.scalars.return_value.all.return_value = []
 
     def set_message_ids() -> None:
         for index, inserted in enumerate(db.add.call_args_list, start=5025):
@@ -1183,6 +1185,7 @@ def test_reply_conversation_message_allows_not_active_session() -> None:
     conversation_session.status = AvatarConversationSessionStatus.NOT_ACTIVE
     conversation_session.ended_at = datetime(2026, 7, 29, 18, 0, 0)  # noqa: DTZ001
     db.scalar.side_effect = [conversation_session, 0]
+    db.scalars.return_value.all.return_value = []
     db.flush.side_effect = lambda: [
         setattr(call.args[0], "id", index)
         for index, call in enumerate(db.add.call_args_list, start=1)
@@ -1202,7 +1205,7 @@ def test_reply_conversation_message_allows_not_active_session() -> None:
         )
 
     assert response.status_code == 201
-    generate_reply.assert_called_once_with("다시 이어서 얘기하자", [])
+    generate_reply.assert_called_once_with("다시 이어서 얘기하자", [], [])
     assert response.json()["userMessage"]["content"] == "다시 이어서 얘기하자"
     assert response.json()["avatarMessage"]["content"] == (
         "잘 못 들었어. 다시 한 번 말해줄래?"
@@ -1220,6 +1223,7 @@ def test_reply_conversation_message_allows_active_voice_session() -> None:
         conversation_type=ConversationType.VOICE,
     )
     db.scalar.side_effect = [conversation_session, 0]
+    db.scalars.return_value.all.return_value = []
     db.flush.side_effect = lambda: [
         setattr(call.args[0], "id", index)
         for index, call in enumerate(db.add.call_args_list, start=1)
@@ -1246,7 +1250,7 @@ def test_reply_conversation_message_allows_active_voice_session() -> None:
         )
 
     assert response.status_code == 201
-    generate_reply.assert_called_once_with("안녕", [])
+    generate_reply.assert_called_once_with("안녕", [], [])
     assert response.json()["userMessage"]["content"] == "안녕"
     assert response.json()["avatarMessage"]["content"] == (
         "안녕! 오늘 기분은 어때?"
@@ -1304,6 +1308,7 @@ def test_reply_conversation_message_passes_image_urls_to_gpt() -> None:
         conversation_type=ConversationType.TEXT,
     )
     db.scalar.side_effect = [conversation_session, None, None, None, 12]
+    db.scalars.return_value.all.return_value = []
 
     def set_message_ids() -> None:
         for index, inserted in enumerate(db.add.call_args_list, start=5025):
@@ -1329,7 +1334,7 @@ def test_reply_conversation_message_passes_image_urls_to_gpt() -> None:
         )
 
     assert response.status_code == 201
-    generate_reply.assert_called_once_with("이 사진들 봐줘", image_urls)
+    generate_reply.assert_called_once_with("이 사진들 봐줘", image_urls, [])
     body = response.json()
     assert body["userMessage"]["imageUrls"] == image_urls
     assert "imageUrls" not in body["avatarMessage"]
@@ -1407,6 +1412,7 @@ def test_reply_conversation_message_rolls_back_when_commit_fails() -> None:
         session(id=1001, conversation_type=ConversationType.TEXT),
         0,
     ]
+    db.scalars.return_value.all.return_value = []
     db.commit.side_effect = RuntimeError("db failed")
 
     with patch(
@@ -1425,6 +1431,7 @@ def test_reply_conversation_message_rolls_back_when_commit_fails() -> None:
 def test_reply_conversation_message_does_not_save_when_gpt_fails() -> None:
     db = Mock(spec=Session)
     db.scalar.return_value = session(id=1001, conversation_type=ConversationType.TEXT)
+    db.scalars.return_value.all.return_value = []
 
     with patch(
         "app.services.conversation.generate_avatar_reply",
@@ -1448,6 +1455,7 @@ def test_reply_conversation_message_uploads_voice_audio_to_blob_storage() -> Non
         conversation_type=ConversationType.VOICE,
     )
     db.scalar.side_effect = [conversation_session, 0]
+    db.scalars.return_value.all.return_value = []
     db.flush.side_effect = lambda: [
         setattr(call.args[0], "id", index)
         for index, call in enumerate(db.add.call_args_list, start=1)
@@ -1489,6 +1497,7 @@ def test_reply_conversation_message_does_not_save_when_voice_synthesis_fails() -
         session(id=12, conversation_type=ConversationType.VOICE),
         0,
     ]
+    db.scalars.return_value.all.return_value = []
 
     with (
         patch(
@@ -1522,6 +1531,7 @@ def test_reply_conversation_message_does_not_save_when_audio_upload_fails() -> N
         session(id=12, conversation_type=ConversationType.VOICE),
         0,
     ]
+    db.scalars.return_value.all.return_value = []
 
     with (
         patch(
@@ -1555,6 +1565,7 @@ def test_reply_conversation_message_does_not_generate_audio_for_text_session() -
         session(id=1001, conversation_type=ConversationType.TEXT),
         0,
     ]
+    db.scalars.return_value.all.return_value = []
     db.flush.side_effect = lambda: [
         setattr(call.args[0], "id", index)
         for index, call in enumerate(db.add.call_args_list, start=1)
@@ -1632,6 +1643,115 @@ def test_reply_conversation_message_returns_400_for_unknown_conversation_type() 
         "message": "요청값이 올바르지 않습니다.",
     }
     db.scalar.assert_not_called()
+
+
+def test_reply_conversation_message_passes_recent_history_to_gpt() -> None:
+    db = Mock(spec=Session)
+    db.scalar.side_effect = [
+        session(id=1001, conversation_type=ConversationType.TEXT),
+        4,
+    ]
+    history = [
+        message(
+            id=5001,
+            content="오늘 뭐 했어?",
+            sequence_number=1,
+            sender_type=ConversationMessageSenderType.USER,
+        ),
+        message(
+            id=5002,
+            content="연습하고 있었어!",
+            sequence_number=2,
+            sender_type=ConversationMessageSenderType.AVATAR,
+        ),
+    ]
+    db.scalars.return_value.all.return_value = list(reversed(history))
+    db.flush.side_effect = lambda: [
+        setattr(call.args[0], "id", index)
+        for index, call in enumerate(db.add.call_args_list, start=1)
+    ]
+
+    with patch(
+        "app.services.conversation.generate_avatar_reply",
+        return_value="아까 말한 연습 얘기 이어서 해줄게!",
+    ) as generate_reply:
+        response = reply_conversation_message_request(db)
+
+    assert response.status_code == 201
+    # 조회는 최신순이지만 GPT에는 오래된 순서로 전달합니다.
+    assert generate_reply.call_args.args[2] == history
+
+
+def test_reply_conversation_message_queries_only_recent_allowed_history() -> None:
+    db = Mock(spec=Session)
+    db.scalar.side_effect = [
+        session(id=1001, conversation_type=ConversationType.TEXT),
+        0,
+    ]
+    db.scalars.return_value.all.return_value = []
+    db.flush.side_effect = lambda: [
+        setattr(call.args[0], "id", index)
+        for index, call in enumerate(db.add.call_args_list, start=1)
+    ]
+
+    with patch(
+        "app.services.conversation.generate_avatar_reply",
+        return_value="좋아!",
+    ):
+        reply_conversation_message_request(db)
+
+    query = str(
+        db.scalars.call_args.args[0].compile(compile_kwargs={"literal_binds": True})
+    )
+    assert "avatar_conversation_message.conversation_session_id = 1001" in query
+    assert "avatar_conversation_message.status = 'ALLOWED'" in query
+    assert "ORDER BY avatar_conversation_message.sequence_number DESC" in query
+    assert "LIMIT 30" in query
+
+
+def test_reply_conversation_message_sends_history_as_user_and_assistant_turns() -> None:
+    history = [
+        message(
+            id=5001,
+            content="오늘 뭐 했어?",
+            sequence_number=1,
+            sender_type=ConversationMessageSenderType.USER,
+        ),
+        message(
+            id=5002,
+            content="연습하고 있었어!",
+            sequence_number=2,
+            sender_type=ConversationMessageSenderType.AVATAR,
+        ),
+    ]
+
+    response_input = _avatar_reply_response_input(
+        user_content="아까 그 연습 얘기 더 해줘",
+        image_urls=[],
+        history=history,
+    )
+
+    assert [item["role"] for item in response_input] == [
+        "system",
+        "user",
+        "assistant",
+        "user",
+    ]
+    assert response_input[1]["content"] == "오늘 뭐 했어?"
+    assert response_input[2]["content"] == "연습하고 있었어!"
+    assert response_input[3]["content"] == "아까 그 연습 얘기 더 해줘"
+    assert "이전 대화 내용이 함께 주어지면" in response_input[0]["content"]
+
+
+def test_reply_conversation_message_sends_only_system_and_user_without_history() -> None:
+    response_input = _avatar_reply_response_input(
+        user_content="안녕",
+        image_urls=[],
+        history=[],
+    )
+
+    assert [item["role"] for item in response_input] == ["system", "user"]
+    assert response_input[1]["content"] == "안녕"
 
 
 def test_reply_conversation_message_swagger_contract() -> None:

@@ -2,7 +2,7 @@
 
 테스트 파일: `tests/test_conversation.py`
 실행: `.venv\Scripts\python.exe -m pytest tests/test_conversation.py -q`
-최종 실행 결과: 77 passed (2026-08-30)
+최종 실행 결과: 81 passed (2026-08-30)
 
 DB는 `Mock(spec=Session)` 으로 대체하고 `app.dependency_overrides[get_db]` 로 주입합니다.
 실제 MySQL, OpenAI, Azure Blob Storage에는 접속하지 않습니다.
@@ -39,7 +39,28 @@ app.services.conversation.upload_conversation_audio    Azure Blob 업로드 (VOI
 | 예외 | test_reply_conversation_message_does_not_save_when_voice_synthesis_fails | TTS 실패 | 500 INTERNAL_SERVER_ERROR, 메시지 저장 없음 | PASS |
 | 예외 | test_reply_conversation_message_does_not_save_when_audio_upload_fails | Blob 업로드 실패 | 500, 메시지 저장 없음 | PASS |
 | 예외 | test_reply_conversation_message_rolls_back_when_commit_fails | commit 실패 | 500, rollback 1회 | PASS |
+| 맥락 | test_reply_conversation_message_passes_recent_history_to_gpt | 직전 메시지 2개 존재 | GPT 3번째 인자로 오래된 순서의 메시지 목록 전달 | PASS |
+| 맥락 | test_reply_conversation_message_queries_only_recent_allowed_history | 맥락 조회 SQL 검증 | 세션 id 조건, `status='ALLOWED'`, `sequence_number DESC`, `LIMIT 30` | PASS |
+| 맥락 | test_reply_conversation_message_sends_history_as_user_and_assistant_turns | USER/AVATAR 메시지 혼합 | `system → user → assistant → user(현재)` 순서, 시스템 프롬프트에 맥락 지시 포함 | PASS |
+| 맥락 | test_reply_conversation_message_sends_only_system_and_user_without_history | 이전 대화 없음 | `system → user` 두 개만 전달 | PASS |
 | 문서 | test_reply_conversation_message_swagger_contract | OpenAPI 스키마 | 응답 코드 `{201, 404}`, `security` 에 `HTTPBearer` | PASS |
+
+### 대화 맥락 전달
+
+GPT 호출 시 **직전 메시지 최대 30개(`CONVERSATION_HISTORY_SIZE`, 대화 15턴)** 를 함께 넘깁니다.
+DB에서는 `sequence_number DESC` 로 최신순 조회한 뒤, GPT에는 대화 흐름대로 오래된 순서로
+뒤집어 전달합니다. 저장된 `USER` 메시지는 `user`, `AVATAR` 메시지는 `assistant` 발화로 변환합니다.
+
+```text
+system     맥락 유지 지시가 포함된 제니 페르소나 프롬프트
+user       (이전) 오늘 뭐 했어?
+assistant  (이전) 연습하고 있었어!
+...        최대 30개
+user       (현재) 사용자 메시지 + 이미지
+```
+
+`status='BLOCKED'` 메시지는 맥락에서 제외합니다. 맥락 조회는 `db.scalars` 를 쓰므로
+기존 `db.scalar.side_effect` 순서에는 영향을 주지 않습니다.
 
 ### 부분 저장 방지
 
@@ -51,6 +72,8 @@ app.services.conversation.upload_conversation_audio    Azure Blob 업로드 (VOI
 
 - **실제 GPT 응답 품질과 TTS 음성 품질**은 외부 API 결과라 검증 대상이 아닙니다.
   호출 인자(모델·음성·지시문은 서비스 모듈 상수)와 반환값 처리만 확인합니다.
+- **맥락이 실제로 응답 품질을 개선하는지**는 모델 동작이라 검증하지 않고, 전달되는
+  입력의 순서·역할·개수만 확인합니다.
 - **Blob URL의 실제 경로 형식**(`conversation_audio/{userId}/{sessionId}/{uuid}.mp3`)은
   `app/services/blob_storage.py` 의 `upload_conversation_audio` 책임이라 이 API 테스트에서는
   전달 인자만 검증하고 URL 조립은 검증하지 않습니다.
@@ -64,5 +87,5 @@ app.services.conversation.upload_conversation_audio    Azure Blob 업로드 (VOI
 ## 그 밖의 대화 API
 
 같은 파일에 대화 세션 목록·상세 조회, 세션 생성·삭제·저장, 보관 메시지 저장·해제,
-신고 생성 테스트가 함께 있습니다(총 77개). 해당 API들의 명세 문서가 아직 없어 이 가이드에는
+신고 생성 테스트가 함께 있습니다(총 81개). 해당 API들의 명세 문서가 아직 없어 이 가이드에는
 정리하지 않았습니다.

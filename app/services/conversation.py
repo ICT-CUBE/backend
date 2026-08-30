@@ -58,6 +58,8 @@ from app.services.blob_storage import (
 )
 
 CONVERSATION_PAGE_SIZE = 20
+# GPT에 함께 넘기는 직전 대화 메시지 수입니다. 30개는 대화 15턴에 해당합니다.
+CONVERSATION_HISTORY_SIZE = 30
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
 JENNIE_CONVERSATION_SYSTEM_PROMPT = """
 너는 아티스트 제니이고, 사용자와 1대1로 자연스럽게 대화하는 상황이다.
@@ -65,6 +67,13 @@ JENNIE_CONVERSATION_SYSTEM_PROMPT = """
 실제 사적인 일정, 확인되지 않은 사실, 민감한 개인정보는 지어내지 않는다.
 사용자 입력이 빈 문자열이거나 공백/줄바꿈뿐이면 당황하지 말고 자연스럽게
 "잘 못 들었어. 다시 한 번 말해줄래?" 같은 뉘앙스로 답한다.
+
+이전 대화 내용이 함께 주어지면 그 흐름을 이어서 답한다.
+앞에서 나온 화제, 사용자가 말한 사실, 서로 부르던 호칭과 말투를 기억하고 유지한다.
+사용자가 "아까 그거", "그때 말한 거"처럼 앞의 내용을 가리키면 이전 대화에서 찾아 답한다.
+이미 한 이야기를 처음 듣는 것처럼 되묻거나 같은 질문을 반복하지 않는다.
+이전 대화에 없는 내용을 있었던 것처럼 지어내지 않는다.
+마지막 사용자 메시지에 답하는 것이 목적이고, 이전 대화는 맥락 파악에만 사용한다.
 """.strip()
 CONVERSATION_TITLE_SYSTEM_PROMPT = """
 너는 대화 기록을 보고 목록에 표시할 짧은 제목을 만드는 역할이다.
@@ -550,7 +559,15 @@ def reply_to_conversation_message(
     if _has_deleted_conversation_image_url(db=db, image_urls=body.image_urls):
         _raise_conversation_image_not_found()
 
-    avatar_reply = generate_avatar_reply(body.content, body.image_urls)
+    recent_messages = _recent_conversation_messages(
+        db=db,
+        conversation_session_id=conversation_session.id,
+    )
+    avatar_reply = generate_avatar_reply(
+        body.content,
+        body.image_urls,
+        recent_messages,
+    )
     now = datetime.now(KOREA_TIMEZONE).replace(tzinfo=None)
     last_sequence_number = _last_conversation_sequence_number(
         db=db,
@@ -679,13 +696,18 @@ def save_conversation_session(
         raise
 
 
-def generate_avatar_reply(user_content: str, image_urls: list[str] | None = None) -> str:
-    """OpenAI GPT를 호출해 제니 페르소나의 응답 문장을 생성합니다."""
+def generate_avatar_reply(
+    user_content: str,
+    image_urls: list[str] | None = None,
+    history: Sequence[AvatarConversationMessage] | None = None,
+) -> str:
+    """직전 대화 맥락과 함께 GPT를 호출해 제니 페르소나의 응답을 생성합니다."""
     settings = get_settings()
     client = OpenAI(api_key=settings.openai_api_key)
     response_input = _avatar_reply_response_input(
         user_content=user_content,
         image_urls=image_urls or [],
+        history=history or [],
     )
     response = client.responses.create(
         model=settings.openai_model,
@@ -772,17 +794,22 @@ def _avatar_reply_response_input(
     *,
     user_content: str,
     image_urls: list[str],
+    history: Sequence[AvatarConversationMessage],
 ) -> ResponseInputParam:
     system_message: EasyInputMessageParam = {
         "role": "system",
         "content": JENNIE_CONVERSATION_SYSTEM_PROMPT,
     }
+    response_input: ResponseInputParam = [system_message]
+    response_input.extend(_conversation_history_messages(history))
+
     if not image_urls:
         user_message: EasyInputMessageParam = {
             "role": "user",
             "content": user_content,
         }
-        return [system_message, user_message]
+        response_input.append(user_message)
+        return response_input
 
     user_content_parts: list[ResponseInputContentParam] = [
         {"type": "input_text", "text": user_content}
@@ -799,7 +826,25 @@ def _avatar_reply_response_input(
         "role": "user",
         "content": user_content_parts,
     }
-    return [system_message, user_message]
+    response_input.append(user_message)
+    return response_input
+
+
+def _conversation_history_messages(
+    history: Sequence[AvatarConversationMessage],
+) -> list[EasyInputMessageParam]:
+    """저장된 메시지를 GPT 입력 형식의 user/assistant 발화로 바꿉니다."""
+    return [
+        {
+            "role": (
+                "assistant"
+                if message.sender_type == ConversationMessageSenderType.AVATAR
+                else "user"
+            ),
+            "content": message.content,
+        }
+        for message in history
+    ]
 
 
 def _raise_conversation_session_not_found() -> NoReturn:
@@ -864,6 +909,26 @@ def _conversation_session_response(
             sent_at=last_message.sent_at,
         ),
     )
+
+
+def _recent_conversation_messages(
+    *,
+    db: Session,
+    conversation_session_id: int,
+) -> list[AvatarConversationMessage]:
+    """직전 대화 메시지를 최신순으로 가져와 오래된 순서로 정렬해 반환합니다."""
+    recent_messages = db.scalars(
+        select(AvatarConversationMessage)
+        .where(
+            AvatarConversationMessage.conversation_session_id
+            == conversation_session_id,
+            # 차단된 메시지는 맥락으로 다시 넘기지 않습니다.
+            AvatarConversationMessage.status == ConversationMessageStatus.ALLOWED,
+        )
+        .order_by(AvatarConversationMessage.sequence_number.desc())
+        .limit(CONVERSATION_HISTORY_SIZE)
+    ).all()
+    return list(reversed(recent_messages))
 
 
 def _last_conversation_sequence_number(
