@@ -1,3 +1,4 @@
+import ssl
 from functools import lru_cache
 
 from pydantic import Field
@@ -74,7 +75,9 @@ class Settings(BaseSettings):
     def database_connect_args(self) -> dict[str, object]:
         if not self.mysql_ssl_enabled:
             return {}
-        return {"ssl": {"ca": "/etc/ssl/certs/ca-certificates.crt"}}
+        # 운영체제의 기본 CA 저장소를 사용해 Linux 배포 컨테이너와 Windows 관리
+        # 스크립트 모두 Azure MySQL 인증서를 검증할 수 있게 합니다.
+        return {"ssl": ssl.create_default_context()}
 
 
 @lru_cache
