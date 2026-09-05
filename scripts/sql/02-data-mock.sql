@@ -146,7 +146,7 @@ INSERT INTO `stage` (`id`, `album_id`, `title`, `description`, `video_url`, `vid
 (4, 1, 'ExtraL MV', 'ExtraL (feat. Doechii) 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_extral.mp4', 'MUSIC_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/music_video_thumbnail/mv_extral.jpg', 168, '2025-02-21 13:00:00', TRUE, FALSE),
 (5, 1, 'like JENNIE MV', 'like JENNIE 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_likejennie.mp4', 'MUSIC_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/music_video_thumbnail/mv_likejennie.jpg', 124, '2025-03-07 13:00:00', TRUE, TRUE),
 (6, 1, 'Handlebars MV', 'Handlebars (feat. Dua Lipa) 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_handlebars.mp4', 'MUSIC_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/music_video_thumbnail/mv_handlebars.jpg', 185, '2025-03-10 13:00:00', TRUE, FALSE),
-(7, 1, 'Seoul City MV', 'Seoul City 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_seoul city.mp4', 'MUSIC_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/music_video_thumbnail/mv_seoul%20city.jpg', 164, '2025-04-26 13:00:00', TRUE, FALSE),
+(7, 1, 'Seoul City MV', 'Seoul City 뮤직비디오', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_music_video/mv_seoul_city.mp4', 'MUSIC_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/music_video_thumbnail/mv_seoul_city.jpg', 164, '2025-04-26 13:00:00', TRUE, FALSE),
 (8, 1, 'start a war Live Performance', 'start a war 콘서트 영상', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_concert_video/concert_zen.mp4', 'CONCERT_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/concert_video_thumbnail/concert_zen.jpg', 165, '2025-03-28 13:00:00', TRUE, FALSE),
 (9, 1, 'Love Hangover Live Performance', 'Love Hangover 콘서트 영상', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_concert_video/concert_lovehangover.mp4', 'CONCERT_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/concert_video_thumbnail/concert_mantra.jpg', 180, '2025-02-12 13:00:00', TRUE, FALSE),
 (10, 1, 'like JENNIE Live Performance', 'like JENNIE 콘서트 영상', 'https://haniumstorage.blob.core.windows.net/hanium/stage/stage_concert_video/concert_likejennie.mp4', 'CONCERT_VIDEO', 'https://haniumstorage.blob.core.windows.net/hanium/stage/concert_video_thumbnail/concert_likejennie.jpg', 124, '2025-03-12 13:00:00', TRUE, FALSE),
@@ -369,16 +369,16 @@ INSERT INTO `comment_like` (`id`, `comment_id`, `user_id`, `is_liked`) VALUES
 (10, 45, 6, TRUE);
 
 INSERT INTO `market_product` (`id`, `cube_id`, `product_image_url`) VALUES
-(1, 1, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png'),
-(2, 2, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
-(3, 3, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
-(4, 4, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png'),
-(5, 5, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
-(6, 6, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
-(7, 7, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png'),
-(8, 8, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
-(9, 9, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card.png'),
-(10, 10, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/Icon%20Background.png');
+(1, 1, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-1.png'),
+(2, 2, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-2.png'),
+(3, 3, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-3.png'),
+(4, 4, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground.png'),
+(5, 5, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cubecard-1.png'),
+(6, 6, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cubecard-2.png'),
+(7, 7, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cubecard-3.png'),
+(8, 8, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cubecard.png'),
+(9, 9, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-1.png'),
+(10, 10, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-2.png');
 
 INSERT INTO `sell_listing` (`id`, `market_product_id`, `user_id`, `product_status`, `title`, `description`, `price`, `status`) VALUES
 (1, 2, 2, '좋음', '빅뱅 메이드 큐브 31번', '상태 좋은 큐브 판매합니다.', 35000, 'SOLD'),
@@ -399,6 +399,6 @@ INSERT INTO `trade` (`id`, `sell_listing_id`, `buyer_user_id`, `buyer_phone_numb
 (1, 1, 1, '010-1234-5678', '서울특별시 강남구 테헤란로 1', 36750, '2025-04-08 14:30:00', '2025-04-09 10:00:00', '2025-04-09 15:30:00', '2025-05-09 15:30:00', NULL, 'DELIVERED');
 
 INSERT INTO `listing_media` (`id`, `sell_listing_id`, `image_url`) VALUES
-(1, 1, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cube%20card-2.png');
+(1, 1, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-2.png');
 
 -- INSERT INTO `digital_certificate` (`id`, `trade_id`, `network`, `token_standard`, `token_id`, `contract_address`, `tx_hash`, `metadata_url`) VALUES

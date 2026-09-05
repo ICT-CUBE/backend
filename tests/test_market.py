@@ -129,11 +129,16 @@ def set_complete_trade_results(
     status: TradeStatus = TradeStatus.DELIVERED,
     seller_user_id: int = 2,
     serial_number: str = "NO.0044",
+    cube: Cube | None = None,
 ):
     """거래 조회와 이전 대상 조회 결과를 순서대로 지정합니다."""
     trade, buyer = complete_trade_row(status=status)
-    # 확정된 NFT 이전 작업이 없는 상태를 기본으로 둡니다.
-    db.scalar.return_value = None
+    # 확정된·대기 중인 NFT 이전 작업이 없는 상태를 기본으로 두고 큐브를 마지막에 조회합니다.
+    db.scalar.side_effect = [
+        None,
+        None,
+        cube if cube is not None else traded_cube(status=CubeStatus.TRADE_PENDING),
+    ]
     db.execute.side_effect = [
         Mock(first=Mock(return_value=(trade, buyer))),
         Mock(first=Mock(return_value=(seller_user_id, serial_number))),
@@ -149,10 +154,15 @@ def set_complete_trade_results(
 def active_sell_listing(*, user_id: int = 2) -> SellListing:
     return SellListing(
         id=1,
+        market_product_id=3,
         user_id=user_id,
         status=SellListingStatus.ACTIVE,
         deleted_at=None,
     )
+
+
+def traded_cube(*, status: CubeStatus = CubeStatus.OWNED) -> Cube:
+    return Cube(id=2, status=status, deleted_at=None)
 
 
 def trade_detail_row():
@@ -183,6 +193,7 @@ def trade_detail_row():
 def complete_trade_row(*, status: TradeStatus = TradeStatus.DELIVERED):
     trade = Trade(
         id=23,
+        sell_listing_id=7,
         buyer_user_id=1,
         completed_time=None,
         status=status,
@@ -468,7 +479,8 @@ def test_delete_sell_listing_swagger_contract() -> None:
 def test_create_trade_saves_trade_and_marks_sell_listing_sold() -> None:
     db = Mock(spec=Session)
     sell_listing = active_sell_listing()
-    db.scalar.side_effect = [sell_listing, None]
+    cube = traded_cube()
+    db.scalar.side_effect = [sell_listing, None, cube]
 
     response = create_trade_request(db)
 
@@ -489,7 +501,40 @@ def test_create_trade_saves_trade_and_marks_sell_listing_sold() -> None:
     assert inserted.completed_time is None
     assert inserted.status == TradeStatus.PAID
     assert sell_listing.status == SellListingStatus.SOLD
+    assert cube.status == CubeStatus.TRADE_PENDING
     db.commit.assert_called_once()
+
+
+def test_create_trade_locks_and_marks_cube_of_the_sold_listing() -> None:
+    db = Mock(spec=Session)
+    cube = traded_cube()
+    db.scalar.side_effect = [active_sell_listing(), None, cube]
+
+    response = create_trade_request(db)
+
+    assert response.status_code == 204
+    assert cube.status == CubeStatus.TRADE_PENDING
+    cube_query = compiled_query(db.scalar.call_args_list[2])
+    assert "market_product.cube_id = cube.id" in cube_query
+    assert "market_product.id = 3" in cube_query
+    assert "FOR UPDATE" in cube_query
+
+
+def test_create_trade_returns_404_when_cube_not_found() -> None:
+    db = Mock(spec=Session)
+    sell_listing = active_sell_listing()
+    db.scalar.side_effect = [sell_listing, None, None]
+
+    response = create_trade_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "SELL_LISTING_INVALID",
+        "message": "판매 상품이 유효하지 않습니다.",
+    }
+    assert sell_listing.status == SellListingStatus.ACTIVE
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
 
 
 def test_create_trade_returns_404_for_missing_sell_listing() -> None:
@@ -673,6 +718,36 @@ def test_complete_trade_updates_trade_and_creates_certificate(monkeypatch) -> No
     db.commit.assert_called_once()
 
 
+def test_complete_trade_releases_cube_to_owned() -> None:
+    db = Mock(spec=Session)
+    cube = traded_cube(status=CubeStatus.TRADE_PENDING)
+    set_complete_trade_results(db, cube=cube)
+
+    response = complete_trade_request(db, trade_id=23)
+
+    assert response.status_code == 200
+    assert cube.status == CubeStatus.OWNED
+    cube_query = compiled_query(db.scalar.call_args_list[2])
+    assert "market_product.cube_id = cube.id" in cube_query
+    assert "sell_listing.market_product_id = market_product.id" in cube_query
+    assert "sell_listing.id = 7" in cube_query
+    assert "FOR UPDATE" in cube_query
+    db.commit.assert_called_once()
+
+
+def test_complete_trade_keeps_cube_status_when_cube_is_disabled() -> None:
+    db = Mock(spec=Session)
+    cube = traded_cube(status=CubeStatus.DISABLED)
+    set_complete_trade_results(db, cube=cube)
+
+    response = complete_trade_request(db, trade_id=23)
+
+    assert response.status_code == 200
+    # 거래와 무관하게 비활성화된 큐브를 다시 살리지 않습니다.
+    assert cube.status == CubeStatus.DISABLED
+    db.commit.assert_called_once()
+
+
 def test_complete_trade_requests_transfer_with_seller_and_serial_number() -> None:
     db = Mock(spec=Session)
     set_complete_trade_results(db, seller_user_id=7, serial_number="NO.0055")
@@ -705,15 +780,18 @@ def test_complete_trade_releases_trade_lock_before_transfer() -> None:
 def test_complete_trade_reuses_confirmed_transfer_operation() -> None:
     db = Mock(spec=Session)
     set_complete_trade_results(db)
-    db.scalar.return_value = BlockchainOperation(
-        id=5,
-        operation_type=BlockchainOperationType.TRANSFER,
-        status=BlockchainOperationStatus.CONFIRMED,
-        token_id=31,
-        trade_id=23,
-        idempotency_key="key-9",
-        tx_hash=CERTIFICATE_VALUES["tx_hash"],
-    )
+    db.scalar.side_effect = [
+        BlockchainOperation(
+            id=5,
+            operation_type=BlockchainOperationType.TRANSFER,
+            status=BlockchainOperationStatus.CONFIRMED,
+            token_id=31,
+            trade_id=23,
+            idempotency_key="key-9",
+            tx_hash=CERTIFICATE_VALUES["tx_hash"],
+        ),
+        traded_cube(status=CubeStatus.TRADE_PENDING),
+    ]
     transfer = Mock()
 
     with patch(
@@ -757,7 +835,7 @@ def test_complete_trade_returns_409_when_transfer_is_in_progress() -> None:
 def test_complete_trade_queries_transfer_operation_by_status() -> None:
     db = Mock(spec=Session)
     set_complete_trade_results(db)
-    db.scalar.side_effect = [None, None]
+    db.scalar.side_effect = [None, None, traded_cube(status=CubeStatus.TRADE_PENDING)]
 
     complete_trade_request(db, trade_id=23)
 

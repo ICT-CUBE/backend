@@ -352,39 +352,31 @@ Status Code : 200
 
 
 
-## 거래 진행정보 생성
+## 거래 진행 정보 생성
 - http 메서드: post
 - domain: market
 - endpoint: api/v1/users/me/trades
 
 ### API 설명
 
-주문 확인 화면에서 사용자가 결제하기 버튼을 눌러 결제가 완료되면 호출한다.
+주문 확인 화면에서 사용자가 에스크로 결제 진행 버튼을 누른 뒤 결제가 완료되면 호출한다.
 
-구매자 배송 정보와 판매글의 가격을 기준으로 거래 정보를 생성하고 판매 대상 큐브를 거래 대기 상태로 변경한다.
+요청값을 기준으로 `trade` 테이블에 거래 진행 정보를 생성한다.
 
 ---
 
 ### 처리 정책
 
-- `buyer_user_id`는 API를 호출한 현재 사용자의 id로 저장한다. 로그인 구현 전에는 항상 id=1을 사용한다.
-- `sellListingId`에 해당하는 판매글이 존재하고, `status = ACTIVE`이며, `deleted_at IS NULL`인 경우에만 거래를 생성한다.
-- 판매글에 연결된 마켓 상품과 큐브가 존재하고 삭제되지 않았으며, 큐브가 비활성화되지 않은 경우에만 거래를 생성한다.
-- 판매글 또는 연결된 마켓 상품·큐브가 거래 가능한 상태가 아니면 404: SELL_LISTING_INVALID를 반환한다.
-- 이미 해당 판매글에 거래가 생성되어 있으면 409: TRADE_ALREADY_EXISTS를 반환한다.
-- 현재 사용자가 등록한 판매글이면 자기 상품 구매를 막기 위해 409: SELF_TRADE_NOT_ALLOWED를 반환한다.
-- 구매자는 `buyerPhoneNumber`와 `buyerAddress`만 전달하며, 결제 금액과 결제 시각은 서버에서 결정한다.
-- `trade.buyer_phone_number`와 `trade.buyer_address`에는 요청으로 받은 값을 저장한다.
-- `trade.total_price`는 `sell_listing.price × 1.05`로 계산한다.
-- 계산 결과 원 단위 미만의 소수점이 발생하면 버림 처리한다.
-- 결제 금액은 프론트에서 전달받지 않으며 DB에 저장된 판매글 가격만 신뢰한다.
-- `trade.paid_time`은 거래 생성 시점의 한국 표준시(KST)를 offset 없는 date-time으로 저장한다.
-- `trade.sent_time`, `shipped_time`, `delivered_time`, `completed_time`은 `null`로 저장한다.
+- `buyer_user_id`는 결제하기를 호출한 현재 사용자의 ID로 저장한다. (로그인 구현 전에는 항상 id=1)
+- `sellListingId`에 해당하는 판매 상품이 존재하고, 판매 상품의 `status = ACTIVE`이며, `deleted_at IS NULL`인 경우에만 거래를 생성한다.
+- 판매 상품이 존재하지 않거나, `status = SOLD`, `status = DELETED`, 또는 `deleted_at IS NOT NULL`이면 404: SELL_LISTING_INVALID를 반환한다.
+- 이미 해당 판매 상품에 거래가 생성되어 있으면 409: TRADE_ALREADY_EXISTS를 반환한다.
+- 현재 사용자가 등록한 판매 상품이면 자기 상품 구매를 막기 위해 409: SELF_TRADE_NOT_ALLOWED를 반환한다.
 - `trade.status`는 `PAID`로 저장한다.
-- 거래 생성이 완료되면 `sell_listing.status`를 `SOLD`로 변경한다.
-- 판매글과 연결된 `cube.status`를 `TRADE_PENDING`으로 변경한다.
-- 거래 생성, 판매글 상태 변경, 큐브 상태 변경은 하나의 DB 트랜잭션으로 처리한다.
-- 정상 처리되면 서버가 계산한 최종 결제 금액만 반환한다.
+- `trade.paid_time`은 프론트에서 전달한 `paidTime` 값을 저장한다.
+- `paidTime`은 offset 없는 ISO 8601 date-time만 허용한다. 예: `2026-08-15T21:30:00`
+- `sent_time`, `shipped_time`, `delivered_time`, `completed_time`은 `null`로 저장한다.
+- 거래 생성이 완료되면 `sell_listing.status`를 `SOLD`로 변경하고 해당 cube 정보의 상태를 trade_pending 으로 변경한다.
 
 ---
 
@@ -404,15 +396,19 @@ Status Code : 200
 
 | 필드 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
-| `sellListingId` | number | O | 구매할 판매글 id |
-| `buyerPhoneNumber` | string | O | 구매자 연락처 |
+| `sellListingId` | number | O | 거래를 생성할 판매 상품 id |
 | `buyerAddress` | string | O | 구매자 배송 주소 |
+| `buyerPhoneNumber` | string | O | 구매자 연락처 |
+| `totalPrice` | number | O | 배송비 등을 포함한 최종 결제 금액 |
+| `paidTime` | string(date-time) | O | 결제 완료 시각 |
 
 ```json
 {
   "sellListingId": 1,
+  "buyerAddress": "서울특별시 강남구 테헤란로 429,1934호",
   "buyerPhoneNumber": "010-4282-4533",
-  "buyerAddress": "서울특별시 강남구 테헤란로 429, 1934호"
+  "totalPrice": 12740,
+  "paidTime": "2026-08-15T21:30:00"
 }
 ```
 
@@ -420,17 +416,7 @@ Status Code : 200
 
 ### 정상 응답 데이터
 
-Status Code : 201
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| `totalPrice` | number | 판매글 가격에 5%를 더해 서버가 계산한 최종 결제 금액 |
-
-```json
-{
-  "totalPrice": 36750
-}
-```
+Status Code : 204
 
 ---
 
@@ -438,7 +424,7 @@ Status Code : 201
 
 Status Code : 404
 
-판매글 또는 연결된 마켓 상품·큐브가 존재하지 않거나 거래 가능한 상태가 아닌 경우
+판매 상품이 존재하지 않거나 거래 생성 가능한 상태가 아닌 경우
 
 ```json
 {
@@ -449,7 +435,7 @@ Status Code : 404
 
 Status Code : 409
 
-이미 거래가 생성된 판매글인 경우
+이미 거래가 생성된 판매 상품인 경우
 
 ```json
 {
@@ -458,7 +444,7 @@ Status Code : 409
 }
 ```
 
-현재 사용자가 자신이 등록한 판매글을 구매하려는 경우
+현재 사용자가 자신이 등록한 판매 상품을 구매하려는 경우
 
 ```json
 {

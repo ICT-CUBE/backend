@@ -574,6 +574,16 @@ def create_trade(
             message="자신이 등록한 판매 상품은 구매할 수 없습니다.",
         )
 
+    cube = db.scalar(
+        select(Cube)
+        .join(MarketProduct, MarketProduct.cube_id == Cube.id)
+        .where(MarketProduct.id == sell_listing.market_product_id)
+        .limit(1)
+        .with_for_update()
+    )
+    if cube is None:
+        _raise_sell_listing_invalid()
+
     trade = Trade(
         sell_listing_id=sell_listing.id,
         buyer_user_id=current_user_id,
@@ -588,6 +598,7 @@ def create_trade(
         status=TradeStatus.PAID,
     )
     sell_listing.status = SellListingStatus.SOLD
+    cube.status = CubeStatus.TRADE_PENDING
 
     try:
         db.add(trade)
@@ -744,6 +755,7 @@ def complete_trade(
     )
     trade.status = TradeStatus.COMPLETED
     trade.completed_time = completed_time
+    _release_traded_cube(db=db, trade=trade)
 
     try:
         db.add(certificate)
@@ -819,6 +831,24 @@ def _get_transfer_target(*, db: Session, trade: Trade) -> tuple[int, str]:
         _raise_trade_not_found()
     seller_user_id, serial_number = row
     return seller_user_id, serial_number
+
+
+def _release_traded_cube(*, db: Session, trade: Trade) -> None:
+    """구매 확정된 거래의 큐브를 거래 대기에서 보유 상태로 되돌립니다."""
+    cube = db.scalar(
+        select(Cube)
+        .join(MarketProduct, MarketProduct.cube_id == Cube.id)
+        .join(SellListing, SellListing.market_product_id == MarketProduct.id)
+        .where(SellListing.id == trade.sell_listing_id)
+        .limit(1)
+        .with_for_update()
+    )
+    if cube is None:
+        _raise_trade_not_found()
+
+    # 비활성화 등 거래와 무관하게 바뀐 상태는 덮어쓰지 않습니다.
+    if cube.status == CubeStatus.TRADE_PENDING:
+        cube.status = CubeStatus.OWNED
 
 
 def _transfer_traded_nft(
