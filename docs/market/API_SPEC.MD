@@ -591,7 +591,7 @@ Status Code : 404
 - `paid_time`이 같은 거래는 `trade.id` 내림차순으로 정렬한다.
 - 각 거래에는 상세 조회 화면으로 이동할 때 사용할 거래 id를 포함한다.
 - 판매글이 삭제되었거나 판매글과 연결된 마켓 상품이 삭제된 거래는 조회 결과에서 제외한다.
-- 상품 이미지는 판매글에 연결된 삭제되지 않은 `listing_media` 중 id가 가장 작은 데이터의 `image_url`을 사용하며, 이미지가 없으면 `null`을 반환한다.
+- 상품 이미지는 판매글의 마켓 상품에 등록된 `market_product.product_image_url`을 사용하며, 값이 없으면 `null`을 반환한다.
 - 큐브 이름과 시리얼 번호는 판매글의 마켓 상품과 연결된 큐브 정보를 사용한다.
 - 가격은 배송비 등이 포함된 `trade.total_price`가 아니라 판매글에 등록된 `sell_listing.price`를 반환한다.
 - 모든 거래에는 `paid_time`이 반드시 존재한다고 가정한다.
@@ -629,7 +629,7 @@ Status Code : 200
 | --- | --- | --- |
 | `trades` | array | 현재 사용자가 구매자로 참여한 거래 내역 목록 |
 | `trades[].id` | number | 거래 id |
-| `trades[].productImageUrl` | string | null | 판매글의 첫 번째 판매 이미지 URL |
+| `trades[].productImageUrl` | string | null | 마켓 상품의 큐브 대표 이미지 URL |
 | `trades[].productName` | string | 큐브 제품명 |
 | `trades[].serialNumber` | string | 큐브 시리얼 번호 |
 | `trades[].price` | number | 판매글에 등록된 상품 가격 |

@@ -614,18 +614,8 @@ def get_trade_history(
     current_user_id: int,
 ) -> TradeHistoryResponse:
     """현재 사용자가 구매자인 거래 내역을 결제 시각 내림차순으로 조회합니다."""
-    product_image_url = (
-        select(ListingMedia.image_url)
-        .where(
-            ListingMedia.sell_listing_id == SellListing.id,
-            ListingMedia.deleted_at.is_(None),
-        )
-        .order_by(ListingMedia.id.asc())
-        .limit(1)
-        .scalar_subquery()
-    )
     rows = db.execute(
-        select(Trade, SellListing.price, Cube, product_image_url)
+        select(Trade, SellListing.price, Cube, MarketProduct.product_image_url)
         .join(
             SellListing,
             and_(
@@ -649,14 +639,14 @@ def get_trade_history(
         trades=[
             TradeHistoryItemResponse(
                 id=trade.id,
-                product_image_url=image_url,
+                product_image_url=product_image_url,
                 product_name=cube.product_name,
                 serial_number=cube.serial_number,
                 price=price,
                 paid_date=trade.paid_time.date(),
                 status=_trade_history_status(trade.status),
             )
-            for trade, price, cube, image_url in rows
+            for trade, price, cube, product_image_url in rows
         ]
     )
 

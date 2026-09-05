@@ -254,13 +254,13 @@ MySQL에 실제로 질의해 얻은 값은 아닙니다.
 | 정상 | test_read_trade_history_returns_buyer_trades | 구매 거래 2건 | 200 + 응답 JSON 전체 일치 | PASS |
 | 정상 변형 | test_read_trade_history_returns_completed_status | `trade.status=COMPLETED` | `status="COMPLETED"` | PASS |
 | 정상 변형 | test_read_trade_history_maps_ongoing_statuses_to_in_progress | `PAID`/`SENT`/`SHIPPING`/`DELIVERED` | 모두 `status="IN_PROGRESS"` | PASS |
-| 정상 변형 | test_read_trade_history_returns_null_product_image_url | 판매 이미지 없음 | `productImageUrl=null` | PASS |
+| 정상 변형 | test_read_trade_history_returns_null_product_image_url | 마켓 상품 대표 이미지 없음 | `productImageUrl=null` | PASS |
 | 정상 변형 | test_read_trade_history_returns_date_without_time | `paid_time=2025-04-08T23:59:59` | `paidDate="2025-04-08"` | PASS |
 | 정상 변형 | test_read_trade_history_returns_empty_list_when_no_trade | 거래 0건 | 200 + `trades=[]` | PASS |
 | 소유권 | test_read_trade_history_queries_only_current_user_trades | 조회 SQL 검증 | `trade.buyer_user_id = 1`, 판매자 조건 없음 | PASS |
 | 정책 | test_read_trade_history_excludes_deleted_sell_listing_and_market_product | 조회 SQL 검증 | 판매글·마켓상품 `deleted_at IS NULL`, 가격은 `sell_listing.price` | PASS |
 | 정책 | test_read_trade_history_orders_by_paid_time_and_trade_id_desc | 정렬 SQL 검증 | `ORDER BY trade.paid_time DESC, trade.id DESC` | PASS |
-| 정책 | test_read_trade_history_uses_first_listing_media_image | 이미지 서브쿼리 검증 | `listing_media.deleted_at IS NULL`, `ORDER BY listing_media.id ASC`, `LIMIT 1` | PASS |
+| 정책 | test_read_trade_history_uses_market_product_image | 이미지 컬럼 검증 | `market_product.product_image_url` 사용, `listing_media` 미조회 | PASS |
 | 문서 | test_read_trade_history_swagger_contract | OpenAPI 스키마 | 응답 코드 `{200}` | PASS |
 
 ### 검증하지 않은 항목

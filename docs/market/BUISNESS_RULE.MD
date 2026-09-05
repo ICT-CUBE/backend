@@ -81,8 +81,8 @@
 - 페이지네이션을 적용하지 않고 조건에 맞는 거래 전체를 반환한다.
 - 모든 거래에는 `paid_time`이 반드시 존재한다고 가정한다.
 - 결제 날짜는 `trade.paid_time`의 날짜를 한국시간 기준 `YYYY-MM-DD` 형식으로 반환한다.
-- 상품 이미지는 판매글에 연결된 삭제되지 않은 `listing_media` 중 id가 가장 작은 데이터의 `image_url`을 사용한다.
-- 판매글에 삭제되지 않은 이미지가 없으면 `productImageUrl`은 `null`로 반환한다.
+- 상품 이미지는 판매글의 마켓 상품에 등록된 `market_product.product_image_url`을 사용한다.
+- 마켓 상품에 대표 이미지가 없으면 `productImageUrl`은 `null`로 반환한다.
 - 큐브 제품명과 시리얼 번호는 판매글의 마켓 상품과 연결된 큐브 정보를 사용한다.
 - 가격은 배송비 등이 포함된 `trade.total_price`가 아니라 판매글에 등록된 `sell_listing.price`를 반환한다.
 - `trade.status = COMPLETED`이면 화면 표시용 `status`는 `COMPLETED`로 반환한다.

@@ -2200,10 +2200,10 @@ def trade_history_row(
     status: TradeStatus = TradeStatus.PAID,
     paid_time: str = "2025-04-08T14:30:00",
     price: int = 35000,
-    image_url: str | None = "https://cdn.example.com/cube%20card.png",
+    product_image_url: str | None = "https://cdn.example.com/cube%20card.png",
     cube_id: int = 31,
 ):
-    """거래 내역 조회가 반환하는 (거래, 판매가, 큐브, 이미지 URL) 행을 만듭니다."""
+    """거래 내역 조회가 반환하는 (거래, 판매가, 큐브, 대표 이미지 URL) 행을 만듭니다."""
     trade = Trade(
         id=trade_id,
         buyer_user_id=1,
@@ -2215,7 +2215,7 @@ def trade_history_row(
         product_name="BIGBANG MADE CUBE",
         artist_name="Big Bang",
     )
-    return trade, price, cube, image_url
+    return trade, price, cube, product_image_url
 
 
 def set_trade_history_results(db: Mock, *, rows: list | None = None) -> None:
@@ -2299,7 +2299,7 @@ def test_read_trade_history_maps_ongoing_statuses_to_in_progress():
 
 def test_read_trade_history_returns_null_product_image_url():
     db = Mock(spec=Session)
-    set_trade_history_results(db, rows=[trade_history_row(image_url=None)])
+    set_trade_history_results(db, rows=[trade_history_row(product_image_url=None)])
 
     response = read_trade_history_request(db)
 
@@ -2364,18 +2364,15 @@ def test_read_trade_history_orders_by_paid_time_and_trade_id_desc():
     assert "ORDER BY trade.paid_time DESC, trade.id DESC" in query
 
 
-def test_read_trade_history_uses_first_listing_media_image():
+def test_read_trade_history_uses_market_product_image():
     db = Mock(spec=Session)
     set_trade_history_results(db, rows=[])
 
     read_trade_history_request(db)
 
     query = compiled_query(db.execute.call_args)
-    assert "listing_media.image_url" in query
-    assert "listing_media.sell_listing_id = sell_listing.id" in query
-    assert "listing_media.deleted_at IS NULL" in query
-    assert "ORDER BY listing_media.id ASC" in query
-    assert "LIMIT 1" in query
+    assert "market_product.product_image_url" in query
+    assert "listing_media" not in query
 
 
 def test_read_trade_history_swagger_contract():
