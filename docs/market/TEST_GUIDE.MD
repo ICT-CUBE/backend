@@ -2,7 +2,7 @@
 
 테스트 파일: `tests/test_market.py`
 실행: `.venv\Scripts\python.exe -m pytest tests/test_market.py -q`
-최종 실행 결과: 95 passed (2026-08-28)
+최종 실행 결과: 107 passed (2026-09-05)
 
 DB는 `Mock(spec=Session)` 으로 대체하고 `app.dependency_overrides[get_db]` 로 주입합니다.
 실제 MySQL에는 접속하지 않습니다.
@@ -185,23 +185,19 @@ MySQL에 실제로 질의해 얻은 값은 아닙니다.
 
 ## 거래 진행 정보 생성 — `POST /api/v1/users/me/trades`
 
-`db.execute` 로 (판매글, 큐브) 행을 잠금 조회하고 `db.scalar` 로 기존 거래를 확인하므로
-`set_trade_results()` 헬퍼로 두 결과를 지정합니다. 결제 시각은 `_kst_now_naive` 를
-monkeypatch 해서 고정합니다.
+`db.scalar` 를 판매글 잠금 조회 → 기존 거래 확인 → 큐브 잠금 조회 순서로 3회 호출하므로
+`db.scalar.side_effect` 에 세 결과를 순서대로 지정합니다.
 
 | 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
 |---|---|---|---|---|
-| 정상 | test_create_trade_saves_trade_and_marks_sell_listing_sold | 판매가 35000원 ACTIVE 판매글 | 201 + `{"totalPrice": 36750}`, 거래 `PAID` 저장, 판매글 `SOLD`, 큐브 `TRADE_PENDING`, commit 1회 | PASS |
-| 정상 변형 | test_create_trade_floors_total_price_under_one_won | 판매가 12345원 (12962.25원) | `totalPrice=12962` 로 버림 | PASS |
-| 오류 | test_create_trade_returns_404_for_missing_sell_listing | 판매글·마켓상품·큐브 조회 결과 없음 | 404 SELL_LISTING_INVALID, 저장 없음 | PASS |
-| 오류 | test_create_trade_returns_404_for_inactive_sell_listing_without_existing_trade | 판매글 `status=DELETED` | 404 SELL_LISTING_INVALID, 큐브 상태 변경 없음 | PASS |
-| 오류 | test_create_trade_returns_409_when_trade_already_exists | 같은 판매글의 거래 존재 | 409 TRADE_ALREADY_EXISTS, rollback 1회 | PASS |
-| 오류 | test_create_trade_returns_409_for_self_trade | 판매자가 현재 사용자 | 409 SELF_TRADE_NOT_ALLOWED, 큐브 상태 변경 없음 | PASS |
-| 요청 검증 | test_create_trade_returns_400_when_required_json_field_is_missing | `buyerAddress` 누락 | 400 INVALID_REQUEST, 쿼리 미실행 | PASS |
-| 요청 검증 | test_create_trade_returns_400_when_sell_listing_id_is_not_a_number | `sellListingId="abc"` | 400 INVALID_REQUEST, 쿼리 미실행 | PASS |
-| 정책 | test_create_trade_excludes_deleted_or_disabled_cube_and_market_product | 조회 SQL 검증 | 판매글·마켓상품·큐브 삭제 조건, `cube.status != 'DISABLED'`, `FOR UPDATE` | PASS |
-| 예외 | test_create_trade_rolls_back_when_commit_fails | commit이 예외 발생 | 500 + rollback 1회 | PASS |
-| 문서 | test_create_trade_swagger_contract | OpenAPI 스키마 | 응답 코드 `{201, 404, 409}`, 요청 Body `{sellListingId, buyerPhoneNumber, buyerAddress}`, 응답 `{totalPrice}` | PASS |
+| 정상 | test_create_trade_saves_trade_and_marks_sell_listing_sold | ACTIVE 판매글, 연결된 큐브 존재 | 204, 거래 `PAID` 저장, 판매글 `SOLD`, 큐브 `TRADE_PENDING`, commit 1회 | PASS |
+| 정상 | test_create_trade_locks_and_marks_cube_of_the_sold_listing | 큐브 조회 SQL 검증 | 판매글의 `market_product_id` 로 조인한 큐브를 `FOR UPDATE` 로 잠그고 `TRADE_PENDING` 으로 변경 | PASS |
+| 오류 | test_create_trade_returns_404_when_cube_not_found | 판매글에 연결된 큐브 조회 결과 없음 | 404 SELL_LISTING_INVALID, 판매글 상태 유지, 저장 없음 | PASS |
+| 오류 | test_create_trade_returns_404_for_missing_sell_listing | 판매글 조회 결과 없음 | 404 SELL_LISTING_INVALID, 저장 없음 | PASS |
+| 오류 | test_create_trade_returns_404_for_inactive_sell_listing_without_existing_trade | 판매글 `status=DELETED` | 404 SELL_LISTING_INVALID, 저장 없음 | PASS |
+| 상태 전이 | test_create_trade_returns_409_when_trade_already_exists | 같은 판매글의 거래 존재 | 409 TRADE_ALREADY_EXISTS, rollback 1회 | PASS |
+| 소유권 | test_create_trade_returns_409_for_self_trade | 판매자가 현재 사용자 | 409 SELF_TRADE_NOT_ALLOWED, rollback 1회 | PASS |
+| 문서 | test_create_trade_swagger_responses | OpenAPI 스키마 | 응답 코드 `{204, 404, 409}` | PASS |
 
 ### 검증하지 않은 항목
 
@@ -212,6 +208,7 @@ monkeypatch 해서 고정합니다.
   `FOR UPDATE` 가 포함되는지만 검증했습니다.
 - **`buyer_user_id = 1` 고정**은 로그인 구현 전 임시 정책이라 `get_current_user_id` 의존성이
   반환하는 값을 그대로 저장하는지만 확인했습니다.
+- **요청 검증·경계값·예외(commit 실패)** 케이스는 이번 작업 범위가 아니어서 추가하지 않았습니다.
 
 ---
 
@@ -275,3 +272,110 @@ monkeypatch 해서 고정합니다.
 - **정렬 결과**는 Mock DB가 ORDER BY를 실제로 실행하지 않으므로 생성된 SQL로 검증했습니다.
 - **`paid_time` 이 항상 존재한다는 전제**는 명세를 그대로 따랐고, `NULL` 인 거래에 대한
   방어 코드는 두지 않았습니다.
+
+---
+
+## 판매 가능 큐브 조회 — `GET /api/v1/users/me/sellable-cubes`
+
+`db.execute` 한 번으로 (큐브, 마켓 상품) 행을 조회하므로 `db.execute.return_value.all` 에
+결과를 지정합니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_read_sellable_cubes_returns_active_unlisted_cubes | 판매 가능 큐브 2건(이미지 있음/없음) | 200 + 응답 JSON 전체 일치, 조회 SQL에 소유권·삭제·중복 판매글(NOT EXISTS) 조건과 `ORDER BY cube.id ASC` 포함 | PASS |
+| 정상 변형 | test_read_sellable_cubes_returns_empty_list | 조회 결과 0건 | 200 + `cubes=[]` | PASS |
+| 문서 | test_read_sellable_cubes_swagger_responses | OpenAPI 스키마 | 응답 코드 `{200}`, tag `market` | PASS |
+
+### 검증하지 않은 항목
+
+- **오류·경계값**은 이 API가 정의하는 도메인 오류와 요청 파라미터가 없어 해당 없음입니다.
+- **소유권 조건**은 Mock DB로 결과를 구분할 수 없어 생성된 SQL의 WHERE 절로 검증했습니다.
+
+---
+
+## 판매글 등록 — `POST /api/v1/users/me/sell-listings`
+
+`db.scalar` 를 마켓 상품 조회 → 기존 `ACTIVE` 판매글 확인 순서로 2회 호출하므로
+`db.scalar.side_effect` 에 두 결과를 지정하고, `db.flush.side_effect` 로 생성된 id를 채웁니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_create_sell_listing_saves_listing_from_json_body | 소유 중인 마켓 상품, 판매 중 판매글 없음 | 201 + `{"sellListingId": 7}`, 판매글 `ACTIVE` 저장, flush·commit 각 1회, 조회 SQL 조건 검증 | PASS |
+| 정상 변형 | test_create_sell_listing_saves_null_when_product_status_is_omitted | `productStatus` 생략 | 201, `product_status=None` 저장 | PASS |
+| 요청 검증 | test_create_sell_listing_returns_400_when_required_json_field_is_missing | `title` 누락 | 400 INVALID_REQUEST, 쿼리 미실행 | PASS |
+| 오류 | test_create_sell_listing_returns_404_for_unavailable_market_product | 마켓 상품 조회 결과 없음 | 404 MARKET_PRODUCT_NOT_FOUND, 저장 없음 | PASS |
+| 상태 전이 | test_create_sell_listing_returns_409_for_existing_active_listing | 같은 마켓 상품의 `ACTIVE` 판매글 존재 | 409 SELL_LISTING_ALREADY_ACTIVE, rollback 1회 | PASS |
+| 문서 | test_create_sell_listing_swagger_contract | OpenAPI 스키마 | 응답 코드 `{201, 404, 409}`, 요청 Body 5개 필드, `productStatus` 는 선택 | PASS |
+
+### 검증하지 않은 항목
+
+- **소유권**은 마켓 상품 조회 SQL에 `cube_ownership.user_id` 조건이 포함되는지로 확인했습니다.
+- **예외(commit 실패)** 케이스는 추가하지 않았습니다.
+
+---
+
+## 판매글 삭제 — `DELETE /api/v1/users/me/sell-listings/{sellListingId}`
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_delete_sell_listing_soft_deletes_current_user_listing | 현재 사용자의 삭제되지 않은 판매글 | 204, `status=DELETED` + `deleted_at` KST naive(마이크로초 0) 저장, commit 1회 | PASS |
+| 소유권 | test_delete_sell_listing_returns_404_when_listing_is_unavailable | 없는 판매글 또는 남의 판매글 | 404 SELL_LISTING_NOT_FOUND, commit 없음 | PASS |
+| 문서 | test_delete_sell_listing_swagger_contract | OpenAPI 스키마 | 응답 코드 `{204, 404}` | PASS |
+
+### 검증하지 않은 항목
+
+- **"없는 판매글" 과 "남의 판매글"** 은 Mock DB로 구분할 수 없어 조회 SQL의 `user_id` 조건으로
+  함께 검증했습니다.
+- **이미 삭제된 판매글 재요청**도 같은 404 경로라 별도 케이스를 만들지 않았습니다.
+
+---
+
+## 거래 상세 조회 — `GET /api/v1/users/me/trades/{tradeId}`
+
+`db.execute` 로 (거래, 판매글, 마켓 상품, 큐브) 행을 조회하므로
+`db.execute.return_value.first` 에 `trade_detail_row()` 를 지정합니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_read_trade_detail_returns_trade_product_and_timeline | `SHIPPING` 거래 | 200 + 응답 JSON 전체 일치, 타임라인 5단계의 `completed` 플래그 | PASS |
+| 소유권 | test_read_trade_detail_returns_404_for_unknown_or_other_user_trade | 없는 거래 또는 남의 거래 | 404 TRADE_NOT_FOUND | PASS |
+| 문서 | test_read_trade_detail_swagger_responses | OpenAPI 스키마 | 응답 코드 `{200, 404}` | PASS |
+
+### 검증하지 않은 항목
+
+- **타임라인 라벨**은 서비스 상단 `TRADE_TIMELINE_LABELS` 상수를 그대로 쓰므로 정상 케이스의
+  응답 JSON 비교로만 확인했습니다.
+
+---
+
+## 구매 확정 — `PATCH /api/v1/users/me/trades/{tradeId}/complete`
+
+`db.execute` 로 (거래, 구매자) → (판매자 id, 시리얼) 을 조회하고, `db.scalar` 로
+확정된 이전 작업 → 대기 중 이전 작업 → 큐브를 순서대로 조회하므로
+`set_complete_trade_results()` 헬퍼로 다섯 결과를 한 번에 지정합니다.
+NFT 이전은 `app.services.market.transfer_cube_nft` 를 patch 해서 대체합니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_complete_trade_updates_trade_and_creates_certificate | `DELIVERED` 거래 | 200 + 응답 JSON 전체 일치, 거래 `COMPLETED` + `completed_time` 저장, 인증서 생성, commit 1회 | PASS |
+| 정상 | test_complete_trade_releases_cube_to_owned | 큐브가 `TRADE_PENDING` | 200, 큐브 `OWNED` 로 복귀, 조회 SQL이 거래의 판매글로 조인하며 `FOR UPDATE` 포함 | PASS |
+| 정상 변형 | test_complete_trade_keeps_cube_status_when_cube_is_disabled | 큐브가 `DISABLED` | 200, 큐브 상태 유지 | PASS |
+| 정상 | test_complete_trade_requests_transfer_with_seller_and_serial_number | 판매자 7, 시리얼 NO.0055 | 이전 요청에 거래 id·판매자·구매자·시리얼 전달 | PASS |
+| 정책 | test_complete_trade_releases_trade_lock_before_transfer | 호출 순서 검증 | 외부 호출 전에 `rollback()` 으로 거래 행 잠금 해제 | PASS |
+| 정상 변형 | test_complete_trade_reuses_confirmed_transfer_operation | 이미 `CONFIRMED` 인 이전 작업 존재 | 200, 이전 재요청 없이 기존 결과로 인증서 생성 | PASS |
+| 상태 전이 | test_complete_trade_returns_409_when_transfer_is_in_progress | `REQUESTED` 이전 작업 존재 | 409 TRADE_CONFIRMATION_TIMEOUT, 이전 중복 접수 없음 | PASS |
+| 정책 | test_complete_trade_queries_transfer_operation_by_status | 조회 SQL 검증 | 거래 id·`TRANSFER`·`CONFIRMED`/`REQUESTED` 조건 | PASS |
+| 오류 | test_complete_trade_returns_409_when_transfer_is_rejected | 블록체인 서버가 이전 거절 | 409 TRADE_TRANSFER_REJECTED, 저장 없음 | PASS |
+| 오류 | test_complete_trade_returns_409_when_confirmation_times_out | 확정 대기 초과 | 409 TRADE_CONFIRMATION_TIMEOUT | PASS |
+| 예외 | test_complete_trade_returns_500_when_blockchain_is_unreachable | 블록체인 서버 연결 실패 | 500 INTERNAL_SERVER_ERROR | PASS |
+| 소유권 | test_complete_trade_returns_404_for_unknown_or_other_user_trade | 없는 거래 또는 남의 거래 | 404 TRADE_NOT_FOUND, 저장 없음 | PASS |
+| 상태 전이 | test_complete_trade_returns_409_when_trade_is_not_delivered | 거래가 이미 `COMPLETED` | 409 TRADE_NOT_DELIVERED, 저장 없음 | PASS |
+| 문서 | test_complete_trade_swagger_responses | OpenAPI 스키마 | 라우터 선언과 응답 코드 집합 일치 | PASS |
+
+### 검증하지 않은 항목
+
+- **큐브 상태 복귀와 거래 확정의 단일 트랜잭션 처리**는 두 변경이 모두 세션에 반영된 뒤
+  `db.commit()` 이 한 번만 호출되는 것으로 확인했습니다. 실제 격리 동작은 Mock DB로 검증할
+  수 없습니다.
+- **큐브 소유권(`cube_ownership`) 이전**은 구현되어 있지 않아 검증 대상이 아닙니다.
+- **블록체인 서버 실환경 연동**은 `docs/blockchain/TEST_GUIDE.MD` 에서 다룹니다.

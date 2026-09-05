@@ -127,8 +127,9 @@ HTTP 전송은 `_send` 를 대체해 호출 인자를 검증합니다.
 | 경계값 | test_transfer_cube_nft_raises_timeout_and_keeps_requested_status | 확정 대기 초과 | `CONFIRMATION_TIMEOUT`, 상태는 `REQUESTED` 유지 | PASS |
 | 정책 | test_transfer_cube_nft_raises_when_final_owner_is_not_buyer | 소유자 불일치 | `OWNER_MISMATCH`, NFT 조회 안 함 | PASS |
 
-`tests/test_market.py` 에 구매 확정 API 쪽 테스트 6개가 있습니다: 실제 값 인증서 생성,
-판매자·시리얼 전달, **외부 호출 전 거래 잠금 해제 순서**, 409 두 종류, 500, 확정된 작업 재사용.
+`tests/test_market.py` 에 구매 확정 API 쪽 테스트 14개가 있습니다: 실제 값 인증서 생성,
+판매자·시리얼 전달, **외부 호출 전 거래 잠금 해제 순서**, 409 세 종류, 500, 확정된 작업 재사용,
+구매 확정 후 큐브 `OWNED` 복귀. 표는 `docs/market/TEST_GUIDE.MD` 의 구매 확정 절에 있습니다.
 
 ### 실환경 확인
 

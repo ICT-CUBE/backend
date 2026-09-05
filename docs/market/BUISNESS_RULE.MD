@@ -93,21 +93,30 @@
 
 ## 거래 진행 정보 생성
 
-- 거래의 구매자는 API를 호출한 현재 사용자로 결정하며, 로그인 구현 전에는 사용자 id 1을 사용한다.
-- 프론트에서는 구매할 판매글의 `sellListingId`, 구매자 연락처와 배송 주소만 전달한다.
-- 결제 금액과 결제 시각은 프론트 요청값을 신뢰하지 않고 서버에서 결정한다.
+- 거래의 구매자는 인증 토큰으로 식별된 현재 사용자로 결정한다.
+- 프론트에서는 구매할 판매글의 `sellListingId`, 구매자 배송 주소, 구매자 연락처, 최종 결제 금액과 결제 완료 시각을 전달한다.
 - 판매글은 `status = ACTIVE`이고 `deleted_at IS NULL`인 경우에만 거래할 수 있다.
-- 판매글에 연결된 마켓 상품과 큐브가 존재하고 삭제되지 않았으며, 큐브가 비활성화되지 않은 경우에만 거래할 수 있다.
-- 판매글 또는 연결된 마켓 상품·큐브가 거래 가능한 상태가 아니면 `404 SELL_LISTING_INVALID`를 반환한다.
+- 판매글이 존재하지 않거나 `SOLD`, `DELETED` 상태이거나 `deleted_at IS NOT NULL`이면 `404 SELL_LISTING_INVALID`를 반환한다.
 - 하나의 판매글에는 하나의 거래만 생성할 수 있으며, 기존 거래가 존재하면 `409 TRADE_ALREADY_EXISTS`를 반환한다.
 - 사용자는 자신이 등록한 판매글을 구매할 수 없으며, 이를 시도하면 `409 SELF_TRADE_NOT_ALLOWED`를 반환한다.
 - `trade.buyer_phone_number`와 `trade.buyer_address`에는 요청으로 받은 값을 저장한다.
-- `trade.total_price`는 DB에 저장된 `sell_listing.price`에 5%를 더해 계산한다.
-- 최종 결제 금액 계산 결과 원 단위 미만의 소수점이 발생하면 버림 처리한다.
-- `trade.paid_time`은 거래 생성 시점의 한국 표준시(KST)를 offset 없는 date-time으로 저장한다.
+- `trade.total_price`에는 요청으로 받은 `totalPrice`를 저장한다.
+- `trade.paid_time`에는 요청으로 받은 `paidTime`을 저장하며, offset 없는 ISO 8601 date-time 형식만 허용한다.
 - 거래 생성 시 `trade.status`는 `PAID`로 저장한다.
 - `trade.sent_time`, `shipped_time`, `delivered_time`, `completed_time`은 `null`로 저장한다.
 - 거래가 생성되면 해당 판매글의 `status`를 `SOLD`로 변경한다.
 - 거래가 생성되면 판매글의 마켓 상품과 연결된 큐브의 `status`를 `TRADE_PENDING`으로 변경한다.
 - 거래 생성, 판매글 상태 변경, 큐브 상태 변경은 하나의 DB 트랜잭션으로 처리하며 하나라도 실패하면 전체 작업을 롤백한다.
-- 정상 처리되면 서버가 계산한 `totalPrice`만 응답한다.
+- 정상 처리되면 응답 본문 없이 `204 No Content`를 반환한다.
+
+## 구매 확정
+
+- 구매 확정은 거래의 구매자 본인만 요청할 수 있으며, 없는 거래이거나 다른 사용자의 거래이면 `404 TRADE_NOT_FOUND`를 반환한다.
+- `trade.status = DELIVERED`인 거래만 구매 확정할 수 있으며, 그 외 상태이면 `409 TRADE_NOT_DELIVERED`를 반환한다.
+- 거래 검증을 마치면 거래 행 잠금을 풀고 NFT 이전을 요청한다. 이전 절차는 `docs/blockchain/BUISNESS_RULE.MD`를 따른다.
+- 외부 호출을 마친 뒤 거래 상태를 다시 확인해 그 사이 확정된 거래는 오류로 응답한다.
+- 구매 확정이 완료되면 `trade.status`를 `COMPLETED`로 변경하고 `trade.completed_time`에 한국 표준시(KST)를 offset 없는 date-time으로 저장한다.
+- 구매 확정이 완료되면 거래 대기 상태였던 큐브의 `status`를 `OWNED`로 되돌린다.
+- 거래와 무관하게 이미 다른 상태로 바뀐 큐브(예: `DISABLED`)는 상태를 변경하지 않는다.
+- 거래 상태 변경, 큐브 상태 변경, 디지털 인증서 생성은 하나의 DB 트랜잭션으로 처리하며 하나라도 실패하면 전체 작업을 롤백한다.
+- 물리 큐브의 소유권(`cube_ownership`) 이전은 아직 처리하지 않는다.
