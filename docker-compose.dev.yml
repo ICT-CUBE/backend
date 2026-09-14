@@ -12,14 +12,23 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      chroma:
+        condition: service_healthy
+
+  chroma:
+    image: chromadb/chroma:1.5.3
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   mysql:
     image: mysql:8.4
-    environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-hanium}
-      MYSQL_USER: ${MYSQL_USER:-hanium}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-hanium_password}
     ports:
       - "3306:3306"
     volumes:
@@ -33,3 +42,4 @@ services:
 
 volumes:
   mysql-data:
+  chroma-data:

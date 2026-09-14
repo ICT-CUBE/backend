@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="")
     openai_model: str = Field(default="gpt-4.1-mini")
 
+    chroma_host: str = Field(default="localhost")
+    chroma_port: int = Field(default=8000)
+    chroma_ssl_enabled: bool = Field(default=False)
+    chroma_collection_name: str = Field(default="jenny_knowledge")
+
     # JWT Access Token 설정입니다. 비밀키는 Git에 올리지 않고
     # 로컬/배포 환경 변수로만 주입합니다.
     jwt_secret_key: str = Field(default="")
