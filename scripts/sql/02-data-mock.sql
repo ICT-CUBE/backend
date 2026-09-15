@@ -12,17 +12,17 @@ INSERT INTO `user` (`id`, `email`, `password_hash`, `login_provider`, `provider_
 (9, 'user9@arzone.com', '$argon2id$v=19$m=65536,t=3,p=4$bXU1E7/2HjUNj87O5VJVRg$E9G5cPMlc2oiQQwQLPmd2z9KPNengCi1Oi1AdE2HTO0', 'EMAIL', 'cubemaster', '큐브마스터', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE'),
 (10, 'user10@arzone.com', '$argon2id$v=19$m=65536,t=3,p=4$0g1TVF6arqDamTNG7UTj5g$rrBARIFw7lBp/DBwrJ2wRnqFprsVPQbX3+Lgct21r40', 'EMAIL', 'jenniesupport', '제니응원단', 'https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png', 0, 'ACTIVE');
 
-INSERT INTO `cube` (`id`, `serial_number`, `product_name`, `ownership_code_hash`, `artist_name`, `status`) VALUES
-(1, 'NO.0026', 'JENNIE RUBY CUBE', '9999', 'Jennie', 'OWNED'),
-(2, 'NO.0031', 'BIGBANG MADE CUBE', '1111', 'Big Bang', 'TRADE_PENDING'),
-(3, 'NO.0022', 'ROSE ROISE CUBE', '2222', 'ROSE', 'OWNED'),
-(4, 'NO.0044', 'JENNIE SOLO CUBE', '4444', 'Jennie', 'UNREGISTERED'),
-(5, 'NO.0055', 'BIGBANG STILL LIFE CUBE', '5555', 'Big Bang', 'UNREGISTERED'),
-(6, 'NO.0066', 'ROSE ROSIE CUBE', '6666', 'ROSE', 'UNREGISTERED'),
-(7, 'NO.0077', 'JENNIE RUBY CUBE', '7777', 'Jennie', 'OWNED'),
-(8, 'NO.0088', 'AESPA ARMAGEDDON CUBE', '8888', 'AESPA', 'OWNED'),
-(9, 'NO.0099', 'ROSE ROISE CUBE', '9990', 'ROSE', 'OWNED'),
-(10, 'NO.0100', 'IU THE WINNING CUBE', '1010', 'IU', 'OWNED');
+INSERT INTO `cube` (`id`, `serial_number`, `product_name`, `ownership_code_hash`, `artist_name`, `status`, `product_image_url`) VALUES
+(1, 'NO.0026', 'JENNIE RUBY CUBE', '9999', 'Jennie', 'OWNED', 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-1.png'),
+(2, 'NO.0031', 'BIGBANG MADE CUBE', '1111', 'Big Bang', 'TRADE_PENDING', 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-2.png'),
+(3, 'NO.0022', 'ROSE ROISE CUBE', '2222', 'ROSE', 'OWNED', 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-3.png'),
+(4, 'NO.0044', 'JENNIE SOLO CUBE', '4444', 'Jennie', 'UNREGISTERED', 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground.png'),
+(5, 'NO.0055', 'BIGBANG STILL LIFE CUBE', '5555', 'Big Bang', 'UNREGISTERED', 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cubecard-1.png'),
+(6, 'NO.0066', 'ROSE ROSIE CUBE', '6666', 'ROSE', 'UNREGISTERED', 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cubecard-2.png'),
+(7, 'NO.0077', 'JENNIE RUBY CUBE', '7777', 'Jennie', 'OWNED', 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cubecard-3.png'),
+(8, 'NO.0088', 'AESPA ARMAGEDDON CUBE', '8888', 'AESPA', 'OWNED', 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cubecard.png'),
+(9, 'NO.0099', 'ROSE ROISE CUBE', '9990', 'ROSE', 'OWNED', 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-1.png'),
+(10, 'NO.0100', 'IU THE WINNING CUBE', '1010', 'IU', 'OWNED', 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-2.png');
 
 INSERT INTO `cube_verification` (`id`, `user_id`, `cube_id`, `verification_status`, `code_expires_at`, `verified_at`) VALUES
 (1, 1, 1, 'SUCCESS', '2025-03-14 19:25:00', '2025-03-07 19:25:00'),
@@ -368,19 +368,7 @@ INSERT INTO `comment_like` (`id`, `comment_id`, `user_id`, `is_liked`) VALUES
 (9, 40, 1, FALSE),
 (10, 45, 6, TRUE);
 
-INSERT INTO `market_product` (`id`, `cube_id`, `product_image_url`) VALUES
-(1, 1, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-1.png'),
-(2, 2, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-2.png'),
-(3, 3, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-3.png'),
-(4, 4, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground.png'),
-(5, 5, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cubecard-1.png'),
-(6, 6, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cubecard-2.png'),
-(7, 7, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cubecard-3.png'),
-(8, 8, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/cubecard.png'),
-(9, 9, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-1.png'),
-(10, 10, 'https://haniumstorage.blob.core.windows.net/hanium/cube_images/IconBackground-2.png');
-
-INSERT INTO `sell_listing` (`id`, `market_product_id`, `user_id`, `product_status`, `title`, `description`, `price`, `status`) VALUES
+INSERT INTO `sell_listing` (`id`, `cube_id`, `user_id`, `product_status`, `title`, `description`, `price`, `status`) VALUES
 (1, 2, 2, '좋음', '빅뱅 메이드 큐브 31번', '상태 좋은 큐브 판매합니다.', 35000, 'SOLD'),
 (2, 3, 3, '좋음', '로제 큐브 판매', '상태 좋은 큐브 판매합니다.', 35000, 'ACTIVE'),
 (3, 9, 6, '미개봉', '로제 ROISE 큐브 99번', '미개봉 상태로 보관한 로제 큐브입니다.', 42000, 'ACTIVE'),

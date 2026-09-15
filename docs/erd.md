@@ -22,6 +22,7 @@ erDiagram
         varchar_255 ownership_code_hash "NOT NULL"
         varchar_20 artist_name "NOT NULL"
         varchar_20 status "NOT NULL, Enum: UNREGISTERED | OWNED | TRADE_PENDING | DISABLED"
+        varchar_500 product_image_url "NULL"
         datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
         datetime deleted_at "NULL"
@@ -360,7 +361,7 @@ erDiagram
 
     SELL_LISTING {
         bigint id PK
-        bigint market_product_id FK "NOT NULL"
+        bigint cube_id FK "NOT NULL"
         bigint user_id FK "NOT NULL"
         varchar_30 product_status "NULL"
         varchar_20 title "NOT NULL"
@@ -426,15 +427,6 @@ erDiagram
         datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
     }
 
-    MARKET_PRODUCT {
-        bigint id PK
-        bigint cube_id FK "NOT NULL, UNIQUE"
-        varchar_500 product_image_url "NULL"
-        datetime created_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-        datetime updated_at "NOT NULL, DEFAULT: CURRENT_TIMESTAMP"
-        datetime deleted_at "NULL"
-    }
-
     LISTING_MEDIA {
         bigint id PK
         bigint sell_listing_id FK "NOT NULL"
@@ -483,7 +475,7 @@ erDiagram
     SELL_LISTING ||--o{ SELLING_LIST_LIKE : "receives"
     USER ||--o{ SELLING_LIST_LIKE : "creates"
     SELL_LISTING ||--o| TRADE : "creates"
-    CUBE ||--o| MARKET_PRODUCT : "has"
+    CUBE ||--o{ SELL_LISTING : "is listed as"
     SELL_LISTING ||--o{ LISTING_MEDIA : "contains"
     TRADE ||--o| DIGITAL_CERTIFICATE : "contains"
     CUBE ||--o{ BLOCKCHAIN_OPERATION : "is minted through"

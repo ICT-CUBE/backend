@@ -94,7 +94,7 @@ Azure 환경변수의 DB 접속 정보와 블록체인 인증값을 실행 프�
 ## 블록체인 연동 로컬 실행
 
 큐브 NFT 발행·이전은 별도 저장소의 ARZONE Blockchain Server와 연동합니다.
-연동 계약과 규칙은 `docs/blockchain/` 문서를 참고합니다.
+연동 계약과 규칙은 `app/blockchain/docs/` 문서를 참고합니다.
 
 아래 절차는 두 저장소가 같은 상위 디렉터리에 있고, Backend와 Blockchain Server
 애플리케이션은 각각 Docker Compose로 실행하는 구성을 기준으로 합니다. 현재

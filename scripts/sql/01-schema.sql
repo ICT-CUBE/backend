@@ -68,6 +68,7 @@ CREATE TABLE `cube` (
     `ownership_code_hash` VARCHAR(255) NOT NULL,
     `artist_name` VARCHAR(20) NOT NULL,
     `status` VARCHAR(20) NOT NULL DEFAULT 'UNREGISTERED',
+    `product_image_url` VARCHAR(500) NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted_at` DATETIME NULL,
@@ -533,21 +534,9 @@ CREATE TABLE `comment_like` (
     CONSTRAINT `fk_comment_like_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `market_product` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `cube_id` BIGINT NOT NULL,
-    `product_image_url` VARCHAR(500) NULL,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    `deleted_at` DATETIME NULL,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_market_product_cube_id` (`cube_id`),
-    CONSTRAINT `fk_market_product_cube` FOREIGN KEY (`cube_id`) REFERENCES `cube` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE `sell_listing` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `market_product_id` BIGINT NOT NULL,
+    `cube_id` BIGINT NOT NULL,
     `user_id` BIGINT NOT NULL,
     `product_status` VARCHAR(30) NULL,
     `title` VARCHAR(20) NOT NULL,
@@ -558,9 +547,9 @@ CREATE TABLE `sell_listing` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted_at` DATETIME NULL,
     PRIMARY KEY (`id`),
-    KEY `idx_sell_listing_market_product_id` (`market_product_id`),
+    KEY `idx_sell_listing_cube_id` (`cube_id`),
     KEY `idx_sell_listing_user_id` (`user_id`),
-    CONSTRAINT `fk_sell_listing_market_product` FOREIGN KEY (`market_product_id`) REFERENCES `market_product` (`id`),
+    CONSTRAINT `fk_sell_listing_cube` FOREIGN KEY (`cube_id`) REFERENCES `cube` (`id`),
     CONSTRAINT `fk_sell_listing_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`),
     CONSTRAINT `ck_sell_listing_status` CHECK (`status` IN ('ACTIVE', 'SOLD', 'DELETED'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
