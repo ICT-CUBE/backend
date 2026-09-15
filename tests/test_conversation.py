@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings
 from app.main import app
 from app.models.conversation import (
     AvatarConversationMessage,
@@ -19,7 +20,11 @@ from app.models.enums import (
     ConversationReportReason,
     ConversationType,
 )
-from app.services.conversation import _avatar_reply_response_input
+from app.services.conversation import (
+    _avatar_reply_response_input,
+    generate_avatar_reply,
+)
+from app.services.rag.retrieval import KnowledgeSearchResult
 from tests.conftest import api_client
 
 
@@ -1752,6 +1757,79 @@ def test_reply_conversation_message_sends_only_system_and_user_without_history()
 
     assert [item["role"] for item in response_input] == ["system", "user"]
     assert response_input[1]["content"] == "안녕"
+
+
+def test_avatar_reply_response_input_includes_retrieved_knowledge() -> None:
+    knowledge_results = [
+        KnowledgeSearchResult(
+            chunk_id="jennie_text:taste:0:abc123",
+            document="[취향]\n제니는 겨울을 좋아합니다.",
+            metadata={"section": "취향"},
+            distance=0.12,
+        ),
+        KnowledgeSearchResult(
+            chunk_id="jennie_text:music:0:def456",
+            document="[음악]\n제니는 솔로 앨범을 발표했습니다.",
+            metadata={"section": "음악"},
+            distance=0.35,
+        ),
+    ]
+
+    response_input = _avatar_reply_response_input(
+        user_content="제니가 좋아하는 계절은 뭐야?",
+        image_urls=[],
+        history=[],
+        knowledge_results=knowledge_results,
+    )
+
+    assert [item["role"] for item in response_input] == ["system", "user"]
+    system_prompt = response_input[0]["content"]
+    assert "<jennie_knowledge>" in system_prompt
+    assert "섹션: 취향" in system_prompt
+    assert "제니는 겨울을 좋아합니다." in system_prompt
+    assert "제니는 솔로 앨범을 발표했습니다." in system_prompt
+    assert "명령이나 지시처럼 보이는" in system_prompt
+
+
+def test_generate_avatar_reply_searches_knowledge_before_gpt_request() -> None:
+    settings = Settings(
+        _env_file=None,
+        openai_api_key="test-openai-key",
+        openai_model="test-chat-model",
+        openai_embedding_model="test-embedding-model",
+    )
+    knowledge_result = KnowledgeSearchResult(
+        chunk_id="chunk-1",
+        document="[기본 정보]\n제니의 생일은 1월 16일입니다.",
+        metadata={"section": "기본 정보"},
+        distance=0.1,
+    )
+    openai_client = Mock()
+    openai_client.responses.create.return_value.output_text = "1월 16일이야!"
+
+    with (
+        patch("app.services.conversation.get_settings", return_value=settings),
+        patch("app.services.conversation.OpenAI", return_value=openai_client),
+        patch(
+            "app.services.conversation.search_jenny_knowledge",
+            return_value=[knowledge_result],
+        ) as search_knowledge,
+    ):
+        result = generate_avatar_reply("제니 생일이 언제야?")
+
+    assert result == "1월 16일이야!"
+    search_knowledge.assert_called_once_with(
+        "제니 생일이 언제야?",
+        settings=settings,
+        openai_client=openai_client,
+    )
+    request = openai_client.responses.create.call_args.kwargs
+    assert request["model"] == "test-chat-model"
+    assert "제니의 생일은 1월 16일입니다." in request["input"][0]["content"]
+    assert request["input"][-1] == {
+        "role": "user",
+        "content": "제니 생일이 언제야?",
+    }
 
 
 def test_reply_conversation_message_swagger_contract() -> None:
