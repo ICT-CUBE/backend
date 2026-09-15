@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     openai_api_key: str = Field(default="")
     openai_model: str = Field(default="gpt-4.1-mini")
+    openai_embedding_model: str = Field(default="text-embedding-3-small")
 
     chroma_host: str = Field(default="localhost")
     chroma_port: int = Field(default=8000)
