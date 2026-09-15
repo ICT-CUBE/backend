@@ -23,7 +23,7 @@ ChromaDB는 답변을 생성하지 않는다. 임베딩 벡터, 원문 청크, �
 |---|---|
 | 원본 문서 | `scripts/rag/jennie_text.md` |
 | 벡터 데이터베이스 | ChromaDB |
-| Chroma 서버/클라이언트 버전 | `1.5.3` |
+| Chroma 서버/클라이언트 버전 | `1.5.9` |
 | 컬렉션 이름 | `jenny_knowledge` |
 | 임베딩 제공자 | OpenAI |
 | 임베딩 모델 | `text-embedding-3-small` |
@@ -52,7 +52,7 @@ ChromaDB는 답변을 생성하지 않는다. 임베딩 벡터, 원문 청크, �
 ### 3.2 로컬 Chroma 컨테이너 구성
 
 - [x] `docker-compose.dev.yml`에 `chroma` 서비스를 추가했다.
-- [x] `chromadb/chroma:1.5.3` 이미지를 고정해서 사용한다.
+- [x] `chromadb/chroma:1.5.9` 이미지를 고정해서 사용한다.
 - [x] 호스트 포트 `8001`을 Chroma 컨테이너 포트 `8000`에 연결했다.
 - [x] Chroma의 `/data`를 `chroma-data` 볼륨에 연결했다.
 - [x] `/api/v2/heartbeat` 기반 health check를 추가했다.
@@ -73,7 +73,7 @@ Chroma 이미지는 프로젝트에서 직접 빌드하지 않는다. Compose �
 
 ### 3.3 Python 의존성 추가
 
-- [x] `requirements.txt`에 `chromadb==1.5.3`을 추가했다.
+- [x] `requirements.txt`에 `chromadb==1.5.9`을 추가했다.
 - [x] Chroma 서버 이미지와 Python 클라이언트의 버전을 맞췄다.
 - [x] 기존 `openai==1.109.1` 패키지를 임베딩 생성에도 사용하기로 했다.
 
@@ -136,20 +136,34 @@ Compose의 API 서비스는 `env_file: .env`를 사용한다. Compose 파일을
 - [x] 파싱, 길이 제한, 결정적 ID, 빈 문서, 실제 원본 검증 단위 테스트를 작성했다.
 - [x] 실제 `jennie_text.md`에서 34개 섹션, 35개 고유 청크를 생성했으며 가장 긴
   청크가 1,098자인 것을 확인했다.
-- [ ] 현재 실행 환경의 pytest 의존성/캐시 제약으로 테스트 파일의 pytest 통과는
-  아직 확인하지 못했다.
+- [x] 청크 분할 단위 테스트가 통과했다.
+
+### 3.8 OpenAI 임베딩 및 Chroma 적재 스크립트
+
+- [x] `OPENAI_EMBEDDING_MODEL` 설정과 로컬/운영 환경변수 예시를 추가했다.
+- [x] `app/services/rag/indexing.py`에 배치 임베딩 생성 로직을 구현했다.
+- [x] OpenAI 응답 인덱스를 검증하고 요청 순서대로 임베딩을 정렬한다.
+- [x] 청크 ID, 임베딩, 원문, 메타데이터를 Chroma에 `upsert`한다.
+- [x] 같은 원본에서 사라진 오래된 청크 ID를 적재 성공 후 삭제한다.
+- [x] 빈 원본이면 기존 데이터를 삭제하지 않고 오류로 중단한다.
+- [x] `scripts/rag/index_jennie.py` 관리 CLI를 추가했다.
+- [x] 배치 처리, 응답 검증, upsert, 오래된 ID 삭제, 빈 원본, API 키 검증에 대한
+  단위 테스트를 작성했다.
+- [x] Chroma `1.5.3`의 프로젝트 `.env` 충돌을 확인하고 서버/클라이언트를
+  `1.5.9`로 올렸다.
+- [x] 청킹, 적재, Chroma 클라이언트 관련 테스트 22개가 통과했다.
+- [x] 전체 테스트 580개가 통과해 기존 기능의 회귀가 없음을 확인했다.
+- [ ] 실제 OpenAI API와 Chroma 컨테이너를 대상으로 제니 문서를 적재하는 작업은
+  아직 실행하지 않았다.
 
 ## 4. 아직 구현되지 않은 부분
 
 현재 Chroma 컨테이너와 설정만 준비된 상태다. 제니 텍스트는 아직 임베딩되지
 않았으며 `chroma-data` 볼륨에도 제니 컬렉션 데이터가 적재되지 않았다.
 
-- [ ] `OPENAI_EMBEDDING_MODEL` 환경설정 추가
+- [ ] 실제 OpenAI/Chroma 대상 제니 문서 적재 실행
 - [ ] 실제 Chroma 컨테이너 대상 클라이언트 연결 검증
-- [ ] 청크 분할 pytest 실행 확인
-- [ ] OpenAI 임베딩 생성 로직 작성
-- [ ] Chroma 컬렉션 생성 및 `upsert` 적재 스크립트 작성
-- [ ] 적재 결과와 재실행 안전성 테스트
+- [ ] 실제 적재 후 컬렉션 건수와 재실행 결과 확인
 - [ ] 사용자 질문 임베딩과 Top-K 검색 로직 작성
 - [ ] 기존 대화 응답 서비스에 검색 결과 연결
 - [ ] RAG 프롬프트 및 답변 제한 규칙 작성
@@ -159,7 +173,7 @@ Compose의 API 서비스는 `env_file: .env`를 사용한다. Compose 파일을
 
 ## 5. 앞으로의 구현 순서
 
-### 단계 1. 임베딩 환경설정 추가
+### 단계 1. 임베딩 환경설정 추가 — 완료
 
 `Settings`, `.env.example`, `.env.production.example`에 다음 값을 추가한다.
 
@@ -172,9 +186,9 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 
 완료 조건:
 
-- `settings.openai_embedding_model`로 모델명에 접근할 수 있다.
-- 환경변수가 없을 때 `text-embedding-3-small`이 기본값으로 사용된다.
-- 설정 로딩 테스트가 통과한다.
+- [x] `settings.openai_embedding_model`로 모델명에 접근할 수 있다.
+- [x] 환경변수가 없을 때 `text-embedding-3-small`이 기본값으로 사용된다.
+- [x] 적재 단위 테스트에서 설정값 전달을 확인했다.
 
 ### 단계 2. Chroma 클라이언트 모듈 작성 및 연결 검증
 
@@ -209,7 +223,7 @@ collection = client.get_or_create_collection(
 - 설정한 컬렉션을 생성하거나 기존 컬렉션을 가져올 수 있다.
 - Chroma 장애 상황에 대한 테스트가 있다.
 
-### 단계 3. 원본 문서 청크 분할 — 구현 완료, pytest 실행 대기
+### 단계 3. 원본 문서 청크 분할 — 완료
 
 `jennie_text.md`는 `[기본 정보]`, `[성격 및 평소 모습]`, `[패션]` 같은 섹션
 제목을 우선 경계로 사용한다. 고정 글자 수로 전체 문서를 무조건 자르지 않는다.
@@ -246,10 +260,9 @@ jennie_text:{section_slug}:{chunk_index}:{content_hash}
 - [x] 같은 원본을 두 번 분할했을 때 동일한 청크와 ID가 생성된다.
 - [x] 제목이 각 청크에 보존된다.
 - [x] 모든 청크가 설정한 최대 길이 이내다.
-- [ ] `tests/test_rag_chunking.py`를 Docker API 컨테이너에서 실행해 통과를
-  확인한다.
+- [x] `tests/test_rag_chunking.py` 테스트가 통과했다.
 
-### 단계 4. 임베딩 및 Chroma 적재 스크립트 작성
+### 단계 4. 임베딩 및 Chroma 적재 스크립트 작성 — 구현 완료, 실제 적재 대기
 
 별도 관리 스크립트에서 다음 순서로 실행한다.
 
@@ -289,10 +302,12 @@ docker compose -f docker-compose.dev.yml exec api `
 
 완료 조건:
 
-- 최초 실행으로 컬렉션과 데이터가 생성된다.
-- 동일 문서로 다시 실행해도 중복 데이터가 늘어나지 않는다.
-- 일부 문서가 바뀌면 해당 ID가 안정적으로 갱신된다.
-- API 키, Chroma 연결, OpenAI 호출 실패가 명확한 오류로 표시된다.
+- [x] 동일 문서에는 결정적 ID와 `upsert`를 사용해 중복 생성을 방지한다.
+- [x] 변경 또는 삭제된 청크의 오래된 ID를 제거하는 동기화 로직이 있다.
+- [x] API 키 누락과 잘못된 임베딩 응답을 명확한 오류로 처리한다.
+- [x] OpenAI 또는 Chroma 호출 예외를 숨기지 않고 호출자에게 전달한다.
+- [ ] 실제 최초 실행으로 컬렉션과 데이터가 생성되는지 확인한다.
+- [ ] 동일 문서를 실제로 다시 적재해 컬렉션 건수가 늘지 않는지 확인한다.
 
 ### 단계 5. 질문 검색 서비스 작성
 
@@ -430,12 +445,12 @@ docker compose -f docker-compose.dev.yml down -v
 - [x] Chroma 접속 설정 추가
 - [x] 제니 원본 텍스트 준비
 - [x] OpenAI `text-embedding-3-small` 선택
-- [ ] OpenAI 임베딩 모델 설정 추가
+- [x] OpenAI 임베딩 모델 설정 추가
 - [x] Chroma 클라이언트 모듈 구현
 - [ ] 실제 Chroma 연결 통합 검증
 - [x] 문서 청크 분할 구현
-- [ ] 청크 분할 단위 테스트 실행 확인
-- [ ] 적재 스크립트 구현
+- [x] 청크 분할 단위 테스트 실행 확인
+- [x] 적재 스크립트 구현
 - [ ] 제니 문서 실제 적재
 - [ ] 검색 서비스 구현
 - [ ] 대화 응답 서비스에 RAG 연결
