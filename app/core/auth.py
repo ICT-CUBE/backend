@@ -13,9 +13,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.enums import UserStatus
 from app.core.exceptions import ApiError
-from app.models.enums import UserStatus
-from app.models.user import User
+from app.user.models import User
 
 # 인증 실패는 모두 같은 401로 처리하므로 FastAPI 기본 오류 응답을 쓰지 않습니다.
 bearer_scheme = HTTPBearer(auto_error=False)

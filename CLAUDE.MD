@@ -13,21 +13,28 @@ FastAPI + SQLAlchemy 2.0(ORM, sync) + MySQL 기반 백엔드입니다.
 ```text
 app/
   main.py                     앱 생성, 예외 핸들러 등록, 헬스체크
-  api/router.py               도메인 라우터를 prefix/tag와 함께 등록
-  api/routes/<도메인>.py       HTTP 계층 (검증·직렬화·OpenAPI 문서)
-  services/<도메인>.py         비즈니스 로직 + DB 접근
-  schemas/<도메인>.py          요청/응답 Pydantic 스키마
-  models/<도메인>.py           SQLAlchemy ORM 매핑
-  models/enums.py             DDL CHECK 제약과 1:1로 대응하는 고정 코드값
-  core/                       config, database, auth, exceptions, openapi
+  router.py                   도메인 라우터를 prefix/tag와 함께 등록
+  models.py                   모든 도메인 ORM 모델을 임포트해 매퍼에 등록
+  <도메인>/
+    router.py                 HTTP 계층 (검증·직렬화·OpenAPI 문서)
+    service.py                비즈니스 로직 + DB 접근
+    schemas.py                요청/응답 Pydantic 스키마
+    models.py                 SQLAlchemy ORM 매핑 (해당 도메인 테이블이 있을 때만)
+    <모듈>.py                  도메인 안에서만 공유하는 모듈 (예: blockchain/client.py)
+    docs/API_SPEC.MD          API 명세 (진실의 원천 2)
+    docs/BUISNESS_RULE.MD     비즈니스 룰 (진실의 원천 3)
+    docs/TEST_GUIDE.MD        테스트 결과 정리 (내가 작성)
+    tests/test_<도메인>.py     도메인 테스트
+  core/                       여러 도메인이 함께 쓰는 모듈
+    config, database, auth, exceptions, openapi, security, chroma
+    schemas.py                ApiSchema, ErrorResponse
+    enums.py                  DDL CHECK 제약과 1:1로 대응하는 고정 코드값
+    blob_storage.py           Azure Blob 접근
+    search.py                 LIKE 검색 헬퍼
+    tests/conftest.py         테스트 공용 헬퍼 (api_client)
 docs/
   erd.md                      ERD (진실의 원천 1)
-  <도메인>/API_SPEC.MD         API 명세 (진실의 원천 2)
-  <도메인>/BUISNESS_RULE.MD    비즈니스 룰 (진실의 원천 3)
-  <도메인>/TEST_GUIDE.MD       테스트 결과 정리 (내가 작성)
 scripts/sql/01-schema.sql     DDL (진실의 원천 4)
-tests/test_<도메인>.py         도메인당 테스트 파일 1개
-tests/conftest.py             테스트 공용 헬퍼
 ```
 
 ---
@@ -36,13 +43,13 @@ tests/conftest.py             테스트 공용 헬퍼
 
 구현 요청을 받으면 항상 이 순서로 진행합니다.
 
-1. `docs/<도메인>/API_SPEC.MD` 와 `docs/<도메인>/BUISNESS_RULE.MD` 를 먼저 읽습니다.
+1. `app/<도메인>/docs/API_SPEC.MD` 와 `app/<도메인>/docs/BUISNESS_RULE.MD` 를 먼저 읽습니다.
 2. `docs/erd.md` 와 `scripts/sql/01-schema.sql` 로 테이블·컬럼·제약을 확인합니다.
-3. `app/models/` 에 해당 ORM 매핑이 있는지 확인합니다. 없으면 DDL 기준으로 추가합니다.
+3. `app/<도메인>/models.py` 에 해당 ORM 매핑이 있는지 확인합니다. 없으면 DDL 기준으로 추가합니다.
 4. 같은 도메인 또는 가장 비슷한 기존 도메인의 route/service/schema를 열어 형태를 그대로 따릅니다.
 5. schema → service → route → router 등록 순으로 구현합니다.
-6. `tests/test_<도메인>.py` 에 테스트를 추가하고 실행합니다.
-7. `docs/<도메인>/TEST_GUIDE.MD` 를 갱신합니다.
+6. `app/<도메인>/tests/test_<도메인>.py` 에 테스트를 추가하고 실행합니다.
+7. `app/<도메인>/docs/TEST_GUIDE.MD` 를 갱신합니다.
 8. 작업 내용을 정리해서 보고합니다. (7장 참고)
 
 명세와 기존 코드/DDL이 충돌하면 **임의로 판단하지 않고 물어봅니다.**
@@ -51,20 +58,20 @@ tests/conftest.py             테스트 공용 헬퍼
 
 ## 3. 계층별 규칙
 
-### 3.1 schemas (`app/schemas/<도메인>.py`)
+### 3.1 schemas (`app/<도메인>/schemas.py`)
 
 - 모듈 docstring: `"""<한글 도메인명> 도메인 API 요청·응답 스키마."""`
-- 모든 스키마는 `app.schemas.base.ApiSchema` 를 상속합니다.
+- 모든 스키마는 `app.core.schemas.ApiSchema` 를 상속합니다.
   내부는 `snake_case`, JSON은 `alias_generator=to_camel` 로 자동 `camelCase` 변환됩니다.
 - 네이밍: `<도메인><대상>Request` / `<도메인><대상>Response`.
   중첩 응답은 `StageListResponse` → `StageListItemResponse` 처럼 바깥/안쪽을 나눕니다.
 - 응답 필드는 명세의 JSON 구조를 그대로 반영합니다. 명세에 없는 필드를 추가하지 않습니다.
 - Nullable은 `str | None` 처럼 표기합니다.
-- 특정 API에서만 허용되는 부분집합 enum은 `app/schemas/` 안에 `StrEnum` 으로 따로 둡니다
-  (예: `StageSessionEndStatus`). DB 전체 코드값은 `app/models/enums.py` 를 임포트해 씁니다.
-- 공통 오류 응답은 `app.schemas.common.ErrorResponse` 를 씁니다.
+- 특정 API에서만 허용되는 부분집합 enum은 도메인 `schemas.py` 안에 `StrEnum` 으로 따로 둡니다
+  (예: `StageSessionEndStatus`). DB 전체 코드값은 `app/core/enums.py` 를 임포트해 씁니다.
+- 공통 오류 응답은 `app.core.schemas.ErrorResponse` 를 씁니다.
 
-### 3.2 services (`app/services/<도메인>.py`)
+### 3.2 services (`app/<도메인>/service.py`)
 
 - 모듈 docstring: 그 파일이 담당하는 로직을 한 줄로 씁니다.
 - 함수 시그니처는 **키워드 전용**입니다: `def xxx(*, db: Session, current_user_id: int, ...)`.
@@ -78,11 +85,11 @@ tests/conftest.py             테스트 공용 헬퍼
 - 시각 저장은 **KST naive datetime**:
   `datetime.now(KOREA_TIMEZONE).replace(tzinfo=None)`.
   `KOREA_TIMEZONE = timezone(timedelta(hours=9))` 는 서비스 모듈 상단에 둡니다(기존 관례).
-- 외부 저장소(Azure Blob)는 `app/services/blob_storage.py` 의 함수를 통해서만 접근하고,
+- 외부 저장소(Azure Blob)는 `app/core/blob_storage.py` 의 함수를 통해서만 접근하고,
   실패는 공통 500(`INTERNAL_SERVER_ERROR`)으로 변환합니다.
 - 라우터는 서비스만 호출하고, 서비스는 라우터를 모릅니다. 서비스끼리의 임의 호출도 만들지 않습니다.
 
-### 3.3 routes (`app/api/routes/<도메인>.py`)
+### 3.3 routes (`app/<도메인>/router.py`)
 
 - 모듈 docstring: `"""<한글 도메인명> 도메인 API 라우터."""`
 - `router = APIRouter()` 를 선언하고, prefix가 다른 엔드포인트 묶음이 필요하면
@@ -96,14 +103,14 @@ tests/conftest.py             테스트 공용 헬퍼
 - Path/Query/Form의 외부 이름이 camelCase면 `alias="trackId"` 를 붙입니다.
   자연스러운 범위 제약(`ge=1` 등)은 기존 관례대로 붙입니다.
 - 204 응답은 `-> Response` 로 선언하고 `return Response(status_code=status.HTTP_204_NO_CONTENT)`.
-- 새 라우터는 `app/api/router.py` 에 `prefix`/`tags` 와 함께 등록합니다.
+- 새 라우터는 `app/router.py` 에 `prefix`/`tags` 와 함께 등록합니다.
 
-### 3.4 models (`app/models/<도메인>.py`)
+### 3.4 models (`app/<도메인>/models.py`)
 
 - DDL(`scripts/sql/01-schema.sql`)이 기준입니다. 컬럼명·타입·nullable을 그대로 반영합니다.
 - enum 컬럼은 기존 패턴 유지:
   `Enum(XxxEnum, values_callable=enum_values, native_enum=False, create_constraint=False)`.
-- 새 모델을 만들면 `app/models/__init__.py` 의 import와 `__all__` 에 **알파벳 순**으로 추가합니다.
+- 새 모델을 만들면 `app/models.py` 의 import와 `__all__` 에 **알파벳 순**으로 추가합니다.
 - 순환 임포트를 피하기 위해 관계 타입은 `TYPE_CHECKING` 블록에서 임포트하고 문자열로 씁니다.
 - 스키마 변경이 필요하면 코드만 고치지 않고 ERD/DDL과 함께 처리할지 먼저 확인합니다.
 
@@ -129,17 +136,17 @@ tests/conftest.py             테스트 공용 헬퍼
 
 ### 4.1 파일 구성
 
-- **도메인당 파일 1개**: `tests/test_<도메인>.py`. (기존 구조 유지)
+- **도메인당 파일 1개**: `app/<도메인>/tests/test_<도메인>.py`. (기존 구조 유지)
 - 한 파일 안에서 API 단위로 섹션을 나눕니다.
   API마다 `request_<동작>()` 요청 헬퍼를 하나 두고, 그 아래에 해당 API 테스트들을 모읍니다.
-- 공용 보일러플레이트는 `tests/conftest.py` 의 `api_client(db)` 컨텍스트 매니저를 씁니다.
-  `tests/test_*.py` 전부가 이 방식이므로 `override_get_db` 를 새로 만들지 않습니다.
+- 공용 보일러플레이트는 `app/core/tests/conftest.py` 의 `api_client(db)` 컨텍스트 매니저를 씁니다.
+  API 테스트 전부가 이 방식이므로 `override_get_db` 를 새로 만들지 않습니다.
   500 응답을 확인할 때만 `api_client(db, raise_server_exceptions=False)` 를 씁니다.
-  (예외: `tests/test_exceptions.py` 는 `create_app()` 으로 별도 앱을 만들고 DB를 쓰지 않아
+  (예외: `app/core/tests/test_exceptions.py` 는 `create_app()` 으로 별도 앱을 만들고 DB를 쓰지 않아
   `TestClient` 를 직접 사용합니다.)
 
 ```python
-from tests.conftest import api_client
+from app.core.tests.conftest import api_client
 
 
 def request_cube_verification(db, *, body=None):
@@ -156,7 +163,7 @@ def request_cube_verification(db, *, body=None):
 - 조회 순서대로 `db.scalar.side_effect = [...]` 를 지정합니다.
 - 저장 검증은 `db.add.side_effect` 로 수집한 객체를 확인하고,
   `db.commit.assert_called_once()` / `db.commit.assert_not_called()` 로 트랜잭션을 확인합니다.
-- 외부 의존성은 `patch("app.services.<도메인>.<함수>")` 로 서비스 모듈이 참조하는 이름을 패치합니다.
+- 외부 의존성은 `patch("app.<도메인>.service.<함수>")` 로 서비스 모듈이 참조하는 이름을 패치합니다.
 - 응답은 `response.status_code` 와 `response.json()` **전체**를 비교합니다.
 - 공통 500 응답을 검증할 때는 `patch("app.main.get_settings", return_value=Settings(debug=False))`
   로 앱을 만듭니다. `debug=true` 에서는 Starlette이 공통 핸들러 대신 HTML 트레이스백을 반환합니다.
@@ -194,13 +201,13 @@ def request_cube_verification(db, *, body=None):
 
 ## 5. TEST_GUIDE 작성 규칙
 
-`docs/<도메인>/TEST_GUIDE.MD` 에 API별로 아래 형식으로 정리합니다.
+`app/<도메인>/docs/TEST_GUIDE.MD` 에 API별로 아래 형식으로 정리합니다.
 
 ```markdown
 # <도메인> 테스트 가이드
 
-테스트 파일: `tests/test_<도메인>.py`
-실행: `.venv\Scripts\python.exe -m pytest tests/test_<도메인>.py -q`
+테스트 파일: `app/<도메인>/tests/test_<도메인>.py`
+실행: `.venv\Scripts\python.exe -m pytest app/<도메인>/tests/test_<도메인>.py -q`
 최종 실행 결과: N passed (YYYY-MM-DD)
 
 ---

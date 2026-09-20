@@ -9,16 +9,11 @@ import sys
 from pathlib import Path
 from textwrap import dedent
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.core.chroma import get_jenny_knowledge_collection  # noqa: E402
-from app.services.rag.indexing import (  # noqa: E402
-    DEFAULT_EMBEDDING_BATCH_SIZE,
-    index_document,
-)
-
+from app.rag.indexing import DEFAULT_EMBEDDING_BATCH_SIZE, index_document
 
 DEFAULT_SOURCE = Path(__file__).with_name("jennie_text.md")
 

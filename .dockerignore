@@ -8,3 +8,7 @@ __pycache__
 .pytest_cache
 .ruff_cache
 *.egg-info
+
+# 도메인 폴더 안의 테스트·문서는 배포 이미지에 포함하지 않습니다.
+app/**/tests
+app/**/docs

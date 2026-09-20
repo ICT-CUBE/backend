@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from enum import Enum as PythonEnum
 from typing import Any
 
 from sqlalchemy import create_engine, event, text
@@ -33,6 +34,11 @@ SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 class Base(DeclarativeBase):
     pass
+
+
+def enum_values(enum_class: type[PythonEnum]) -> list[str]:
+    """SQLAlchemy가 Enum 이름이 아니라 DDL의 실제 문자열 값을 사용하게 합니다."""
+    return [str(item.value) for item in enum_class.__members__.values()]
 
 
 def get_db() -> Generator[Session, None, None]:
