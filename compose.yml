@@ -14,6 +14,21 @@ services:
         condition: service_healthy
       chroma:
         condition: service_healthy
+      rag-indexer:
+        condition: service_completed_successfully
+
+  rag-indexer:
+    build:
+      context: .
+    command: python scripts/rag/index_jennie.py --if-empty
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    depends_on:
+      chroma:
+        condition: service_healthy
+    restart: "no"
 
   chroma:
     image: chromadb/chroma:1.5.9
@@ -22,20 +37,25 @@ services:
     volumes:
       - chroma-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/heartbeat"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8000"]
       interval: 10s
       timeout: 5s
       retries: 10
 
   mysql:
     image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-hanium}
+      MYSQL_USER: ${MYSQL_USER:-hanium}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-hanium_password}
     ports:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
       - ./scripts/sql:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot_password"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot --password=\"$${MYSQL_ROOT_PASSWORD}\""]
       interval: 10s
       timeout: 5s
       retries: 10
