@@ -1,8 +1,17 @@
-"""홈 정보 조회 API 응답 스키마."""
+"""홈 도메인 API 요청·응답 스키마."""
 
 from datetime import datetime
+from enum import StrEnum
 
+from app.core.enums import NotificationType
 from app.core.schemas import ApiSchema
+
+
+class HomeNotificationFilter(StrEnum):
+    ALL = "ALL"
+    MISSION = "MISSION"
+    EVENT = "EVENT"
+    MARKET = "MARKET"
 
 
 class HomeUserResponse(ApiSchema):
@@ -39,3 +48,23 @@ class HomeResponse(ApiSchema):
     cube_ownership: HomeCubeOwnershipResponse
     cube: HomeCubeResponse
     affinity: HomeAffinityResponse
+
+
+class HomeNotificationItemResponse(ApiSchema):
+    id: int
+    notification_type: NotificationType
+    title: str
+    content: str
+    is_read: bool
+    sent_at: datetime
+
+
+class HomePaginationResponse(ApiSchema):
+    page: int
+    size: int
+    has_next: bool
+
+
+class HomeNotificationsResponse(ApiSchema):
+    notifications: list[HomeNotificationItemResponse]
+    pagination: HomePaginationResponse

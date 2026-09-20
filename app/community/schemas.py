@@ -74,3 +74,16 @@ class CommunityPaginationResponse(ApiSchema):
 class CommunityPostsResponse(ApiSchema):
     posts: list[CommunityPostItemResponse]
     pagination: CommunityPaginationResponse
+
+
+class CommunityPostLikeResponse(ApiSchema):
+    is_liked: bool
+    like_count: int
+
+
+class CommunityCommentCreateRequest(ApiSchema):
+    content: str
+
+
+class CommunityCommentCreateResponse(ApiSchema):
+    comment: CommunityCommentItemResponse

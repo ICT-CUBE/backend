@@ -301,6 +301,229 @@ Status Code : 404
 ```
 
 
+## 커뮤니티 게시글 좋아요 토글
+- http 메서드: patch
+- domain: community
+- endpoint: /api/v1/community/posts/{postId}/like
+
+### API 설명
+
+사용자가 커뮤니티 게시글의 좋아요 버튼을 누르면 호출한다.
+
+현재 사용자의 게시글 좋아요 상태를 반전하고, 변경된 좋아요 상태와 전체 좋아요 수를 반환한다.
+
+---
+
+### 처리 정책
+
+- 현재 로그인한 사용자와 `postId`를 기준으로 게시글 좋아요를 처리한다.
+- 큐브 소유권은 게시글 좋아요 처리 조건으로 사용하지 않는다.
+- `postId`에 해당하는 게시글의 `status`가 `ACTIVE` 또는 `REPORTED`이고 `deleted_at IS NULL`인 경우에만 좋아요를 처리한다.
+- 게시글이 존재하지 않거나 `status = DELETED`이거나 `deleted_at IS NOT NULL`이면 404: POST_NOT_FOUND를 반환한다.
+- 현재 사용자가 작성한 게시글에도 좋아요를 누를 수 있다.
+- 현재 사용자와 게시글에 해당하는 `post_like` 행이 없으면 `is_liked = true`인 행을 생성한다.
+- 기존 `post_like.is_liked = true`이면 `false`로 변경한다.
+- 기존 `post_like.is_liked = false`이면 `true`로 변경한다.
+- 좋아요를 취소해도 `post_like` 행을 삭제하지 않는다.
+- `(post_id, user_id)` 조합은 하나의 좋아요 행만 가질 수 있다.
+- 처리 대상 게시글을 잠근 상태에서 좋아요 생성 또는 변경을 수행한다.
+- 좋아요 변경 사항을 반영한 뒤 `is_liked = true`인 행만 집계하여 `likeCount`를 계산한다.
+- 처리에 성공하면 트랜잭션을 한 번 커밋하고, 실패하면 롤백한다.
+- 이 API는 요청할 때마다 현재 좋아요 상태를 반전하므로 멱등성을 보장하지 않는다.
+
+---
+
+### 요청 Query
+
+없음
+
+---
+
+### 요청 Path
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `postId` | number | O | 좋아요 상태를 변경할 게시글 id. 1 이상의 정수 |
+
+```json
+{
+  "postId": 1
+}
+```
+
+---
+
+### 요청 Body
+
+없음
+
+---
+
+### 정상 응답 데이터
+
+Status Code : 200
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `isLiked` | boolean | 토글 이후 현재 사용자의 좋아요 상태 |
+| `likeCount` | number | 토글 이후 게시글의 전체 좋아요 수 |
+
+좋아요를 설정한 경우
+
+```json
+{
+  "isLiked": true,
+  "likeCount": 6
+}
+```
+
+좋아요를 취소한 경우
+
+```json
+{
+  "isLiked": false,
+  "likeCount": 5
+}
+```
+
+---
+
+### 오류 응답 데이터
+
+Status Code : 404
+
+게시글이 존재하지 않거나 좋아요를 처리할 수 없는 상태인 경우
+
+```json
+{
+  "code": "POST_NOT_FOUND",
+  "message": "게시글을 찾을 수 없습니다."
+}
+```
+
+Path 값이 올바르지 않은 경우의 400, 인증 실패에 대한 401과 서버 내부 오류에 대한 500은 공통 오류 정책을 따른다.
+
+
+## 커뮤니티 댓글 작성
+- http 메서드: post
+- domain: community
+- endpoint: /api/v1/community/posts/{postId}/comments
+
+### API 설명
+
+사용자가 커뮤니티 게시글에 댓글을 작성할 때 호출한다.
+
+현재 사용자를 작성자로 댓글을 저장하고 생성된 댓글 정보를 반환한다.
+
+---
+
+### 처리 정책
+
+- 현재 로그인한 사용자의 ID를 댓글 작성자 ID로 저장한다.
+- 큐브 소유권은 댓글 작성 조건으로 사용하지 않는다.
+- `postId`에 해당하는 게시글의 `status`가 `ACTIVE` 또는 `REPORTED`이고 `deleted_at IS NULL`인 경우에만 댓글을 작성할 수 있다.
+- 게시글이 존재하지 않거나 `status = DELETED`이거나 `deleted_at IS NOT NULL`이면 404: POST_NOT_FOUND를 반환한다.
+- 현재 사용자가 작성한 게시글에도 댓글을 작성할 수 있다.
+- `content`의 앞뒤 공백을 제거한 뒤 저장한다.
+- `content`가 빈 문자열이거나 공백으로만 구성되었거나 1,000자를 초과하면 공통 400: INVALID_REQUEST를 반환한다.
+- `content` 내부의 줄바꿈은 허용한다.
+- 댓글의 `status`는 `ACTIVE`, `deleted_at`은 `null`로 저장한다.
+- 대댓글과 댓글 이미지 첨부는 지원하지 않는다.
+- 게시글을 잠근 상태에서 댓글을 생성하여 게시글 삭제와 댓글 작성이 동시에 처리되지 않도록 한다.
+- 댓글 생성에 성공하면 트랜잭션을 한 번 커밋하고, 실패하면 롤백한다.
+- 게시글의 댓글 수를 별도 컬럼에 저장하거나 증가시키지 않는다.
+- 댓글 작성은 동일한 요청을 반복하면 별도의 댓글이 생성되므로 멱등성을 보장하지 않는다.
+- 게시글 작성자에게 알림을 생성하는 처리는 이 API의 범위에 포함하지 않는다.
+
+---
+
+### 요청 Query
+
+없음
+
+---
+
+### 요청 Path
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `postId` | number | O | 댓글을 작성할 게시글 id. 1 이상의 정수 |
+
+```json
+{
+  "postId": 1
+}
+```
+
+---
+
+### 요청 Body
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `content` | string | O | 댓글 내용. 앞뒤 공백 제거 후 1자 이상 1,000자 이하 |
+
+```json
+{
+  "content": "큐브 디자인이 정말 예쁘네요."
+}
+```
+
+---
+
+### 정상 응답 데이터
+
+Status Code : 201
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `comment` | object | 생성된 댓글 정보 |
+| `comment.id` | number | 댓글 id |
+| `comment.author.id` | number | 작성자 사용자 id |
+| `comment.author.nickname` | string \| null | 작성자 닉네임 |
+| `comment.author.profileImageUrl` | string \| null | 작성자 프로필 이미지 URL |
+| `comment.content` | string | 댓글 내용 |
+| `comment.createdAt` | string(date-time) | 댓글 작성 시각. KST 기준 offset 없는 ISO 8601 형식 |
+| `comment.likeCount` | number | 댓글 좋아요 수. 생성 시 0 |
+| `comment.isLiked` | boolean | 현재 사용자의 댓글 좋아요 여부. 생성 시 false |
+| `comment.isMine` | boolean | 현재 사용자가 작성한 댓글인지 여부. 생성 시 true |
+
+```json
+{
+  "comment": {
+    "id": 46,
+    "author": {
+      "id": 1,
+      "nickname": "블링크",
+      "profileImageUrl": "https://haniumstorage.blob.core.windows.net/hanium/profile_image/profile_002.png"
+    },
+    "content": "큐브 디자인이 정말 예쁘네요.",
+    "createdAt": "2026-09-20T18:30:00",
+    "likeCount": 0,
+    "isLiked": false,
+    "isMine": true
+  }
+}
+```
+
+---
+
+### 오류 응답 데이터
+
+Status Code : 404
+
+게시글이 존재하지 않거나 댓글을 작성할 수 없는 상태인 경우
+
+```json
+{
+  "code": "POST_NOT_FOUND",
+  "message": "게시글을 찾을 수 없습니다."
+}
+```
+
+Path 또는 Body 값이 올바르지 않은 경우의 400, 인증 실패에 대한 401과 서버 내부 오류에 대한 500은 공통 오류 정책을 따른다.
+
+
 
 ## 커뮤니티 게시글 작성
 - http 메서드: post

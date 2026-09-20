@@ -1,10 +1,12 @@
-"""홈 화면에 필요한 사용자·큐브·친밀도 조회 로직."""
+"""홈 화면에 필요한 사용자·큐브·친밀도 조회와 알림 조회·읽음 처리 로직."""
 
-from sqlalchemy import case, select
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import case, select, update
 from sqlalchemy.orm import Session, joinedload
 
 from app.affinity.models import Affinity, Level
-from app.core.enums import OwnershipStatus
+from app.core.enums import NotificationType, OwnershipStatus
 from app.core.exceptions import ApiError
 from app.cube.models import CubeOwnership
 from app.home.schemas import (
@@ -12,9 +14,17 @@ from app.home.schemas import (
     HomeCubeOwnershipResponse,
     HomeCubeResponse,
     HomeLevelResponse,
+    HomeNotificationFilter,
+    HomeNotificationItemResponse,
+    HomeNotificationsResponse,
+    HomePaginationResponse,
     HomeResponse,
     HomeUserResponse,
 )
+from app.user.models import Notification
+
+KOREA_TIMEZONE = timezone(timedelta(hours=9))
+NOTIFICATION_PAGE_SIZE = 20
 
 
 def get_home(*, db: Session, current_user_id: int) -> HomeResponse:
@@ -94,3 +104,102 @@ def get_home(*, db: Session, current_user_id: int) -> HomeResponse:
             ),
         ),
     )
+
+
+def get_notifications(
+    *,
+    db: Session,
+    current_user_id: int,
+    notification_type: HomeNotificationFilter,
+    page: int,
+    size: int,
+) -> HomeNotificationsResponse:
+    """현재 사용자의 알림을 전송 시각 내림차순으로 한 페이지 조회합니다."""
+    statement = select(Notification).where(Notification.user_id == current_user_id)
+    if notification_type != HomeNotificationFilter.ALL:
+        statement = statement.where(
+            Notification.notification_type == NotificationType(notification_type)
+        )
+
+    # 다음 페이지 존재 여부를 판단하려고 한 건을 더 조회합니다.
+    rows = db.scalars(
+        statement.order_by(Notification.sent_at.desc(), Notification.id.desc())
+        .offset(page * size)
+        .limit(size + 1)
+    ).all()
+
+    return HomeNotificationsResponse(
+        notifications=[
+            HomeNotificationItemResponse(
+                id=notification.id,
+                notification_type=notification.notification_type,
+                title=notification.title,
+                content=notification.content,
+                is_read=notification.is_read,
+                sent_at=notification.sent_at,
+            )
+            for notification in rows[:size]
+        ],
+        pagination=HomePaginationResponse(
+            page=page,
+            size=size,
+            has_next=len(rows) > size,
+        ),
+    )
+
+
+def read_notification(
+    *,
+    db: Session,
+    current_user_id: int,
+    notification_id: int,
+) -> None:
+    """현재 사용자의 알림 한 건을 읽음 상태로 저장합니다."""
+    # 같은 알림에 대한 동시 요청이 read_at을 덮어쓰지 않게 행을 잠급니다.
+    notification = db.scalar(
+        select(Notification)
+        .where(
+            Notification.id == notification_id,
+            Notification.user_id == current_user_id,
+        )
+        .limit(1)
+        .with_for_update()
+    )
+    if notification is None:
+        raise ApiError(
+            status_code=404,
+            code="NOTIFICATION_NOT_FOUND",
+            message="알림을 찾을 수 없습니다.",
+        )
+    # 이미 읽은 알림은 기존 read_at을 유지합니다.
+    if notification.is_read:
+        return
+
+    notification.is_read = True
+    notification.read_at = datetime.now(KOREA_TIMEZONE).replace(tzinfo=None)
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def read_all_notifications(*, db: Session, current_user_id: int) -> None:
+    """현재 사용자의 미읽음 알림을 한 번의 일괄 수정으로 읽음 처리합니다."""
+    # 처리 대상이 모두 같은 read_at을 갖도록 시각을 한 번만 만듭니다.
+    read_at = datetime.now(KOREA_TIMEZONE).replace(tzinfo=None)
+
+    try:
+        db.execute(
+            update(Notification)
+            .where(
+                Notification.user_id == current_user_id,
+                Notification.is_read.is_(False),
+            )
+            .values(is_read=True, read_at=read_at)
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise

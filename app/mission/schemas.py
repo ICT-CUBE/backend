@@ -1,4 +1,4 @@
-"""미션 도메인 API 응답 스키마."""
+"""미션 도메인 API 요청·응답 스키마."""
 
 from datetime import datetime
 
@@ -42,3 +42,22 @@ class MissionListResponse(ApiSchema):
     affinity: MissionAffinityResponse
     daily_missions: list[MissionItemResponse]
     event_missions: list[MissionItemResponse]
+
+
+class MissionDailyRewardItemResponse(ApiSchema):
+    id: int
+    name: str
+    reward_type: str
+    reward_count: int | None
+
+
+class MissionDailyDetailItemResponse(ApiSchema):
+    id: int
+    mission_type: str
+    title: str
+    mission_info: str | None
+    reward_item: MissionDailyRewardItemResponse
+
+
+class MissionDailyDetailResponse(ApiSchema):
+    mission: MissionDailyDetailItemResponse

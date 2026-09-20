@@ -76,13 +76,13 @@ INSERT INTO `affinity` (`id`, `cube_ownership_id`, `level_id`, `current_xp`) VAL
 (7, 7, 1, 0);
 
 INSERT INTO `mission` (`id`, `reward_item_id`, `mission_type`, `title`, `description`, `mission_info`, `target_action`, `target_count`, `start_at`, `end_at`, `is_active`) VALUES
-(1, 2, 'DAILY', '홈 화면 방문하기', 'AR ZONE 접속', 'home_view=1', 'HOME_VIEW', 1, NULL, NULL, TRUE),
-(2, 1, 'DAILY', '아바타와 대화하기', '텍스트 또는 음성 대화', 'avatar_chat=3', 'CONVERSATION', 3, NULL, NULL, TRUE),
-(3, 2, 'DAILY', '음원 재생하기', '앨범에서 노래 한 곡 재생', 'play_music=1', 'ALBUM_PLAY', 1, NULL, NULL, TRUE),
-(4, 5, 'DAILY', '아바타 현실 소환하기', 'AR 카메라 3회 사용', 'summon_avatar=3', 'SUMMON_AVATAR', 3, NULL, NULL, TRUE),
-(5, 4, 'DAILY', '갤러리 둘러보기', '아무 사진 5회 열람', 'open_gallery=5', 'OPEN_GALLERY', 5, NULL, NULL, TRUE),
-(6, 3, 'DAILY', '커뮤니티 글 업로드하기', '게시물 1회 업로드', 'write_post=1', 'COMMUNITY_POST', 1, NULL, NULL, TRUE),
-(7, 14, 'EVENT', '[RUBY] 콘서트 인증 이벤트', '아무 뮤직 비디오 5회 시청', 'watch_music_video=5', 'PLAY_MUSIC_VIDEO', 5, '2026-06-12 00:00:00', '2026-09-18 23:59:59', TRUE);
+(1, 2, 'DAILY', '홈 화면 방문하기', 'AR ZONE 접속', 'AR ZONE의 홈 화면에 방문해보세요. 홈 화면에 접속하면 미션이 완료돼요!', 'HOME_VIEW', 1, NULL, NULL, TRUE),
+(2, 1, 'DAILY', '아바타와 대화하기', '텍스트 또는 음성 대화', '아바타와 즐거운 대화를 나눠보세요. 텍스트 또는 음성으로 3회 대화하면 미션이 완료돼요!', 'CONVERSATION', 3, NULL, NULL, TRUE),
+(3, 2, 'DAILY', '음원 재생하기', '앨범에서 노래 한 곡 재생', '좋아하는 아티스트의 음원을 감상해보세요. 앨범에서 음원을 1회 재생하면 미션이 완료돼요!', 'ALBUM_PLAY', 1, NULL, NULL, TRUE),
+(4, 5, 'DAILY', '아바타 현실 소환하기', 'AR 카메라 3회 사용', '아바타를 현실에 소환해 예절샷을 남겨보세요. AR 카메라로 3회 촬영하면 미션이 완료돼요!', 'SUMMON_AVATAR', 3, NULL, NULL, TRUE),
+(5, 4, 'DAILY', '갤러리 둘러보기', '아무 사진 5회 열람', '갤러리에서 추억을 둘러보세요. 갤러리 사진을 5회 열어보면 미션이 완료돼요!', 'OPEN_GALLERY', 5, NULL, NULL, TRUE),
+(6, 3, 'DAILY', '커뮤니티 글 업로드하기', '게시물 1회 업로드', '커뮤니티에 이야기를 공유해보세요. 게시물을 1회 업로드하면 미션이 완료돼요!', 'COMMUNITY_POST', 1, NULL, NULL, TRUE),
+(7, 14, 'EVENT', '[RUBY] 콘서트 인증 이벤트', '아무 뮤직 비디오 5회 시청', 'RUBY 콘서트 인증 이벤트에 참여해보세요. 뮤직비디오를 5회 시청하면 미션이 완료돼요!', 'PLAY_MUSIC_VIDEO', 5, '2026-06-12 00:00:00', '2026-09-18 23:59:59', TRUE);
 
 INSERT INTO `mission_progress` (`id`, `cube_ownership_id`, `mission_id`, `current_count`, `status`, `reward_claimed`, `completed_at`, `claimed_at`) VALUES
 (1, 1, 1, 1, 'REWARDED', TRUE, '2025-03-24 10:00:00', '2025-03-24 10:02:00'),

@@ -1,4 +1,4 @@
-"""커뮤니티 게시글 목록·상세 조회와 게시글 작성·삭제 로직."""
+"""커뮤니티 게시글 목록·상세 조회와 게시글 작성·삭제·좋아요 토글, 댓글 작성 로직."""
 
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.community.models import Comment, CommentLike, Post, PostLike, PostMedia
 from app.community.schemas import (
     CommunityBoardFilter,
+    CommunityCommentCreateResponse,
     CommunityCommentItemResponse,
     CommunityPaginationResponse,
     CommunityPostAuthorResponse,
@@ -17,6 +18,7 @@ from app.community.schemas import (
     CommunityPostDetailItemResponse,
     CommunityPostDetailResponse,
     CommunityPostItemResponse,
+    CommunityPostLikeResponse,
     CommunityPostsResponse,
 )
 from app.core.blob_storage import (
@@ -31,6 +33,7 @@ from app.user.models import User
 COMMUNITY_PAGE_SIZE = 20
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
 POST_TITLE_MAX_LENGTH = 150
+COMMENT_CONTENT_MAX_LENGTH = 1000
 POST_IMAGE_MAX_COUNT = 5
 # 삭제되지 않은 게시글·댓글로 취급하는 상태입니다.
 VISIBLE_POST_STATUSES = (PostStatus.ACTIVE, PostStatus.REPORTED)
@@ -403,4 +406,131 @@ def _raise_post_not_found() -> NoReturn:
         status_code=404,
         code="POST_NOT_FOUND",
         message="게시글을 찾을 수 없습니다.",
+    )
+
+
+def toggle_community_post_like(
+    *,
+    db: Session,
+    current_user_id: int,
+    post_id: int,
+) -> CommunityPostLikeResponse:
+    """게시글 좋아요 상태를 반전하고 반영 후의 좋아요 수를 반환합니다."""
+    # 게시글 삭제 요청과 동시에 처리되지 않도록 게시글을 잠그고 시작합니다.
+    post = db.scalar(
+        select(Post)
+        .where(
+            Post.id == post_id,
+            Post.status.in_(VISIBLE_POST_STATUSES),
+            Post.deleted_at.is_(None),
+        )
+        .limit(1)
+        .with_for_update()
+    )
+    if post is None:
+        _raise_post_not_found()
+
+    post_like = db.scalar(
+        select(PostLike)
+        .where(
+            PostLike.post_id == post_id,
+            PostLike.user_id == current_user_id,
+        )
+        .limit(1)
+    )
+    if post_like is None:
+        # 취소해도 행을 지우지 않으므로 이력이 없을 때만 새로 만듭니다.
+        post_like = PostLike(
+            post_id=post_id,
+            user_id=current_user_id,
+            is_liked=True,
+        )
+        db.add(post_like)
+    else:
+        post_like.is_liked = not post_like.is_liked
+    is_liked = post_like.is_liked
+
+    try:
+        # 변경을 먼저 반영해야 좋아요 수 집계에 이번 요청이 포함됩니다.
+        db.flush()
+        like_count = _count_post_likes(db=db, post_id=post_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return CommunityPostLikeResponse(is_liked=is_liked, like_count=like_count)
+
+
+def _count_post_likes(*, db: Session, post_id: int) -> int:
+    """게시글의 is_liked = true 인 좋아요 행만 집계합니다."""
+    like_count = db.scalar(
+        select(func.count(PostLike.id)).where(
+            PostLike.post_id == post_id,
+            PostLike.is_liked.is_(True),
+        )
+    )
+    return int(like_count or 0)
+
+
+def create_community_comment(
+    *,
+    db: Session,
+    current_user_id: int,
+    post_id: int,
+    content: str,
+) -> CommunityCommentCreateResponse:
+    """게시글에 현재 사용자를 작성자로 댓글을 저장하고 생성된 댓글을 반환합니다."""
+    stripped_content = content.strip()
+    if not stripped_content or len(stripped_content) > COMMENT_CONTENT_MAX_LENGTH:
+        _raise_invalid_request()
+
+    # 게시글 삭제 요청과 동시에 처리되지 않도록 게시글을 잠그고 시작합니다.
+    post = db.scalar(
+        select(Post)
+        .where(
+            Post.id == post_id,
+            Post.status.in_(VISIBLE_POST_STATUSES),
+            Post.deleted_at.is_(None),
+        )
+        .limit(1)
+        .with_for_update()
+    )
+    if post is None:
+        _raise_post_not_found()
+
+    author = db.scalar(select(User).where(User.id == current_user_id).limit(1))
+    comment = Comment(
+        post_id=post_id,
+        user_id=current_user_id,
+        content=stripped_content,
+        status=CommentStatus.ACTIVE,
+        deleted_at=None,
+    )
+    try:
+        db.add(comment)
+        # 작성 시각은 KST로 고정된 DB 세션의 CURRENT_TIMESTAMP를 쓰므로 flush 후 읽습니다.
+        db.flush()
+        comment_id = comment.id
+        created_at = comment.created_at
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return CommunityCommentCreateResponse(
+        comment=CommunityCommentItemResponse(
+            id=comment_id,
+            author=CommunityPostAuthorResponse(
+                id=author.id,
+                nickname=author.nickname,
+                profile_image_url=author.profile_character_img_url,
+            ),
+            content=stripped_content,
+            created_at=created_at,
+            # 새 댓글은 좋아요 이력이 없고 작성자가 현재 사용자입니다.
+            like_count=0,
+            is_liked=False,
+            is_mine=True,
+        )
     )

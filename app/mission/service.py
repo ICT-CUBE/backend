@@ -1,4 +1,4 @@
-"""미션 목록 조회 서비스 로직."""
+"""미션 목록 조회와 데일리 미션 상세 조회 서비스 로직."""
 
 from datetime import datetime, time, timedelta, timezone
 
@@ -17,6 +17,9 @@ from app.cube.models import CubeOwnership
 from app.mission.models import Mission, MissionProgress, RewardItem, UserReward
 from app.mission.schemas import (
     MissionAffinityResponse,
+    MissionDailyDetailItemResponse,
+    MissionDailyDetailResponse,
+    MissionDailyRewardItemResponse,
     MissionItemResponse,
     MissionLevelResponse,
     MissionListResponse,
@@ -166,4 +169,65 @@ def _build_mission_item(
         ),
         start_at=mission.start_at,
         end_at=mission.end_at,
+    )
+
+
+def get_daily_mission(
+    *,
+    db: Session,
+    current_user_id: int,
+    mission_id: int,
+) -> MissionDailyDetailResponse:
+    """현재 사용자의 마지막 접근 큐브 소유권 기준으로 데일리 미션 상세를 조회합니다."""
+    cube_ownership = db.scalar(
+        select(CubeOwnership)
+        .where(
+            CubeOwnership.user_id == current_user_id,
+            CubeOwnership.ownership_status == OwnershipStatus.ACTIVE,
+            CubeOwnership.is_last_accessed.is_(True),
+        )
+        .limit(1)
+    )
+    if cube_ownership is None:
+        raise ApiError(
+            status_code=404,
+            code="CUBE_OWNERSHIP_NOT_FOUND",
+            message="큐브 소유권 정보를 찾을 수 없습니다.",
+        )
+
+    # 보상 아이템이 없거나 삭제된 미션도 조회 대상에서 빼야 해서 inner join으로 거릅니다.
+    mission = db.scalar(
+        select(Mission)
+        .join(Mission.reward_item)
+        .where(
+            Mission.id == mission_id,
+            Mission.mission_type == MissionType.DAILY,
+            Mission.is_active.is_(True),
+            Mission.deleted_at.is_(None),
+            RewardItem.deleted_at.is_(None),
+        )
+        .options(joinedload(Mission.reward_item))
+        .limit(1)
+    )
+    if mission is None:
+        raise ApiError(
+            status_code=404,
+            code="DAILY_MISSION_NOT_FOUND",
+            message="데일리 미션 정보를 찾을 수 없습니다.",
+        )
+
+    reward_item = mission.reward_item
+    return MissionDailyDetailResponse(
+        mission=MissionDailyDetailItemResponse(
+            id=mission.id,
+            mission_type=mission.mission_type.value,
+            title=mission.title,
+            mission_info=mission.mission_info,
+            reward_item=MissionDailyRewardItemResponse(
+                id=reward_item.id,
+                name=reward_item.name,
+                reward_type=reward_item.reward_type.value,
+                reward_count=reward_item.reward_count,
+            ),
+        )
     )

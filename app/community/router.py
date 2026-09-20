@@ -17,16 +17,21 @@ from sqlalchemy.orm import Session
 
 from app.community.schemas import (
     CommunityBoardFilter,
+    CommunityCommentCreateRequest,
+    CommunityCommentCreateResponse,
     CommunityPostCreateResponse,
     CommunityPostDetailResponse,
+    CommunityPostLikeResponse,
     CommunityPostsResponse,
 )
 from app.community.service import (
     COMMUNITY_PAGE_SIZE,
+    create_community_comment,
     create_community_post,
     delete_community_post,
     get_community_post_detail,
     get_community_posts,
+    toggle_community_post_like,
 )
 from app.core.auth import get_current_user_id
 from app.core.database import get_db
@@ -201,3 +206,92 @@ def delete_post(
         post_id=post_id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch(
+    "/posts/{postId}/like",
+    response_model=CommunityPostLikeResponse,
+    summary="커뮤니티 게시글 좋아요 토글",
+    description=(
+        "현재 사용자의 게시글 좋아요 상태를 반전하고, 반전 이후의 좋아요 상태와 "
+        "전체 좋아요 수를 반환합니다. 호출할 때마다 상태가 바뀝니다."
+    ),
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "게시글이 존재하지 않거나 삭제됨",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "POST_NOT_FOUND",
+                        "message": "게시글을 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def update_post_like(
+    post_id: Annotated[int, Path(alias="postId", ge=1)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> CommunityPostLikeResponse:
+    """PATCH /api/v1/community/posts/{postId}/like"""
+    return toggle_community_post_like(
+        db=db,
+        current_user_id=current_user_id,
+        post_id=post_id,
+    )
+
+
+@router.post(
+    "/posts/{postId}/comments",
+    response_model=CommunityCommentCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="커뮤니티 댓글 작성",
+    description=(
+        "현재 사용자를 작성자로 댓글을 저장하고 생성된 댓글 정보를 반환합니다. "
+        "대댓글과 이미지 첨부는 지원하지 않습니다."
+    ),
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": (
+                "content 필드가 없거나, 공백을 제거한 내용이 비었거나 1,000자를 넘음"
+            ),
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "INVALID_REQUEST",
+                        "message": "요청값이 올바르지 않습니다.",
+                    }
+                }
+            },
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "게시글이 존재하지 않거나 삭제됨",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "POST_NOT_FOUND",
+                        "message": "게시글을 찾을 수 없습니다.",
+                    }
+                }
+            },
+        },
+    },
+)
+def create_comment(
+    post_id: Annotated[int, Path(alias="postId", ge=1)],
+    body: CommunityCommentCreateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> CommunityCommentCreateResponse:
+    """POST /api/v1/community/posts/{postId}/comments"""
+    return create_community_comment(
+        db=db,
+        current_user_id=current_user_id,
+        post_id=post_id,
+        content=body.content,
+    )

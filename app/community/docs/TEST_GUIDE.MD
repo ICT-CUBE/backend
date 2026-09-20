@@ -2,7 +2,7 @@
 
 테스트 파일: `app/community/tests/test_community.py`
 실행: `.venv\Scripts\python.exe -m pytest app/community/tests/test_community.py -q`
-최종 실행 결과: 66 passed (2026-08-28)
+최종 실행 결과: 101 passed (2026-09-20)
 
 DB는 `Mock(spec=Session)` 으로 대체하고 `app.dependency_overrides[get_db]` 로 주입합니다.
 실제 MySQL에는 접속하지 않습니다.
@@ -166,3 +166,86 @@ Azure 업로드는 `patch("app.community.service.upload_community_post_image")` 
   서비스가 이들을 조회·수정하지 않으므로 `db.add` 미호출로 대신 확인했습니다.
 - **`updated_at` 갱신**은 ORM의 `onupdate=func.now()` 가 DB에서 처리하므로 검증 대상에서
   제외했습니다.
+
+---
+
+## 커뮤니티 게시글 좋아요 토글 — `PATCH /api/v1/community/posts/{postId}/like`
+
+서비스가 `db.scalar` 를 게시글(잠금 조회) → 좋아요 행 → 좋아요 수 순서로 3번 호출하므로,
+`set_post_like_results()` 헬퍼가 그 순서대로 `side_effect` 를 지정하고 `db.add` 로 저장한
+객체를 모읍니다. 좋아요 수는 Mock DB가 집계하지 않으므로 헬퍼가 돌려줄 값을 직접 지정하고,
+집계 조건 자체는 생성된 SQL로 검증합니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_toggle_post_like_creates_liked_row_when_no_history | 좋아요 이력 없음 | 200 + `{isLiked: true, likeCount: 6}` + `is_liked=true` 행 1건 생성 + commit 1회 | PASS |
+| 정상 변형 | test_toggle_post_like_cancels_existing_like | 기존 `is_liked=true` | 200 + `{isLiked: false, likeCount: 5}` + 행 추가·삭제 없이 값만 반전 | PASS |
+| 정상 변형 | test_toggle_post_like_relikes_cancelled_like | 기존 `is_liked=false` | 200 + `{isLiked: true, likeCount: 6}` + 행 추가 없이 값만 반전 | PASS |
+| 정상 변형 | test_toggle_post_like_allows_liking_own_post | 내가 쓴 게시글 | 200 (작성자여도 좋아요 가능) | PASS |
+| 정상 변형 | test_toggle_post_like_returns_zero_like_count_when_all_cancelled | 모두 취소됨 | 200 + `likeCount: 0` | PASS |
+| 정상 변형 | test_toggle_post_like_toggles_reported_post | `status=REPORTED` 게시글 | 200 | PASS |
+| 오류 | test_toggle_post_like_returns_404_when_post_not_found | 게시글 조회 결과 없음 | 404 POST_NOT_FOUND + 이후 조회·저장·commit 없음 | PASS |
+| 정상 | test_toggle_post_like_locks_visible_post_only | 기본 요청 | `post.id = 1` + `status IN ('ACTIVE','REPORTED')` + `deleted_at IS NULL` + `FOR UPDATE`, WHERE에 `user_id` 조건 없음 | PASS |
+| 정상 | test_toggle_post_like_queries_like_row_of_current_user | 기본 요청 | `post_like.post_id = 1` + `post_like.user_id = 1` | PASS |
+| 정상 | test_toggle_post_like_counts_only_liked_rows_after_flush | 기본 요청 | `count(post_like.id)` + `is_liked IS true` 집계, 집계 전에 flush 1회 | PASS |
+| 경계값 | test_toggle_post_like_allows_minimum_post_id | postId=1 | 200 | PASS |
+| 경계값 | test_toggle_post_like_returns_400_when_post_id_is_zero | postId=0 | 400 INVALID_REQUEST + 조회 안 함 | PASS |
+| 요청 검증 | test_toggle_post_like_returns_400_when_post_id_is_not_number | postId=abc | 400 INVALID_REQUEST + 조회 안 함 | PASS |
+| 예외 | test_toggle_post_like_rolls_back_when_commit_fails | commit이 예외 발생 | 500 + rollback 1회 | PASS |
+| 문서 | test_toggle_post_like_swagger_contract | OpenAPI 스키마 | 응답 코드 `{200, 404}`, 요청 Body 없음 | PASS |
+
+### 검증하지 않은 항목
+
+- **소유권**은 이 API가 작성자를 가리지 않으므로 해당 없음입니다. 대신 잠금 조회 SQL의
+  WHERE에 `post.user_id` 조건이 들어가지 않는지를 확인합니다(게시글 삭제 API와의 차이).
+- **상태 전이**는 토글이 멱등하지 않고 재요청이 정상 동작이라 409 케이스가 해당 없음입니다.
+  대신 `true → false`, `false → true` 양방향을 각각 검증합니다.
+- **`(post_id, user_id)` 유일성**은 DDL의 `uk_post_like_post_user` 가 보장하므로
+  Mock DB로 중복 삽입을 재현하지 않습니다. 이력이 있으면 행을 만들지 않는 분기만 확인합니다.
+- **행 잠금(`FOR UPDATE`)의 실제 동시성 동작**은 SQL에 절이 붙는지까지만 확인합니다.
+- **좋아요 수 집계 결과값 자체**는 Mock DB가 계산하지 않으므로 지정한 값이 그대로
+  응답에 실리는지와 집계 SQL 조건만 확인합니다.
+
+---
+
+## 커뮤니티 댓글 작성 — `POST /api/v1/community/posts/{postId}/comments`
+
+`created_at` 은 Python이 아니라 KST로 고정된 DB 세션의 `CURRENT_TIMESTAMP` 로 채워지므로,
+`set_comment_results()` 헬퍼가 `db.flush` 시점에 댓글 id와 `created_at` 을 부여해
+서버 기본값이 채워지는 상황을 흉내 냅니다. 게시글·작성자 조회는 `db.scalar` 2회입니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_create_comment_saves_comment_and_returns_it | 남의 게시글에 댓글 | 201 + 응답 JSON 전체 일치, `status=ACTIVE`·`deleted_at=None` 저장, commit 1회 | PASS |
+| 정상 변형 | test_create_comment_strips_content | 앞뒤 공백 포함 내용 | 공백 제거한 값으로 저장하고 응답 | PASS |
+| 정상 변형 | test_create_comment_keeps_newlines_in_content | 내용에 줄바꿈 포함 | 줄바꿈을 유지해 저장 | PASS |
+| 정상 변형 | test_create_comment_allows_comment_on_own_post | 내가 쓴 게시글 | 201 + `isMine=true` | PASS |
+| 정상 변형 | test_create_comment_allows_comment_on_reported_post | `status=REPORTED` 게시글 | 201 | PASS |
+| 정상 변형 | test_create_comment_returns_null_author_profile_fields | 작성자 닉네임·프로필 없음 | `author.nickname=null`, `profileImageUrl=null` | PASS |
+| 오류 | test_create_comment_returns_404_when_post_not_found | 게시글 조회 결과 없음 | 404 POST_NOT_FOUND + 저장·commit 없음 | PASS |
+| 정상 | test_create_comment_locks_visible_post_only | 기본 요청 | `post.id = 1` + `status IN ('ACTIVE','REPORTED')` + `deleted_at IS NULL` + `FOR UPDATE`, WHERE에 `user_id` 조건 없음 | PASS |
+| 경계값 | test_create_comment_allows_maximum_content_length | 내용 1,000자 | 201 | PASS |
+| 경계값 | test_create_comment_allows_content_that_fits_after_strip | 공백 포함 1,004자, 제거 후 1,000자 | 201 + 1,000자로 저장 | PASS |
+| 경계값 | test_create_comment_returns_400_when_content_is_too_long | 내용 1,001자 | 400 INVALID_REQUEST + 조회·저장 없음 | PASS |
+| 경계값 | test_create_comment_allows_single_character_content | 내용 1자 | 201 | PASS |
+| 요청 검증 | test_create_comment_returns_400_when_content_is_blank | 내용이 공백뿐 | 400 INVALID_REQUEST + 조회 없음 | PASS |
+| 요청 검증 | test_create_comment_returns_400_when_content_is_empty | 내용이 빈 문자열 | 400 INVALID_REQUEST + 조회 없음 | PASS |
+| 요청 검증 | test_create_comment_returns_400_when_content_is_missing | `content` 필드 누락 | 400 INVALID_REQUEST + 조회 없음 | PASS |
+| 요청 검증 | test_create_comment_returns_400_when_content_is_not_string | `content` 가 숫자 | 400 INVALID_REQUEST + 조회 없음 | PASS |
+| 경계값 | test_create_comment_returns_400_when_post_id_is_zero | postId=0 | 400 INVALID_REQUEST + 조회 없음 | PASS |
+| 요청 검증 | test_create_comment_returns_400_when_post_id_is_not_number | postId=abc | 400 INVALID_REQUEST + 조회 없음 | PASS |
+| 예외 | test_create_comment_rolls_back_when_commit_fails | commit이 예외 발생 | 500 + rollback 1회 | PASS |
+| 문서 | test_create_comment_swagger_contract | OpenAPI 스키마 | 응답 코드 `{201, 400, 404}`, `application/json`, 응답 `{comment}` | PASS |
+
+### 검증하지 않은 항목
+
+- **소유권**은 이 API가 작성자를 가리지 않으므로 해당 없음입니다. 게시글 삭제 API와 달리
+  잠금 조회 WHERE에 `post.user_id` 조건이 없는지를 확인합니다.
+- **상태 전이**는 같은 요청을 반복하면 매번 새 댓글이 생기는 것이 정상이라 409가 해당 없음입니다.
+- **`created_at` 의 실제 값**은 DB가 채우므로 검증 대상이 아닙니다. 서비스가 flush 이후의
+  값을 그대로 응답에 싣는지, 그리고 offset 없는 ISO 8601로 직렬화되는지만 확인합니다.
+- **대댓글·이미지 첨부**는 지원하지 않으므로 관련 필드나 케이스가 없습니다.
+- **게시글 댓글 수 갱신**은 별도 컬럼을 두지 않으므로 증가 처리를 검증하지 않습니다.
+- **게시글 작성자 알림 생성**은 이 API 범위 밖이라 검증하지 않습니다.
+- **작성자 조회 실패**는 인증 의존성(`get_current_user_id`)이 ACTIVE 사용자 존재를 이미
+  보장하므로 별도 오류 케이스를 만들지 않았습니다.

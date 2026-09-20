@@ -165,8 +165,20 @@ def request_cube_verification(db, *, body=None):
   `db.commit.assert_called_once()` / `db.commit.assert_not_called()` 로 트랜잭션을 확인합니다.
 - 외부 의존성은 `patch("app.<도메인>.service.<함수>")` 로 서비스 모듈이 참조하는 이름을 패치합니다.
 - 응답은 `response.status_code` 와 `response.json()` **전체**를 비교합니다.
-- 공통 500 응답을 검증할 때는 `patch("app.main.get_settings", return_value=Settings(debug=False))`
-  로 앱을 만듭니다. `debug=true` 에서는 Starlette이 공통 핸들러 대신 HTML 트레이스백을 반환합니다.
+- 500 응답은 두 종류이고 검증 방법이 다릅니다.
+  - **서비스가 `ApiError(status_code=500, ...)` 로 변환한 경우** (예: Blob 업로드 실패)
+    `api_error_handler` 를 거치므로 `debug` 와 무관하게 JSON입니다.
+    `response.json()` 전체를 비교합니다.
+  - **처리되지 않은 예외** (예: `db.commit()` 실패)
+    `api_client` 는 `app/main.py` 가 import 시점에 만들어 둔 `app` 을 그대로 쓰는데,
+    `.env` 의 `DEBUG=true` 때문에 그 앱은 `debug=True` 입니다.
+    이때 Starlette은 공통 핸들러 대신 트레이스백을 반환하므로 `response.json()` 은 터집니다.
+    기존 도메인과 같이 `response.status_code == 500` 과 `db.rollback.assert_called_once()` 만
+    검증합니다.
+- `patch("app.main.get_settings", return_value=Settings(debug=False))` 는
+  그 패치 안에서 `create_app()` 을 **다시 호출해 새 앱을 만들 때만** 효과가 있습니다
+  (`app/core/tests/test_exceptions.py`). 이미 만들어진 `app` 을 쓰는 `api_client` 에는
+  영향을 주지 않으므로 도메인 테스트에서는 쓰지 않습니다.
 
 ### 4.3 API 하나당 반드시 만드는 케이스
 
