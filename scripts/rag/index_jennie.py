@@ -12,6 +12,7 @@ from textwrap import dedent
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from app.core.chroma import get_jenny_knowledge_collection  # noqa: E402
 from app.rag.indexing import DEFAULT_EMBEDDING_BATCH_SIZE, index_document
 
 DEFAULT_SOURCE = Path(__file__).with_name("jennie_text.md")
@@ -39,13 +40,28 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help="Positive document version stored in Chroma metadata.",
     )
+    parser.add_argument(
+        "--if-empty",
+        action="store_true",
+        help="Skip indexing when the Chroma collection already contains records.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    collection = get_jenny_knowledge_collection()
+    existing_count = collection.count()
+    if args.if_empty and existing_count > 0:
+        print(
+            "Jennie RAG indexing skipped: "
+            f"collection already contains {existing_count} records"
+        )
+        return
+
     result = index_document(
         args.source,
+        collection=collection,
         batch_size=args.batch_size,
         document_version=args.document_version,
     )
