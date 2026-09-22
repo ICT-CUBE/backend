@@ -1,15 +1,25 @@
 """갤러리 조회 API 테스트."""
 
+from collections.abc import Iterator
 from datetime import date, datetime
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.album.models import Track, TrackCapture, TrackSession
 from app.avatar.models import AvatarInteractionPicture
+from app.core.enums import MissionTargetAction
 from app.core.tests.conftest import api_client
 from app.main import app
 from app.stage.models import Stage, StageCapture, StageSession
+
+
+@pytest.fixture(autouse=True)
+def mission_progress() -> Iterator[Mock]:
+    """미션 진행도 로직은 app/mission/tests 에서 검증하고 여기서는 호출만 기록합니다."""
+    with patch("app.gallery.service.increase_mission_progress") as mocked:
+        yield mocked
 
 
 def delete_gallery_item_request(
@@ -431,3 +441,63 @@ def test_delete_gallery_item_swagger_contract() -> None:
 
     assert set(operation["responses"]) == {"204", "404"}
     assert operation["security"] == [{"HTTPBearer": []}]
+
+
+# --- 미션 진행도 반영: GET .../ar-experience ---
+
+
+def make_stage_capture() -> StageCapture:
+    stage = Stage(id=1, title="SOLO", video_url="stage_video", duration_seconds=222)
+    return StageCapture(
+        id=701,
+        stage_session=StageSession(stage=stage),
+        captured_position_seconds=74,
+    )
+
+
+def test_gallery_ar_experience_increases_open_gallery_progress_and_commits(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = make_stage_capture()
+
+    response = request_gallery_ar_experience(
+        db,
+        source_type="STAGE_CAPTURE",
+        gallery_item_id=701,
+    )
+
+    assert response.status_code == 200
+    mission_progress.assert_called_once_with(
+        db=db,
+        current_user_id=1,
+        target_action=MissionTargetAction.OPEN_GALLERY,
+    )
+    db.commit.assert_called_once()
+
+
+def test_gallery_ar_experience_does_not_increase_progress_when_capture_missing(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = request_gallery_ar_experience(db)
+
+    assert response.status_code == 404
+    mission_progress.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_gallery_ar_experience_rolls_back_when_commit_fails() -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = make_stage_capture()
+    db.commit.side_effect = RuntimeError("db failed")
+
+    with api_client(db, raise_server_exceptions=False) as client:
+        response = client.get(
+            "/api/v1/users/me/gallery/STAGE_CAPTURE/701/ar-experience"
+        )
+
+    assert response.status_code == 500
+    db.rollback.assert_called_once()

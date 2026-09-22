@@ -18,9 +18,15 @@ from app.album.schemas import (
     TrackSessionResponse,
 )
 from app.core.blob_storage import normalize_image_content_type, upload_track_capture
-from app.core.enums import OwnershipStatus, TrackPlayMode, TrackSessionStatus
+from app.core.enums import (
+    MissionTargetAction,
+    OwnershipStatus,
+    TrackPlayMode,
+    TrackSessionStatus,
+)
 from app.core.exceptions import ApiError
 from app.cube.models import CubeOwnership
+from app.mission.progress import increase_mission_progress
 
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
 
@@ -168,6 +174,11 @@ def create_track_session(
     )
     try:
         db.add(track_session)
+        increase_mission_progress(
+            db=db,
+            current_user_id=current_user_id,
+            target_action=MissionTargetAction.ALBUM_PLAY,
+        )
         db.flush()
         track_session_id = track_session.id
         db.commit()

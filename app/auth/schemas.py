@@ -1,19 +1,11 @@
 """인증 도메인 API 요청·응답 스키마."""
 
 from datetime import datetime
-from enum import StrEnum
 
 from pydantic import EmailStr, Field, field_validator
 
 from app.core.schemas import ApiSchema
-
-NICKNAME_MAX_LENGTH = 20
-
-
-class ProfileCharacterCode(StrEnum):
-    PROFILE_001 = "profile_001"
-    PROFILE_002 = "profile_002"
-    PROFILE_003 = "profile_003"
+from app.user.profile import ProfileCharacterCode, normalize_nickname
 
 
 class SignupRequest(ApiSchema):
@@ -33,11 +25,7 @@ class SignupRequest(ApiSchema):
     @field_validator("nickname")
     @classmethod
     def validate_nickname(cls, value: str) -> str:
-        # 앞뒤 공백을 제거한 값으로 길이를 검증하고, 그 값을 그대로 저장합니다.
-        stripped_value = value.strip()
-        if not stripped_value or len(stripped_value) > NICKNAME_MAX_LENGTH:
-            raise ValueError("nickname must be 1 to 20 characters")
-        return stripped_value
+        return normalize_nickname(value)
 
 
 class LoginRequest(ApiSchema):

@@ -2,7 +2,7 @@
 
 테스트 파일: `app/home/tests/test_home.py`
 실행: `.venv\Scripts\python.exe -m pytest app/home/tests/test_home.py -q`
-최종 실행 결과: 36 passed (2026-09-20)
+최종 실행 결과: 39 passed (2026-09-22)
 
 ---
 
@@ -92,3 +92,17 @@
 - 요청 검증·경계값: Path/Query/Body가 모두 없어 해당 없음.
 - 이미 읽은 알림의 `read_at` 보존은 UPDATE의 `is_read IS false` 조건으로 보장되므로,
   행별 결과가 아니라 WHERE 절로 검증합니다.
+
+---
+
+## 미션 진행도 반영 — `GET /api/v1/users/me/home`
+
+autouse fixture `mission_progress` 가 `app.home.service.increase_mission_progress` 를 patch 합니다.
+진행도 계산 자체는 `app/mission/docs/TEST_GUIDE.MD` 의 미션 진행도 반영 섹션에서 검증합니다.
+홈 조회는 진행도 저장 때문에 commit 을 하게 되어 rollback 도 함께 검증합니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_home_increases_home_view_mission_progress_and_commits | 홈 조회 성공 | `HOME_VIEW` 로 1회 호출 + commit 1회 | PASS |
+| 오류 | test_home_does_not_increase_progress_when_ownership_is_inactive | 비활성 소유권만 있음 | 403 + 호출·commit 없음 | PASS |
+| 예외 | test_home_rolls_back_when_commit_fails | commit 이 예외 발생 | 500 + rollback 1회 | PASS |

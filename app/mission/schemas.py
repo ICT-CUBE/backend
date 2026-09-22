@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from app.core.enums import MissionType
 from app.core.schemas import ApiSchema
 
 
@@ -61,3 +62,16 @@ class MissionDailyDetailItemResponse(ApiSchema):
 
 class MissionDailyDetailResponse(ApiSchema):
     mission: MissionDailyDetailItemResponse
+
+
+class MissionRewardClaimRequest(ApiSchema):
+    mission_type: MissionType
+
+
+class MissionLevelUpResponse(ApiSchema):
+    level: int
+    level_name: str
+
+
+class MissionRewardClaimResponse(ApiSchema):
+    level_up: MissionLevelUpResponse | None

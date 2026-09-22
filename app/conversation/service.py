@@ -51,10 +51,12 @@ from app.core.enums import (
     ConversationMessageStatus,
     ConversationReportReason,
     ConversationType,
+    MissionTargetAction,
     OwnershipStatus,
 )
 from app.core.exceptions import ApiError
 from app.cube.models import CubeOwnership
+from app.mission.progress import increase_mission_progress
 from app.rag.retrieval import KnowledgeSearchResult, search_jenny_knowledge
 from app.stage.models import StageCapture
 
@@ -613,6 +615,11 @@ def reply_to_conversation_message(
     try:
         db.add(user_message)
         db.add(avatar_message)
+        increase_mission_progress(
+            db=db,
+            current_user_id=current_user_id,
+            target_action=MissionTargetAction.CONVERSATION,
+        )
         db.flush()
         db.commit()
     except Exception:

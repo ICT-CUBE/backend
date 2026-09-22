@@ -26,9 +26,15 @@ from app.core.blob_storage import (
     normalize_image_content_type,
     upload_community_post_image,
 )
-from app.core.enums import BoardType, CommentStatus, PostStatus
+from app.core.enums import (
+    BoardType,
+    CommentStatus,
+    MissionTargetAction,
+    PostStatus,
+)
 from app.core.exceptions import ApiError
 from app.core.search import LIKE_ESCAPE_CHARACTER, like_contains_pattern
+from app.mission.progress import increase_mission_progress
 from app.user.models import User
 
 COMMUNITY_PAGE_SIZE = 20
@@ -325,6 +331,11 @@ def create_community_post(
                     ),
                 )
             )
+        increase_mission_progress(
+            db=db,
+            current_user_id=current_user_id,
+            target_action=MissionTargetAction.COMMUNITY_POST,
+        )
         db.commit()
     except Exception:
         # Blob에 이미 올라간 이미지는 삭제하지 않고 DB만 롤백합니다.

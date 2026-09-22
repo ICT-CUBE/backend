@@ -2,7 +2,7 @@
 
 테스트 파일: `app/community/tests/test_community.py`
 실행: `.venv\Scripts\python.exe -m pytest app/community/tests/test_community.py -q`
-최종 실행 결과: 129 passed (2026-09-22)
+최종 실행 결과: 131 passed (2026-09-22)
 
 DB는 `Mock(spec=Session)` 으로 대체하고 `app.dependency_overrides[get_db]` 로 주입합니다.
 실제 MySQL에는 접속하지 않습니다.
@@ -324,3 +324,15 @@ Azure 업로드는 `patch("app.community.service.upload_community_post_image")` 
 - **행 잠금(`FOR UPDATE`)의 실제 동시성 동작**은 SQL에 절이 붙는지까지만 확인합니다.
 - **좋아요 수 집계 결과값 자체**는 Mock DB가 계산하지 않으므로 지정한 값이 그대로
   응답에 실리는지와 집계 SQL 조건만 확인합니다.
+
+---
+
+## 미션 진행도 반영 — `POST /api/v1/community/posts`
+
+autouse fixture `mission_progress` 가 `app.community.service.increase_mission_progress` 를 patch 합니다.
+진행도 계산 자체는 `app/mission/docs/TEST_GUIDE.MD` 의 미션 진행도 반영 섹션에서 검증합니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_create_post_increases_community_post_mission_progress | 게시글 작성 성공 | `COMMUNITY_POST` 로 1회 호출 | PASS |
+| 오류 | test_create_post_does_not_increase_progress_when_request_is_invalid | 제목 공백 | 400 + 호출 없음 | PASS |

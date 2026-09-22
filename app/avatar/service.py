@@ -21,10 +21,12 @@ from app.core.blob_storage import (
 from app.core.enums import (
     AlbumImageType,
     AvatarInteractionSessionStatus,
+    MissionTargetAction,
     OwnershipStatus,
 )
 from app.core.exceptions import ApiError
 from app.cube.models import CubeOwnership
+from app.mission.progress import increase_mission_progress
 
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
 
@@ -194,6 +196,11 @@ def save_avatar_interaction_picture(
     )
     try:
         db.add(picture)
+        increase_mission_progress(
+            db=db,
+            current_user_id=current_user_id,
+            target_action=MissionTargetAction.SUMMON_AVATAR,
+        )
         db.commit()
     except Exception:
         db.rollback()

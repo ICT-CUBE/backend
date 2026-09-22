@@ -2,7 +2,7 @@
 
 테스트 파일: `app/conversation/tests/test_conversation.py`
 실행: `.venv\Scripts\python.exe -m pytest app/conversation/tests/test_conversation.py -q`
-최종 실행 결과: 81 passed (2026-08-30)
+최종 실행 결과: 85 passed (2026-09-22)
 
 DB는 `Mock(spec=Session)` 으로 대체하고 `app.dependency_overrides[get_db]` 로 주입합니다.
 실제 MySQL, OpenAI, Azure Blob Storage에는 접속하지 않습니다.
@@ -89,3 +89,15 @@ user       (현재) 사용자 메시지 + 이미지
 같은 파일에 대화 세션 목록·상세 조회, 세션 생성·삭제·저장, 보관 메시지 저장·해제,
 신고 생성 테스트가 함께 있습니다(총 81개). 해당 API들의 명세 문서가 아직 없어 이 가이드에는
 정리하지 않았습니다.
+
+---
+
+## 미션 진행도 반영 — `POST /api/v1/users/me/conversation-sessions/{conversationSessionId}/messages`
+
+autouse fixture `mission_progress` 가 `app.conversation.service.increase_mission_progress` 를 patch 합니다.
+진행도 계산 자체는 `app/mission/docs/TEST_GUIDE.MD` 의 미션 진행도 반영 섹션에서 검증합니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_reply_conversation_message_increases_conversation_mission_progress | 메시지 응답 성공 | `CONVERSATION` 으로 1회 호출 | PASS |
+| 오류 | test_reply_conversation_message_does_not_increase_progress_when_404 | 대화 세션 없음 | 404 + 호출 없음 | PASS |

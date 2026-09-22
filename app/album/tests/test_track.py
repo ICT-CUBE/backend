@@ -1,15 +1,29 @@
 """트랙 재생 세션 생성 API 테스트."""
 
+from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock, patch
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.album.models import Track, TrackCapture, TrackSession
-from app.core.enums import OwnershipStatus, TrackPlayMode, TrackSessionStatus
+from app.core.enums import (
+    MissionTargetAction,
+    OwnershipStatus,
+    TrackPlayMode,
+    TrackSessionStatus,
+)
 from app.core.tests.conftest import api_client
 from app.cube.models import CubeOwnership
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def mission_progress() -> Iterator[Mock]:
+    """미션 진행도 로직은 app/mission/tests 에서 검증하고 여기서는 호출만 기록합니다."""
+    with patch("app.album.service.increase_mission_progress") as mocked:
+        yield mocked
 
 
 def request_track_session(
@@ -380,3 +394,33 @@ def test_save_track_capture_swagger_contract() -> None:
     assert set(operation["responses"]) == {"204", "400", "404"}
     assert "multipart/form-data" in operation["requestBody"]["content"]
     assert operation["security"] == [{"HTTPBearer": []}]
+
+
+def test_create_track_session_increases_album_play_mission_progress(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    db.get.return_value = track()
+    db.scalar.return_value = ownership()
+    db.flush.side_effect = lambda: setattr(db.add.call_args.args[0], "id", 601)
+
+    response = request_track_session(db)
+
+    assert response.status_code == 201
+    mission_progress.assert_called_once_with(
+        db=db,
+        current_user_id=1,
+        target_action=MissionTargetAction.ALBUM_PLAY,
+    )
+
+
+def test_create_track_session_does_not_increase_progress_when_track_not_found(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    db.get.return_value = None
+
+    response = request_track_session(db)
+
+    assert response.status_code == 404
+    mission_progress.assert_not_called()

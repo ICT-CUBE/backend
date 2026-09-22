@@ -1,17 +1,31 @@
 """홈 도메인 API 테스트."""
 
+from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock, patch
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.affinity.models import Affinity, Level
-from app.core.enums import LevelName, NotificationType, OwnershipStatus
+from app.core.enums import (
+    LevelName,
+    MissionTargetAction,
+    NotificationType,
+    OwnershipStatus,
+)
 from app.core.tests.conftest import api_client
 from app.cube.models import Cube, CubeOwnership
 from app.home.service import KOREA_TIMEZONE
 from app.main import app
 from app.user.models import Notification, User
+
+
+@pytest.fixture(autouse=True)
+def mission_progress() -> Iterator[Mock]:
+    """미션 진행도 로직은 app/mission/tests 에서 검증하고 여기서는 호출만 기록합니다."""
+    with patch("app.home.service.increase_mission_progress") as mocked:
+        yield mocked
 
 
 def request_home(db: Mock):
@@ -612,3 +626,56 @@ def test_read_all_notifications_swagger_contract() -> None:
     assert "parameters" not in operation
     assert operation["tags"] == ["home"]
     assert operation["security"] == [{"HTTPBearer": []}]
+
+
+# --- 미션 진행도 반영: GET /api/v1/users/me/home ---
+
+
+def test_home_increases_home_view_mission_progress_and_commits(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    db.scalars.return_value.first.return_value = make_ownership(
+        OwnershipStatus.ACTIVE
+    )
+    db.scalar.return_value = 2000
+
+    response = request_home(db)
+
+    assert response.status_code == 200
+    mission_progress.assert_called_once_with(
+        db=db,
+        current_user_id=1,
+        target_action=MissionTargetAction.HOME_VIEW,
+    )
+    db.commit.assert_called_once()
+
+
+def test_home_does_not_increase_progress_when_ownership_is_inactive(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    db.scalars.return_value.first.return_value = make_ownership(
+        OwnershipStatus.TRANSFERRED
+    )
+
+    response = request_home(db)
+
+    assert response.status_code == 403
+    mission_progress.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_home_rolls_back_when_commit_fails() -> None:
+    db = Mock(spec=Session)
+    db.scalars.return_value.first.return_value = make_ownership(
+        OwnershipStatus.ACTIVE
+    )
+    db.scalar.return_value = 2000
+    db.commit.side_effect = RuntimeError("db failed")
+
+    with api_client(db, raise_server_exceptions=False) as client:
+        response = client.get("/api/v1/users/me/home")
+
+    assert response.status_code == 500
+    db.rollback.assert_called_once()

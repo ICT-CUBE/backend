@@ -1,8 +1,10 @@
 """텍스트 및 음성 대화 조회 API 테스트."""
 
+from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock, patch
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.conversation.models import (
@@ -18,11 +20,19 @@ from app.core.enums import (
     ConversationMessageStatus,
     ConversationReportReason,
     ConversationType,
+    MissionTargetAction,
 )
 from app.core.tests.conftest import api_client
 from app.cube.models import CubeOwnership
 from app.main import app
 from app.rag.retrieval import KnowledgeSearchResult
+
+
+@pytest.fixture(autouse=True)
+def mission_progress() -> Iterator[Mock]:
+    """미션 진행도 로직은 app/mission/tests 에서 검증하고 여기서는 호출만 기록합니다."""
+    with patch("app.conversation.service.increase_mission_progress") as mocked:
+        yield mocked
 
 
 def create_conversation_session_request(
@@ -2043,3 +2053,44 @@ def test_update_conversation_session_swagger_contract() -> None:
 
     assert set(operation["responses"]) == {"204", "404"}
     assert operation["security"] == [{"HTTPBearer": []}]
+
+
+def test_reply_conversation_message_increases_conversation_mission_progress(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    conversation_session = session(id=1001, conversation_type=ConversationType.TEXT)
+    conversation_session.cube_ownership_id = 1
+    db.scalar.side_effect = [conversation_session, 12]
+    db.scalars.return_value.all.return_value = []
+
+    def set_message_ids() -> None:
+        for index, inserted in enumerate(db.add.call_args_list, start=5025):
+            inserted.args[0].id = index
+
+    db.flush.side_effect = set_message_ids
+
+    with patch(
+        "app.conversation.service.generate_avatar_reply",
+        return_value="오늘 연습하고 있었어!",
+    ):
+        response = reply_conversation_message_request(db)
+
+    assert response.status_code == 201
+    mission_progress.assert_called_once_with(
+        db=db,
+        current_user_id=1,
+        target_action=MissionTargetAction.CONVERSATION,
+    )
+
+
+def test_reply_conversation_message_does_not_increase_progress_when_404(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = reply_conversation_message_request(db)
+
+    assert response.status_code == 404
+    mission_progress.assert_not_called()

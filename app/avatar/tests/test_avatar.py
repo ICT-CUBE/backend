@@ -1,8 +1,10 @@
 """아바타 소환 세션 API 테스트."""
 
+from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock, patch
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.album.models import AlbumImage
@@ -10,11 +12,19 @@ from app.avatar.models import AvatarInteractionPicture, AvatarInteractionSession
 from app.core.enums import (
     AlbumImageType,
     AvatarInteractionSessionStatus,
+    MissionTargetAction,
     OwnershipStatus,
 )
 from app.core.tests.conftest import api_client
 from app.cube.models import CubeOwnership
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def mission_progress() -> Iterator[Mock]:
+    """미션 진행도 로직은 app/mission/tests 에서 검증하고 여기서는 호출만 기록합니다."""
+    with patch("app.avatar.service.increase_mission_progress") as mocked:
+        yield mocked
 
 
 def create_avatar_interaction_session_request(
@@ -486,3 +496,35 @@ def test_save_avatar_interaction_picture_swagger_contract() -> None:
 
     assert set(operation["responses"]) == {"204", "400", "404"}
     assert operation["security"] == [{"HTTPBearer": []}]
+
+
+def test_save_avatar_interaction_picture_increases_summon_avatar_progress(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = active_interaction_session()
+
+    with patch(
+        "app.avatar.service.upload_avatar_interaction_picture",
+        return_value="https://cdn.example.com/avatar_interaction_picture/1/1101/a.png",
+    ):
+        response = save_avatar_interaction_picture_request(db)
+
+    assert response.status_code == 204
+    mission_progress.assert_called_once_with(
+        db=db,
+        current_user_id=1,
+        target_action=MissionTargetAction.SUMMON_AVATAR,
+    )
+
+
+def test_save_avatar_interaction_picture_does_not_increase_progress_when_404(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = save_avatar_interaction_picture_request(db)
+
+    assert response.status_code == 404
+    mission_progress.assert_not_called()

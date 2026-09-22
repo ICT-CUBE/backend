@@ -11,16 +11,13 @@ from app.auth.schemas import (
     AuthResponse,
     AuthTokenResponse,
     AuthUserResponse,
-    ProfileCharacterCode,
 )
 from app.core.enums import LoginProvider, UserStatus
 from app.core.exceptions import ApiError
 from app.core.security import create_access_token, hash_password, verify_password
 from app.user.models import User, UserSetting
+from app.user.profile import ProfileCharacterCode, to_profile_image_url
 
-PROFILE_IMAGE_URL_FORMAT = (
-    "https://haniumstorage.blob.core.windows.net/hanium/profile_image/{code}.png"
-)
 TOKEN_TYPE = "Bearer"
 
 
@@ -43,9 +40,7 @@ def signup_with_email(
         login_provider=LoginProvider.EMAIL,
         provider_user_id=None,
         nickname=nickname,
-        profile_character_img_url=PROFILE_IMAGE_URL_FORMAT.format(
-            code=profile_character_code.value
-        ),
+        profile_character_img_url=to_profile_image_url(profile_character_code),
         chat_violation_count=0,
         status=UserStatus.ACTIVE,
         deleted_at=None,
