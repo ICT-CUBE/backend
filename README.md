@@ -58,11 +58,11 @@ MySQL: hanium-mysql
 
 자세한 내용은 [docs/architecture.md](docs/architecture.md), [docs/setup.md](docs/setup.md)를 참고합니다.
 
-## Azure 시연 환경 전체 초기화
+## Azure 구매 확정 시연 준비
 
-개발 서버의 Backend DB와 Blockchain DB, 내부 Hardhat 체인을 초기화하고 목데이터
-ACTIVE 큐브 소유권의 NFT 백필까지 한 번에 처리합니다. 먼저 Azure CLI 로그인이
-되어 있어야 합니다.
+배송 완료 거래의 구매 확정과 NFT 소유권 이전을 반복해서 시연할 수 있도록 대상 거래만
+구매 확정 직전 상태로 되돌립니다. 전체 Backend DB, Blockchain DB, Hardhat 체인은
+초기화하지 않습니다. 먼저 Azure CLI 로그인이 되어 있어야 합니다.
 
 ```powershell
 az login
@@ -70,26 +70,27 @@ cd C:\Projects\hanium\backend
 .\.venv\Scripts\python.exe .\scripts\setup_database.py
 ```
 
-실행하면 삭제 대상을 보여준 뒤 Backend DB 이름 `hanium`을 확인 입력으로 요구합니다.
-확인 질문 없이 실행하려면 `--yes`를 사용합니다.
+기본 대상은 목데이터의 거래 1번(`NO.0031`, 판매자 2 → 구매자 1)입니다. 실행하면 대상
+거래와 판매자·구매자를 보여준 뒤 거래 id `1`을 확인 입력으로 요구합니다. 다른 거래를
+준비하려면 `--trade-id`를 지정하고, 확인 질문 없이 실행하려면 `--yes`를 사용합니다.
 
 ```powershell
 .\.venv\Scripts\python.exe .\scripts\setup_database.py --yes
+.\.venv\Scripts\python.exe .\scripts\setup_database.py --trade-id 1
 ```
 
 스크립트는 다음 순서로 실행됩니다.
 
-1. Azure Backend와 Blockchain App Service 환경변수 조회
-2. 두 App Service 중지
-3. Backend DB를 `01-schema.sql`부터 `04-album-image.sql`까지 순서대로 초기화
-4. Blockchain DB의 이전 체인 작업 및 마이그레이션 테이블 전체 삭제
-5. Backend와 Blockchain App Service 재기동
-6. Hardhat 체인 및 CubeNFT 재배포와 Blockchain DB 마이그레이션 완료 대기
-7. Backend 목데이터의 모든 ACTIVE 큐브 소유권 NFT 백필
+1. Azure Backend App Service 환경변수와 대상 거래 조회
+2. 대상 NFT가 미발행이면 판매자에게 Mint
+3. 이전 시연으로 구매자가 NFT를 보유 중이면 판매자에게 역이전
+4. 대상 거래의 기존 디지털 인증서와 Transfer 작업 기록 삭제
+5. 판매자 큐브 소유권, 큐브, 판매글을 거래 중 상태로 복원
+6. 대상 거래를 `DELIVERED` 상태와 배송 타임라인으로 복원
 
-Azure 환경변수의 DB 접속 정보와 블록체인 인증값을 실행 프로세스에만 주입하며,
-비밀값을 로컬 파일이나 콘솔에 출력하지 않습니다. 이 명령은 두 개발 DB의 기존
-데이터와 Hardhat NFT를 모두 삭제하므로 시연 환경을 처음부터 준비할 때만 사용합니다.
+Azure 환경변수의 DB 접속 정보와 블록체인 인증값은 실행 프로세스에만 주입하며 비밀값을
+로컬 파일이나 콘솔에 출력하지 않습니다. 준비가 끝나면 구매자 계정으로 로그인해
+`PATCH /api/v1/users/me/trades/{tradeId}/complete`를 호출하면 됩니다.
 
 ## 블록체인 연동 로컬 실행
 

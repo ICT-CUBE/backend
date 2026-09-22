@@ -2,7 +2,7 @@
 
 테스트 파일: `app/community/tests/test_community.py`
 실행: `.venv\Scripts\python.exe -m pytest app/community/tests/test_community.py -q`
-최종 실행 결과: 101 passed (2026-09-20)
+최종 실행 결과: 129 passed (2026-09-22)
 
 DB는 `Mock(spec=Session)` 으로 대체하고 `app.dependency_overrides[get_db]` 로 주입합니다.
 실제 MySQL에는 접속하지 않습니다.
@@ -249,3 +249,78 @@ Azure 업로드는 `patch("app.community.service.upload_community_post_image")` 
 - **게시글 작성자 알림 생성**은 이 API 범위 밖이라 검증하지 않습니다.
 - **작성자 조회 실패**는 인증 의존성(`get_current_user_id`)이 ACTIVE 사용자 존재를 이미
   보장하므로 별도 오류 케이스를 만들지 않았습니다.
+
+---
+
+## 커뮤니티 댓글 삭제 — `DELETE /api/v1/community/posts/{postId}/comments/{commentId}`
+
+서비스가 `db.scalar` 을 게시글 잠금 조회 → 댓글 잠금 조회 순서로 호출하므로 각 조회 결과와
+생성된 SQL을 순서대로 검증합니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_delete_comment_soft_deletes_current_user_comment | 본인 ACTIVE 댓글 | 204 + Body 없음, `status=DELETED`·`deleted_at` 설정(naive), commit 1회 | PASS |
+| 정상 변형 | test_delete_comment_deletes_reported_comment | 본인 REPORTED 댓글 | 204 + `status=DELETED` | PASS |
+| 오류 | test_delete_comment_returns_404_when_post_is_unavailable | 게시글 조회 결과 없음 | 404 POST_NOT_FOUND + 댓글 조회·commit 없음 | PASS |
+| 오류 | test_delete_comment_returns_404_when_comment_is_unavailable | 댓글 조회 결과 없음 | 404 COMMENT_NOT_FOUND + commit 없음 | PASS |
+| 소유권 | test_delete_comment_locks_visible_post_and_owned_comment | postId=7, commentId=9 | 게시글·댓글 `FOR UPDATE`, 댓글의 게시글·작성자·상태·삭제 조건 확인 | PASS |
+| 경계값 | test_delete_comment_allows_minimum_path_ids | postId=1, commentId=1 | 204 | PASS |
+| 경계값 | test_delete_comment_returns_400_when_post_id_is_zero | postId=0 | 400 INVALID_REQUEST + 조회 없음 | PASS |
+| 경계값 | test_delete_comment_returns_400_when_comment_id_is_zero | commentId=0 | 400 INVALID_REQUEST + 조회 없음 | PASS |
+| 요청 검증 | test_delete_comment_returns_400_when_comment_id_is_not_a_number | commentId=abc | 400 INVALID_REQUEST + 조회 없음 | PASS |
+| 예외 | test_delete_comment_rolls_back_when_commit_fails | commit이 예외 발생 | 500 + rollback 1회 | PASS |
+| 문서 | test_delete_comment_swagger_contract | OpenAPI 스키마 | 응답 코드 `{204, 404}`, 경로 변수 2개, 요청 Body 없음 | PASS |
+
+### 검증하지 않은 항목
+
+- **없는 댓글 / 남의 댓글 / 이미 삭제된 댓글 / 다른 게시글의 댓글**은 Mock DB로 구분할 수
+  없어 모두 같은 404로 처리되는 것만 확인하고, 구분 조건은 생성된 SQL로 검증했습니다.
+- **게시글 삭제와 댓글 삭제의 실제 동시성 동작**은 실제 트랜잭션이 필요해 검증할 수 없고,
+  게시글과 댓글 조회 SQL에 `FOR UPDATE`가 포함되는지만 확인했습니다.
+- **`comment_like` 보존**과 **댓글 수 컬럼 미갱신**은 서비스가 관련 행을 조회·수정하지 않으므로
+  별도 상태 변화 검증을 하지 않았습니다.
+- **`updated_at` 갱신**은 ORM의 `onupdate=func.now()`가 DB에서 처리하므로 검증 대상에서
+  제외했습니다.
+
+---
+
+## 커뮤니티 댓글 좋아요 토글 — `PATCH /api/v1/community/posts/{postId}/comments/{commentId}/like`
+
+서비스가 `db.scalar` 를 게시글(잠금 조회) → 댓글(잠금 조회) → 좋아요 행 → 좋아요 수 순서로
+4번 호출하므로, `set_comment_like_results()` 헬퍼가 그 순서대로 `side_effect` 를 지정하고
+`db.add` 로 저장한 객체를 모읍니다. 좋아요 수는 Mock DB가 집계하지 않으므로 헬퍼가 돌려줄 값을
+직접 지정하고, 집계 조건 자체는 생성된 SQL로 검증합니다.
+
+| 분류 | 테스트 함수 | 조건 | 기대 결과 | 결과 |
+|---|---|---|---|---|
+| 정상 | test_toggle_comment_like_creates_liked_row_when_no_history | 좋아요 이력 없음 | 200 + `{isLiked: true, likeCount: 3}` + `is_liked=true` 행 1건 생성 + commit 1회 | PASS |
+| 정상 변형 | test_toggle_comment_like_cancels_existing_like | 기존 `is_liked=true` | 200 + `{isLiked: false, likeCount: 2}` + 행 추가·삭제 없이 값만 반전 | PASS |
+| 정상 변형 | test_toggle_comment_like_relikes_cancelled_like | 기존 `is_liked=false` | 200 + `{isLiked: true, likeCount: 3}` + 행 추가 없이 값만 반전 | PASS |
+| 정상 변형 | test_toggle_comment_like_allows_liking_own_comment | 내가 쓴 댓글 | 200 (작성자여도 좋아요 가능) | PASS |
+| 정상 변형 | test_toggle_comment_like_returns_zero_like_count_when_all_cancelled | 모두 취소됨 | 200 + `likeCount: 0` | PASS |
+| 정상 변형 | test_toggle_comment_like_toggles_reported_post_and_comment | 게시글·댓글 `status=REPORTED` | 200 | PASS |
+| 오류 | test_toggle_comment_like_returns_404_when_post_not_found | 게시글 조회 결과 없음 | 404 POST_NOT_FOUND + 이후 조회·저장·commit 없음 | PASS |
+| 오류 | test_toggle_comment_like_returns_404_when_comment_not_found | 댓글 조회 결과 없음 | 404 COMMENT_NOT_FOUND + 이후 조회·저장·commit 없음 | PASS |
+| 정상 | test_toggle_comment_like_locks_visible_post_and_comment_of_post | postId=7, commentId=9 | 게시글·댓글 `FOR UPDATE`, 댓글의 게시글·상태·삭제 조건 확인, WHERE에 `user_id` 조건 없음 | PASS |
+| 정상 | test_toggle_comment_like_queries_like_row_of_current_user | commentId=9 | `comment_like.comment_id = 9` + `comment_like.user_id = 1` | PASS |
+| 정상 | test_toggle_comment_like_counts_only_liked_rows_after_flush | commentId=9 | `count(comment_like.id)` + `is_liked IS true` 집계, 집계 전에 flush 1회 | PASS |
+| 경계값 | test_toggle_comment_like_allows_minimum_path_ids | postId=1, commentId=1 | 200 | PASS |
+| 경계값 | test_toggle_comment_like_returns_400_when_post_id_is_zero | postId=0 | 400 INVALID_REQUEST + 조회 안 함 | PASS |
+| 경계값 | test_toggle_comment_like_returns_400_when_comment_id_is_zero | commentId=0 | 400 INVALID_REQUEST + 조회 안 함 | PASS |
+| 요청 검증 | test_toggle_comment_like_returns_400_when_comment_id_is_not_number | commentId=abc | 400 INVALID_REQUEST + 조회 안 함 | PASS |
+| 예외 | test_toggle_comment_like_rolls_back_when_commit_fails | commit이 예외 발생 | 500 + rollback 1회 | PASS |
+| 문서 | test_toggle_comment_like_swagger_contract | OpenAPI 스키마 | 응답 코드 `{200, 404}`, 경로 변수 2개, 요청 Body 없음 | PASS |
+
+### 검증하지 않은 항목
+
+- **소유권**은 이 API가 작성자를 가리지 않으므로 해당 없음입니다. 대신 게시글·댓글 잠금 조회
+  SQL의 WHERE에 `user_id` 조건이 들어가지 않는지를 확인합니다(댓글 삭제 API와의 차이).
+- **없는 댓글 / 삭제된 댓글 / 다른 게시글의 댓글**은 Mock DB로 구분할 수 없어 같은 404로
+  처리되는 것만 확인하고, 구분 조건은 생성된 SQL로 검증했습니다.
+- **상태 전이**는 토글이 멱등하지 않고 재요청이 정상 동작이라 409 케이스가 해당 없음입니다.
+  대신 `true → false`, `false → true` 양방향을 각각 검증합니다.
+- **`(comment_id, user_id)` 유일성**은 DDL의 `uk_comment_like_comment_user` 가 보장하므로
+  Mock DB로 중복 삽입을 재현하지 않습니다. 이력이 있으면 행을 만들지 않는 분기만 확인합니다.
+- **행 잠금(`FOR UPDATE`)의 실제 동시성 동작**은 SQL에 절이 붙는지까지만 확인합니다.
+- **좋아요 수 집계 결과값 자체**는 Mock DB가 계산하지 않으므로 지정한 값이 그대로
+  응답에 실리는지와 집계 SQL 조건만 확인합니다.

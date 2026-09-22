@@ -83,6 +83,28 @@
 - 토글 요청은 호출할 때마다 상태를 반전하므로 멱등성을 보장하지 않는다.
 - 게시글 좋아요와 댓글 좋아요는 서로 독립된 기능으로 관리한다.
 
+## 커뮤니티 댓글 좋아요 토글
+
+- 댓글 좋아요는 `PATCH /api/v1/community/posts/{postId}/comments/{commentId}/like` 엔드포인트를 사용한다.
+- `postId`와 `commentId`는 1 이상의 정수만 허용하고, 올바르지 않은 값은 공통 `400 INVALID_REQUEST`로 처리한다.
+- 댓글 좋아요는 현재 로그인한 사용자와 댓글의 조합을 기준으로 관리한다.
+- 큐브 소유권은 댓글 좋아요 처리 권한에 영향을 주지 않는다.
+- 게시글은 `post.id = postId`, `post.status IN (ACTIVE, REPORTED)`, `post.deleted_at IS NULL` 조건으로 조회한다.
+- 게시글이 존재하지 않거나 삭제된 경우 `404 POST_NOT_FOUND`를 반환한다.
+- 댓글은 `comment.id = commentId`, `comment.post_id = postId`, `comment.status IN (ACTIVE, REPORTED)`, `comment.deleted_at IS NULL` 조건으로 조회한다.
+- 댓글이 존재하지 않거나 다른 게시글에 속하거나 삭제된 경우 `404 COMMENT_NOT_FOUND`를 반환한다.
+- 사용자는 자신이 작성한 댓글에도 좋아요를 누를 수 있다.
+- 좋아요 이력이 없으면 `is_liked = true`인 `comment_like` 행을 생성하고, 이력이 있으면 기존 `is_liked` 값을 반전한다.
+- 좋아요 취소 시 행을 삭제하지 않고 `is_liked = false`로 변경한다.
+- `(comment_id, user_id)` 조합의 좋아요 행은 최대 하나만 존재한다.
+- 게시글을 먼저 잠그고 댓글을 잠근 뒤 좋아요 상태를 변경하여 게시글·댓글 삭제와 좋아요 요청이 동시에 처리되지 않도록 한다.
+- 응답의 좋아요 수는 상태 변경 이후 해당 댓글의 `comment_like.is_liked = true`인 행만 집계한다.
+- 상태 변경과 좋아요 수 계산을 하나의 트랜잭션에서 처리한다.
+- 처리 도중 오류가 발생하면 DB 트랜잭션을 롤백한다.
+- 토글 요청은 호출할 때마다 상태를 반전하므로 멱등성을 보장하지 않는다.
+- 게시글 좋아요와 댓글 좋아요는 서로 독립된 기능으로 관리한다.
+- 공통 `400 INVALID_REQUEST`, `500 INTERNAL_SERVER_ERROR` 외 `404 POST_NOT_FOUND`, `404 COMMENT_NOT_FOUND`를 오류 응답으로 사용한다.
+
 ## 커뮤니티 댓글 작성
 
 - 댓글은 현재 로그인한 사용자를 작성자로 저장한다.
@@ -153,3 +175,24 @@
 - 처리 도중 오류가 발생하면 DB 트랜잭션을 롤백한다.
 - 삭제 성공 시 `204 No Content`를 반환하고 응답 Body는 보내지 않는다.
 - 공통 `400 INVALID_REQUEST`, `500 INTERNAL_SERVER_ERROR`를 제외한 이 API의 오류 응답은 `404 POST_NOT_FOUND`만 사용한다.
+
+## 커뮤니티 댓글 삭제
+
+- 커뮤니티 댓글 삭제는 `DELETE /api/v1/community/posts/{postId}/comments/{commentId}` 엔드포인트를 사용한다.
+- `postId`와 `commentId`는 1 이상의 정수만 허용하고, 올바르지 않은 값은 공통 `400 INVALID_REQUEST`로 처리한다.
+- 게시글은 `post.id = postId`, `post.status IN (ACTIVE, REPORTED)`, `post.deleted_at IS NULL` 조건으로 조회한다.
+- 게시글이 존재하지 않거나 `status = DELETED`이거나 `deleted_at IS NOT NULL`이면 `404 POST_NOT_FOUND`를 반환한다.
+- 댓글은 `comment.id = commentId`, `comment.post_id = postId`, `comment.user_id = 현재 사용자 id`, `comment.deleted_at IS NULL` 조건으로 조회한다.
+- `comment.status`가 `ACTIVE` 또는 `REPORTED`인 본인 댓글만 삭제할 수 있다.
+- 댓글이 존재하지 않거나 `status = DELETED`이거나 `deleted_at IS NOT NULL`이면 `404 COMMENT_NOT_FOUND`를 반환한다.
+- 다른 사용자가 작성한 댓글과 다른 게시글에 속한 댓글은 존재 여부를 노출하지 않고 `404 COMMENT_NOT_FOUND`를 반환한다.
+- 게시글을 먼저 `SELECT ... FOR UPDATE` 방식으로 잠가 게시글 삭제와 댓글 삭제가 동시에 처리되지 않도록 한다.
+- 삭제 대상 댓글도 `SELECT ... FOR UPDATE` 방식으로 잠가 동시에 들어온 삭제 요청 중 하나만 성공하게 한다.
+- 삭제 시 댓글을 실제로 제거하지 않고 `comment.status = DELETED`로 변경한다.
+- `comment.deleted_at`에는 삭제 시점의 한국시간 기준 offset 없는 datetime을 저장한다.
+- `comment.updated_at`은 ORM의 `onupdate=func.now()` 설정을 통해 갱신한다.
+- 댓글 내용과 연결된 `comment_like` 데이터는 삭제하거나 변경하지 않는다.
+- 게시글의 댓글 수는 별도 컬럼에 저장하지 않으므로 갱신하지 않는다.
+- 처리 도중 오류가 발생하면 DB 트랜잭션을 롤백한다.
+- 삭제 성공 시 `204 No Content`를 반환하고 응답 Body는 보내지 않는다.
+- 공통 `400 INVALID_REQUEST`, `500 INTERNAL_SERVER_ERROR` 외 `404 POST_NOT_FOUND`, `404 COMMENT_NOT_FOUND`를 오류 응답으로 사용한다.

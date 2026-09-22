@@ -1,4 +1,4 @@
-"""커뮤니티 게시글 목록·상세 조회와 게시글 작성·삭제·좋아요 토글, 댓글 작성 로직."""
+"""커뮤니티 게시글과 댓글의 조회·작성·삭제 및 좋아요 처리 로직."""
 
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
@@ -12,6 +12,7 @@ from app.community.schemas import (
     CommunityBoardFilter,
     CommunityCommentCreateResponse,
     CommunityCommentItemResponse,
+    CommunityCommentLikeResponse,
     CommunityPaginationResponse,
     CommunityPostAuthorResponse,
     CommunityPostCreateResponse,
@@ -533,4 +534,138 @@ def create_community_comment(
             is_liked=False,
             is_mine=True,
         )
+    )
+
+
+def delete_community_comment(
+    *,
+    db: Session,
+    current_user_id: int,
+    post_id: int,
+    comment_id: int,
+) -> None:
+    """조회 가능한 게시글에서 현재 사용자가 작성한 댓글을 소프트 삭제합니다."""
+    # 게시글 삭제와 댓글 삭제가 동시에 처리되지 않도록 게시글을 먼저 잠급니다.
+    post = db.scalar(
+        select(Post)
+        .where(
+            Post.id == post_id,
+            Post.status.in_(VISIBLE_POST_STATUSES),
+            Post.deleted_at.is_(None),
+        )
+        .limit(1)
+        .with_for_update()
+    )
+    if post is None:
+        _raise_post_not_found()
+
+    # 타인의 댓글인지 여부를 노출하지 않고 조회 불가 댓글과 동일하게 처리합니다.
+    comment = db.scalar(
+        select(Comment)
+        .where(
+            Comment.id == comment_id,
+            Comment.post_id == post_id,
+            Comment.user_id == current_user_id,
+            Comment.status.in_(VISIBLE_COMMENT_STATUSES),
+            Comment.deleted_at.is_(None),
+        )
+        .limit(1)
+        .with_for_update()
+    )
+    if comment is None:
+        _raise_comment_not_found()
+
+    comment.status = CommentStatus.DELETED
+    comment.deleted_at = _kst_now_naive()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def toggle_community_comment_like(
+    *,
+    db: Session,
+    current_user_id: int,
+    post_id: int,
+    comment_id: int,
+) -> CommunityCommentLikeResponse:
+    """댓글 좋아요 상태를 반전하고 반영 후의 댓글 좋아요 수를 반환합니다."""
+    # 게시글·댓글 삭제 요청과 동시에 처리되지 않도록 게시글, 댓글 순으로 잠급니다.
+    post = db.scalar(
+        select(Post)
+        .where(
+            Post.id == post_id,
+            Post.status.in_(VISIBLE_POST_STATUSES),
+            Post.deleted_at.is_(None),
+        )
+        .limit(1)
+        .with_for_update()
+    )
+    if post is None:
+        _raise_post_not_found()
+
+    comment = db.scalar(
+        select(Comment)
+        .where(
+            Comment.id == comment_id,
+            Comment.post_id == post_id,
+            Comment.status.in_(VISIBLE_COMMENT_STATUSES),
+            Comment.deleted_at.is_(None),
+        )
+        .limit(1)
+        .with_for_update()
+    )
+    if comment is None:
+        _raise_comment_not_found()
+
+    comment_like = db.scalar(
+        select(CommentLike)
+        .where(
+            CommentLike.comment_id == comment_id,
+            CommentLike.user_id == current_user_id,
+        )
+        .limit(1)
+    )
+    if comment_like is None:
+        # 취소해도 행을 지우지 않으므로 이력이 없을 때만 새로 만듭니다.
+        comment_like = CommentLike(
+            comment_id=comment_id,
+            user_id=current_user_id,
+            is_liked=True,
+        )
+        db.add(comment_like)
+    else:
+        comment_like.is_liked = not comment_like.is_liked
+    is_liked = comment_like.is_liked
+
+    try:
+        # 변경을 먼저 반영해야 좋아요 수 집계에 이번 요청이 포함됩니다.
+        db.flush()
+        like_count = _count_comment_likes(db=db, comment_id=comment_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return CommunityCommentLikeResponse(is_liked=is_liked, like_count=like_count)
+
+
+def _count_comment_likes(*, db: Session, comment_id: int) -> int:
+    """댓글의 is_liked = true 인 좋아요 행만 집계합니다."""
+    like_count = db.scalar(
+        select(func.count(CommentLike.id)).where(
+            CommentLike.comment_id == comment_id,
+            CommentLike.is_liked.is_(True),
+        )
+    )
+    return int(like_count or 0)
+
+
+def _raise_comment_not_found() -> NoReturn:
+    raise ApiError(
+        status_code=404,
+        code="COMMENT_NOT_FOUND",
+        message="댓글을 찾을 수 없습니다.",
     )

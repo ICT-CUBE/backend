@@ -19,6 +19,7 @@ from app.community.schemas import (
     CommunityBoardFilter,
     CommunityCommentCreateRequest,
     CommunityCommentCreateResponse,
+    CommunityCommentLikeResponse,
     CommunityPostCreateResponse,
     CommunityPostDetailResponse,
     CommunityPostLikeResponse,
@@ -28,9 +29,11 @@ from app.community.service import (
     COMMUNITY_PAGE_SIZE,
     create_community_comment,
     create_community_post,
+    delete_community_comment,
     delete_community_post,
     get_community_post_detail,
     get_community_posts,
+    toggle_community_comment_like,
     toggle_community_post_like,
 )
 from app.core.auth import get_current_user_id
@@ -294,4 +297,102 @@ def create_comment(
         current_user_id=current_user_id,
         post_id=post_id,
         content=body.content,
+    )
+
+
+@router.delete(
+    "/posts/{postId}/comments/{commentId}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="커뮤니티 댓글 삭제",
+    description="현재 사용자가 작성한 댓글을 소프트 딜리트합니다.",
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "게시글 또는 삭제 가능한 본인 댓글이 존재하지 않음",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "postNotFound": {
+                            "summary": "게시글 없음 또는 삭제됨",
+                            "value": {
+                                "code": "POST_NOT_FOUND",
+                                "message": "게시글을 찾을 수 없습니다.",
+                            },
+                        },
+                        "commentNotFound": {
+                            "summary": "댓글 없음, 이미 삭제됨 또는 타인의 댓글",
+                            "value": {
+                                "code": "COMMENT_NOT_FOUND",
+                                "message": "댓글을 찾을 수 없습니다.",
+                            },
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
+def delete_comment(
+    post_id: Annotated[int, Path(alias="postId", ge=1)],
+    comment_id: Annotated[int, Path(alias="commentId", ge=1)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> Response:
+    """DELETE /api/v1/community/posts/{postId}/comments/{commentId}"""
+    delete_community_comment(
+        db=db,
+        current_user_id=current_user_id,
+        post_id=post_id,
+        comment_id=comment_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch(
+    "/posts/{postId}/comments/{commentId}/like",
+    response_model=CommunityCommentLikeResponse,
+    summary="커뮤니티 댓글 좋아요 토글",
+    description=(
+        "현재 사용자의 댓글 좋아요 상태를 반전하고, 반전 이후의 좋아요 상태와 "
+        "해당 댓글의 전체 좋아요 수를 반환합니다. 호출할 때마다 상태가 바뀝니다."
+    ),
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "게시글 또는 좋아요를 처리할 수 있는 댓글이 존재하지 않음",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "postNotFound": {
+                            "summary": "게시글 없음 또는 삭제됨",
+                            "value": {
+                                "code": "POST_NOT_FOUND",
+                                "message": "게시글을 찾을 수 없습니다.",
+                            },
+                        },
+                        "commentNotFound": {
+                            "summary": "댓글 없음, 삭제됨 또는 다른 게시글의 댓글",
+                            "value": {
+                                "code": "COMMENT_NOT_FOUND",
+                                "message": "댓글을 찾을 수 없습니다.",
+                            },
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
+def update_comment_like(
+    post_id: Annotated[int, Path(alias="postId", ge=1)],
+    comment_id: Annotated[int, Path(alias="commentId", ge=1)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+) -> CommunityCommentLikeResponse:
+    """PATCH /api/v1/community/posts/{postId}/comments/{commentId}/like"""
+    return toggle_community_comment_like(
+        db=db,
+        current_user_id=current_user_id,
+        post_id=post_id,
+        comment_id=comment_id,
     )

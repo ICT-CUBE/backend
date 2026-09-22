@@ -1,12 +1,12 @@
 from argparse import Namespace
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 from scripts import setup_database
 
 
-def database_settings(name: str) -> setup_database.DatabaseSettings:
+def database_settings(name: str = "hanium") -> setup_database.DatabaseSettings:
     return setup_database.DatabaseSettings.model_validate(
         {
             "MYSQL_HOST": "mysql.example.com",
@@ -19,146 +19,214 @@ def database_settings(name: str) -> setup_database.DatabaseSettings:
     )
 
 
-def test_parse_blockchain_database_settings_decodes_url_values() -> None:
-    settings = setup_database.parse_blockchain_database_settings(
-        {
-            "DATABASE_URL": "mysql://user:p%40ss@mysql.example.com:3307/cube_nft",
-            "DATABASE_SSL_ENABLED": "true",
-        }
+def demo_trade() -> setup_database.DemoTrade:
+    return setup_database.DemoTrade(
+        trade_id=1,
+        listing_id=1,
+        cube_id=2,
+        serial_number="NO.0031",
+        token_id=31,
+        seller_user_id=2,
+        seller_nickname="지드래곤짱",
+        seller_ownership_id=2,
+        buyer_user_id=1,
+        buyer_nickname="블링크",
     )
 
-    assert settings.mysql_host == "mysql.example.com"
-    assert settings.mysql_port == 3307
-    assert settings.mysql_database == "cube_nft"
-    assert settings.mysql_password.get_secret_value() == "p@ss"
-    assert settings.mysql_ssl_enabled is True
+
+def mock_connection(*, fetch_rows: list[tuple | None]) -> tuple[Mock, Mock]:
+    connection = MagicMock()
+    cursor = connection.cursor.return_value.__enter__.return_value
+    cursor.fetchone.side_effect = fetch_rows
+    return connection, cursor
 
 
-def test_main_runs_demo_reset_in_required_order() -> None:
+def test_load_demo_trade_returns_trade_and_seller_ownership() -> None:
+    connection, cursor = mock_connection(
+        fetch_rows=[
+            (1, 1, 2, "NO.0031", 2, "지드래곤짱", 1, "블링크"),
+            (2,),
+        ]
+    )
+
+    with patch.object(
+        setup_database,
+        "connect_database",
+        return_value=connection,
+    ):
+        target = setup_database.load_demo_trade(
+            settings=database_settings(),
+            trade_id=1,
+        )
+
+    assert target == demo_trade()
+    assert cursor.execute.call_count == 2
+    connection.close.assert_called_once()
+
+
+def test_load_demo_trade_rejects_trade_without_seller_ownership() -> None:
+    connection, _ = mock_connection(
+        fetch_rows=[
+            (1, 1, 2, "NO.0031", 2, "지드래곤짱", 1, "블링크"),
+            None,
+        ]
+    )
+
+    with patch.object(
+        setup_database,
+        "connect_database",
+        return_value=connection,
+    ):
+        with pytest.raises(RuntimeError, match="판매자의 큐브 소유권"):
+            setup_database.load_demo_trade(
+                settings=database_settings(),
+                trade_id=1,
+            )
+
+
+def test_reset_demo_trade_database_updates_only_demo_related_rows() -> None:
+    connection, cursor = mock_connection(fetch_rows=[(1,)])
+
+    with patch.object(
+        setup_database,
+        "connect_database",
+        return_value=connection,
+    ):
+        setup_database.reset_demo_trade_database(
+            settings=database_settings(),
+            target=demo_trade(),
+        )
+
+    queries = [call.args[0] for call in cursor.execute.call_args_list]
+    assert queries[0] == "SELECT id FROM trade WHERE id = %s FOR UPDATE"
+    assert any("DELETE FROM digital_certificate" in query for query in queries)
+    assert any("DELETE FROM blockchain_operation" in query for query in queries)
+    insert_call = next(
+        call
+        for call in cursor.execute.call_args_list
+        if "INSERT INTO blockchain_operation" in call.args[0]
+    )
+    assert "'TRANSFER', 'CONFIRMED'" in insert_call.args[0]
+    token_id, trade_id, _, tx_hash = insert_call.args[1]
+    assert (token_id, trade_id, tx_hash) == (31, 1, setup_database.DEMO_TX_HASH)
+    assert any("UPDATE cube_ownership" in query for query in queries)
+    assert any("UPDATE cube SET status = 'TRADE_PENDING'" in query for query in queries)
+    assert any("UPDATE sell_listing SET status = 'SOLD'" in query for query in queries)
+    assert any("status = 'DELIVERED'" in query for query in queries)
+    connection.commit.assert_called_once()
+    connection.rollback.assert_not_called()
+    connection.close.assert_called_once()
+
+
+def test_reset_demo_trade_database_rolls_back_on_failure() -> None:
+    connection, cursor = mock_connection(fetch_rows=[(1,)])
+    cursor.execute.side_effect = [None, RuntimeError("delete failed")]
+
+    with patch.object(
+        setup_database,
+        "connect_database",
+        return_value=connection,
+    ):
+        with pytest.raises(RuntimeError, match="delete failed"):
+            setup_database.reset_demo_trade_database(
+                settings=database_settings(),
+                target=demo_trade(),
+            )
+
+    connection.rollback.assert_called_once()
+    connection.commit.assert_not_called()
+
+
+def test_load_demo_trade_rejects_unsupported_serial_number() -> None:
+    connection, _ = mock_connection(
+        fetch_rows=[
+            (1, 1, 2, "CUBE-31", 2, "지드래곤짱", 1, "블링크"),
+            (2,),
+        ]
+    )
+
+    with patch.object(
+        setup_database,
+        "connect_database",
+        return_value=connection,
+    ):
+        with pytest.raises(RuntimeError, match="토큰 번호로 변환할 수 없는"):
+            setup_database.load_demo_trade(
+                settings=database_settings(),
+                trade_id=1,
+            )
+
+
+def test_main_resets_demo_trade_after_confirmation() -> None:
     args = Namespace(
         yes=True,
+        trade_id=1,
         resource_group="hanium-rg",
         backend_app="hanium",
-        blockchain_app="hanium-blockchain",
     )
-    backend_database = database_settings("hanium")
-    blockchain_database = database_settings("cube_nft")
+    target = demo_trade()
+    settings = database_settings()
     events: list[str] = []
 
     with (
         patch.object(setup_database, "parse_args", return_value=args),
-        patch.object(setup_database, "validate_sql_files"),
         patch.object(
             setup_database,
             "load_webapp_settings",
-            side_effect=[{"APP": "backend"}, {"APP": "blockchain"}],
+            return_value={"APP": "backend"},
         ),
         patch.object(
             setup_database,
             "parse_backend_database_settings",
-            return_value=backend_database,
+            return_value=settings,
         ),
         patch.object(
             setup_database,
-            "parse_blockchain_database_settings",
-            return_value=blockchain_database,
-        ),
-        patch.object(setup_database, "confirm_reset"),
-        patch.object(
-            setup_database,
-            "set_webapp_state",
-            side_effect=lambda **kwargs: events.append(
-                f"{kwargs['action']}:{kwargs['app_name']}"
-            ),
+            "load_demo_trade",
+            side_effect=lambda **_: events.append("load") or target,
         ),
         patch.object(
             setup_database,
-            "reset_backend_database",
-            side_effect=lambda _: events.append("reset:backend"),
+            "confirm_prepare",
+            side_effect=lambda **_: events.append("confirm"),
         ),
         patch.object(
             setup_database,
-            "reset_blockchain_database",
-            side_effect=lambda _: events.append("reset:blockchain"),
-        ),
-        patch.object(
-            setup_database,
-            "wait_for_endpoint",
-            side_effect=lambda **kwargs: events.append(f"ready:{kwargs['label']}"),
-        ),
-        patch.object(
-            setup_database,
-            "inject_process_environment",
-            side_effect=lambda _: events.append("inject:backend-settings"),
-        ),
-        patch.object(
-            setup_database,
-            "run_backfill",
-            side_effect=lambda: events.append("backfill"),
-        ),
+            "reset_demo_trade_database",
+            side_effect=lambda **_: events.append("database"),
+        ) as reset,
     ):
         setup_database.main()
 
-    assert events == [
-        "stop:hanium-blockchain",
-        "stop:hanium",
-        "reset:backend",
-        "reset:blockchain",
-        "start:hanium",
-        "ready:Backend",
-        "start:hanium-blockchain",
-        "ready:Blockchain Server",
-        "inject:backend-settings",
-        "backfill",
-    ]
+    assert events == ["load", "confirm", "database"]
+    reset.assert_called_once_with(settings=settings, target=target)
 
 
-def test_main_restarts_apps_when_database_reset_fails() -> None:
+def test_main_does_not_reset_database_when_confirmation_cancelled() -> None:
     args = Namespace(
-        yes=True,
+        yes=False,
+        trade_id=1,
         resource_group="hanium-rg",
         backend_app="hanium",
-        blockchain_app="hanium-blockchain",
     )
-    backend_database = database_settings("hanium")
-    blockchain_database = database_settings("cube_nft")
-    states = Mock()
 
     with (
         patch.object(setup_database, "parse_args", return_value=args),
-        patch.object(setup_database, "validate_sql_files"),
-        patch.object(
-            setup_database,
-            "load_webapp_settings",
-            side_effect=[{"APP": "backend"}, {"APP": "blockchain"}],
-        ),
+        patch.object(setup_database, "load_webapp_settings", return_value={}),
         patch.object(
             setup_database,
             "parse_backend_database_settings",
-            return_value=backend_database,
+            return_value=database_settings(),
         ),
         patch.object(
             setup_database,
-            "parse_blockchain_database_settings",
-            return_value=blockchain_database,
+            "load_demo_trade",
+            return_value=demo_trade(),
         ),
-        patch.object(setup_database, "confirm_reset"),
-        patch.object(setup_database, "set_webapp_state", states),
-        patch.object(
-            setup_database,
-            "reset_backend_database",
-            side_effect=RuntimeError("reset failed"),
-        ),
+        patch("builtins.input", return_value="2"),
+        patch.object(setup_database, "reset_demo_trade_database") as reset,
     ):
-        with pytest.raises(RuntimeError, match="reset failed"):
+        with pytest.raises(SystemExit):
             setup_database.main()
 
-    actions = [call.kwargs["action"] for call in states.call_args_list]
-    apps = [call.kwargs["app_name"] for call in states.call_args_list]
-    assert actions == ["stop", "stop", "start", "start"]
-    assert apps == [
-        "hanium-blockchain",
-        "hanium",
-        "hanium",
-        "hanium-blockchain",
-    ]
+    reset.assert_not_called()

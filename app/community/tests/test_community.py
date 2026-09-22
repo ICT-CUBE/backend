@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 
 from sqlalchemy.orm import Session
 
-from app.community.models import Comment, Post, PostLike, PostMedia
+from app.community.models import Comment, CommentLike, Post, PostLike, PostMedia
 from app.core.enums import BoardType, CommentStatus, PostStatus
 from app.core.tests.conftest import api_client
 from app.main import app
@@ -69,6 +69,24 @@ def community_author(
         id=user_id,
         nickname=nickname,
         profile_character_img_url=profile_character_img_url,
+    )
+
+
+def community_comment(
+    *,
+    comment_id: int,
+    post_id: int = 1,
+    user_id: int = 1,
+    status: CommentStatus = CommentStatus.ACTIVE,
+) -> Comment:
+    return Comment(
+        id=comment_id,
+        post_id=post_id,
+        user_id=user_id,
+        content="큐브 디자인이 정말 예쁘네요.",
+        status=status,
+        created_at=datetime.fromisoformat("2026-09-20T18:30:00"),
+        deleted_at=None,
     )
 
 
@@ -465,6 +483,11 @@ def test_read_community_posts_swagger_contract() -> None:
 POST_NOT_FOUND_RESPONSE = {
     "code": "POST_NOT_FOUND",
     "message": "게시글을 찾을 수 없습니다.",
+}
+
+COMMENT_NOT_FOUND_RESPONSE = {
+    "code": "COMMENT_NOT_FOUND",
+    "message": "댓글을 찾을 수 없습니다.",
 }
 
 
@@ -1791,5 +1814,514 @@ def test_create_comment_swagger_contract() -> None:
         response_ref.rsplit("/", 1)[-1]
     ]
     assert set(response_schema["properties"]) == {"comment"}
+    assert operation["tags"] == ["community"]
+    assert operation["security"] == [{"HTTPBearer": []}]
+
+
+# --- 커뮤니티 댓글 삭제: DELETE /api/v1/community/posts/{postId}/comments/{commentId} ---
+
+
+def delete_comment_request(
+    db: Mock,
+    *,
+    post_id: int | str = 1,
+    comment_id: int | str = 1,
+    raise_server_exceptions: bool = True,
+):
+    with api_client(db, raise_server_exceptions=raise_server_exceptions) as client:
+        return client.delete(
+            f"/api/v1/community/posts/{post_id}/comments/{comment_id}"
+        )
+
+
+def set_delete_comment_results(
+    db: Mock,
+    *,
+    post: Post | None,
+    comment: Comment | None = None,
+) -> None:
+    db.scalar.side_effect = [post] if post is None else [post, comment]
+
+
+def test_delete_comment_soft_deletes_current_user_comment() -> None:
+    db = Mock(spec=Session)
+    comment = community_comment(comment_id=1)
+    set_delete_comment_results(
+        db,
+        post=community_post(post_id=1),
+        comment=comment,
+    )
+
+    response = delete_comment_request(db)
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert comment.status == CommentStatus.DELETED
+    assert comment.deleted_at is not None
+    assert comment.deleted_at.tzinfo is None
+    db.commit.assert_called_once()
+    db.add.assert_not_called()
+
+
+def test_delete_comment_deletes_reported_comment() -> None:
+    db = Mock(spec=Session)
+    comment = community_comment(
+        comment_id=1,
+        status=CommentStatus.REPORTED,
+    )
+    set_delete_comment_results(
+        db,
+        post=community_post(post_id=1),
+        comment=comment,
+    )
+
+    response = delete_comment_request(db)
+
+    assert response.status_code == 204
+    assert comment.status == CommentStatus.DELETED
+
+
+def test_delete_comment_returns_404_when_post_is_unavailable() -> None:
+    db = Mock(spec=Session)
+    set_delete_comment_results(db, post=None)
+
+    response = delete_comment_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == POST_NOT_FOUND_RESPONSE
+    assert db.scalar.call_count == 1
+    db.commit.assert_not_called()
+
+
+def test_delete_comment_returns_404_when_comment_is_unavailable() -> None:
+    db = Mock(spec=Session)
+    set_delete_comment_results(
+        db,
+        post=community_post(post_id=1),
+        comment=None,
+    )
+
+    response = delete_comment_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == COMMENT_NOT_FOUND_RESPONSE
+    db.commit.assert_not_called()
+
+
+def test_delete_comment_locks_visible_post_and_owned_comment() -> None:
+    db = Mock(spec=Session)
+    set_delete_comment_results(
+        db,
+        post=community_post(post_id=7),
+        comment=community_comment(comment_id=9, post_id=7),
+    )
+
+    delete_comment_request(db, post_id=7, comment_id=9)
+
+    post_query = compiled_query(db.scalar.call_args_list[0])
+    assert "post.id = 7" in post_query
+    assert "post.status IN ('ACTIVE', 'REPORTED')" in post_query
+    assert "post.deleted_at IS NULL" in post_query
+    assert "FOR UPDATE" in post_query
+
+    comment_query = compiled_query(db.scalar.call_args_list[1])
+    assert "comment.id = 9" in comment_query
+    assert "comment.post_id = 7" in comment_query
+    assert "comment.user_id = 1" in comment_query
+    assert "comment.status IN ('ACTIVE', 'REPORTED')" in comment_query
+    assert "comment.deleted_at IS NULL" in comment_query
+    assert "FOR UPDATE" in comment_query
+
+
+def test_delete_comment_allows_minimum_path_ids() -> None:
+    db = Mock(spec=Session)
+    set_delete_comment_results(
+        db,
+        post=community_post(post_id=1),
+        comment=community_comment(comment_id=1),
+    )
+
+    response = delete_comment_request(db, post_id=1, comment_id=1)
+
+    assert response.status_code == 204
+
+
+def test_delete_comment_returns_400_when_post_id_is_zero() -> None:
+    db = Mock(spec=Session)
+
+    response = delete_comment_request(db, post_id=0)
+
+    assert response.status_code == 400
+    assert response.json() == INVALID_REQUEST_RESPONSE
+    db.scalar.assert_not_called()
+
+
+def test_delete_comment_returns_400_when_comment_id_is_zero() -> None:
+    db = Mock(spec=Session)
+
+    response = delete_comment_request(db, comment_id=0)
+
+    assert response.status_code == 400
+    assert response.json() == INVALID_REQUEST_RESPONSE
+    db.scalar.assert_not_called()
+
+
+def test_delete_comment_returns_400_when_comment_id_is_not_a_number() -> None:
+    db = Mock(spec=Session)
+
+    response = delete_comment_request(db, comment_id="abc")
+
+    assert response.status_code == 400
+    assert response.json() == INVALID_REQUEST_RESPONSE
+    db.scalar.assert_not_called()
+
+
+def test_delete_comment_rolls_back_when_commit_fails() -> None:
+    db = Mock(spec=Session)
+    set_delete_comment_results(
+        db,
+        post=community_post(post_id=1),
+        comment=community_comment(comment_id=1),
+    )
+    db.commit.side_effect = RuntimeError("db failed")
+
+    response = delete_comment_request(db, raise_server_exceptions=False)
+
+    assert response.status_code == 500
+    db.rollback.assert_called_once()
+
+
+def test_delete_comment_swagger_contract() -> None:
+    operation = app.openapi()["paths"][
+        "/api/v1/community/posts/{postId}/comments/{commentId}"
+    ]["delete"]
+
+    assert set(operation["responses"]) == {"204", "404"}
+    assert {parameter["name"] for parameter in operation["parameters"]} == {
+        "postId",
+        "commentId",
+    }
+    assert "requestBody" not in operation
+    assert operation["tags"] == ["community"]
+    assert operation["security"] == [{"HTTPBearer": []}]
+
+
+# --- 커뮤니티 댓글 좋아요 토글 ---
+# PATCH /api/v1/community/posts/{postId}/comments/{commentId}/like
+
+
+def toggle_comment_like_request(
+    db: Mock,
+    *,
+    post_id: int | str = 1,
+    comment_id: int | str = 1,
+    raise_server_exceptions: bool = True,
+):
+    with api_client(db, raise_server_exceptions=raise_server_exceptions) as client:
+        return client.patch(
+            f"/api/v1/community/posts/{post_id}/comments/{comment_id}/like"
+        )
+
+
+def community_comment_like(
+    *,
+    comment_id: int = 1,
+    user_id: int = 1,
+    is_liked: bool = True,
+) -> CommentLike:
+    return CommentLike(id=1, comment_id=comment_id, user_id=user_id, is_liked=is_liked)
+
+
+def set_comment_like_results(
+    db: Mock,
+    *,
+    post: Post | None,
+    comment: Comment | None = None,
+    comment_like: CommentLike | None = None,
+    like_count: int = 0,
+) -> list:
+    """서비스가 조회하는 순서대로 게시글, 댓글, 좋아요 행, 좋아요 수를 지정합니다."""
+    db.scalar.side_effect = [post, comment, comment_like, like_count]
+    added: list = []
+    db.add.side_effect = added.append
+    return added
+
+
+def test_toggle_comment_like_creates_liked_row_when_no_history() -> None:
+    db = Mock(spec=Session)
+    added = set_comment_like_results(
+        db,
+        post=community_post(post_id=1),
+        comment=community_comment(comment_id=4, user_id=2),
+        comment_like=None,
+        like_count=3,
+    )
+
+    response = toggle_comment_like_request(db, post_id=1, comment_id=4)
+
+    assert response.status_code == 200
+    assert response.json() == {"isLiked": True, "likeCount": 3}
+    assert len(added) == 1
+    assert added[0].comment_id == 4
+    assert added[0].user_id == 1
+    assert added[0].is_liked is True
+    db.commit.assert_called_once()
+
+
+def test_toggle_comment_like_cancels_existing_like() -> None:
+    db = Mock(spec=Session)
+    comment_like = community_comment_like(is_liked=True)
+    added = set_comment_like_results(
+        db,
+        post=community_post(post_id=1),
+        comment=community_comment(comment_id=1),
+        comment_like=comment_like,
+        like_count=2,
+    )
+
+    response = toggle_comment_like_request(db)
+
+    assert response.status_code == 200
+    assert response.json() == {"isLiked": False, "likeCount": 2}
+    assert comment_like.is_liked is False
+    assert added == []
+    db.delete.assert_not_called()
+    db.commit.assert_called_once()
+
+
+def test_toggle_comment_like_relikes_cancelled_like() -> None:
+    db = Mock(spec=Session)
+    comment_like = community_comment_like(is_liked=False)
+    added = set_comment_like_results(
+        db,
+        post=community_post(post_id=1),
+        comment=community_comment(comment_id=1),
+        comment_like=comment_like,
+        like_count=3,
+    )
+
+    response = toggle_comment_like_request(db)
+
+    assert response.status_code == 200
+    assert response.json() == {"isLiked": True, "likeCount": 3}
+    assert comment_like.is_liked is True
+    assert added == []
+    db.commit.assert_called_once()
+
+
+def test_toggle_comment_like_allows_liking_own_comment() -> None:
+    db = Mock(spec=Session)
+    set_comment_like_results(
+        db,
+        post=community_post(post_id=1),
+        comment=community_comment(comment_id=1, user_id=1),
+        comment_like=None,
+        like_count=1,
+    )
+
+    response = toggle_comment_like_request(db)
+
+    assert response.status_code == 200
+    assert response.json() == {"isLiked": True, "likeCount": 1}
+
+
+def test_toggle_comment_like_returns_zero_like_count_when_all_cancelled() -> None:
+    db = Mock(spec=Session)
+    set_comment_like_results(
+        db,
+        post=community_post(post_id=1),
+        comment=community_comment(comment_id=1),
+        comment_like=community_comment_like(is_liked=True),
+        like_count=0,
+    )
+
+    response = toggle_comment_like_request(db)
+
+    assert response.status_code == 200
+    assert response.json() == {"isLiked": False, "likeCount": 0}
+
+
+def test_toggle_comment_like_toggles_reported_post_and_comment() -> None:
+    db = Mock(spec=Session)
+    post = community_post(post_id=1)
+    post.status = PostStatus.REPORTED
+    set_comment_like_results(
+        db,
+        post=post,
+        comment=community_comment(comment_id=1, status=CommentStatus.REPORTED),
+        comment_like=None,
+        like_count=1,
+    )
+
+    response = toggle_comment_like_request(db)
+
+    assert response.status_code == 200
+    assert response.json() == {"isLiked": True, "likeCount": 1}
+
+
+def test_toggle_comment_like_returns_404_when_post_not_found() -> None:
+    db = Mock(spec=Session)
+    set_comment_like_results(db, post=None)
+
+    response = toggle_comment_like_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == POST_NOT_FOUND_RESPONSE
+    assert db.scalar.call_count == 1
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_toggle_comment_like_returns_404_when_comment_not_found() -> None:
+    db = Mock(spec=Session)
+    set_comment_like_results(db, post=community_post(post_id=1), comment=None)
+
+    response = toggle_comment_like_request(db)
+
+    assert response.status_code == 404
+    assert response.json() == COMMENT_NOT_FOUND_RESPONSE
+    assert db.scalar.call_count == 2
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_toggle_comment_like_locks_visible_post_and_comment_of_post() -> None:
+    db = Mock(spec=Session)
+    set_comment_like_results(
+        db,
+        post=community_post(post_id=7),
+        comment=community_comment(comment_id=9, post_id=7),
+        comment_like=None,
+        like_count=1,
+    )
+
+    toggle_comment_like_request(db, post_id=7, comment_id=9)
+
+    post_query = compiled_query(db.scalar.call_args_list[0])
+    assert "post.id = 7" in post_query
+    assert "post.status IN ('ACTIVE', 'REPORTED')" in post_query
+    assert "post.deleted_at IS NULL" in post_query
+    assert "FOR UPDATE" in post_query
+    assert "post.user_id" not in post_query.split("WHERE", 1)[1]
+
+    comment_query = compiled_query(db.scalar.call_args_list[1])
+    assert "comment.id = 9" in comment_query
+    assert "comment.post_id = 7" in comment_query
+    assert "comment.status IN ('ACTIVE', 'REPORTED')" in comment_query
+    assert "comment.deleted_at IS NULL" in comment_query
+    assert "FOR UPDATE" in comment_query
+    # 삭제와 달리 작성자 조건으로 거르지 않아 남의 댓글에도 좋아요를 누를 수 있습니다.
+    assert "comment.user_id" not in comment_query.split("WHERE", 1)[1]
+
+
+def test_toggle_comment_like_queries_like_row_of_current_user() -> None:
+    db = Mock(spec=Session)
+    set_comment_like_results(
+        db,
+        post=community_post(post_id=1),
+        comment=community_comment(comment_id=9),
+        comment_like=None,
+        like_count=1,
+    )
+
+    toggle_comment_like_request(db, comment_id=9)
+
+    query = compiled_query(db.scalar.call_args_list[2])
+    assert "comment_like.comment_id = 9" in query
+    assert "comment_like.user_id = 1" in query
+
+
+def test_toggle_comment_like_counts_only_liked_rows_after_flush() -> None:
+    db = Mock(spec=Session)
+    set_comment_like_results(
+        db,
+        post=community_post(post_id=1),
+        comment=community_comment(comment_id=9),
+        comment_like=None,
+        like_count=1,
+    )
+
+    toggle_comment_like_request(db, comment_id=9)
+
+    query = compiled_query(db.scalar.call_args_list[3])
+    assert "count(comment_like.id)" in query
+    assert "comment_like.comment_id = 9" in query
+    assert "comment_like.is_liked IS true" in query
+    db.flush.assert_called_once()
+
+
+def test_toggle_comment_like_allows_minimum_path_ids() -> None:
+    db = Mock(spec=Session)
+    set_comment_like_results(
+        db,
+        post=community_post(post_id=1),
+        comment=community_comment(comment_id=1),
+        comment_like=None,
+        like_count=1,
+    )
+
+    response = toggle_comment_like_request(db, post_id=1, comment_id=1)
+
+    assert response.status_code == 200
+
+
+def test_toggle_comment_like_returns_400_when_post_id_is_zero() -> None:
+    db = Mock(spec=Session)
+
+    response = toggle_comment_like_request(db, post_id=0)
+
+    assert response.status_code == 400
+    assert response.json() == INVALID_REQUEST_RESPONSE
+    db.scalar.assert_not_called()
+
+
+def test_toggle_comment_like_returns_400_when_comment_id_is_zero() -> None:
+    db = Mock(spec=Session)
+
+    response = toggle_comment_like_request(db, comment_id=0)
+
+    assert response.status_code == 400
+    assert response.json() == INVALID_REQUEST_RESPONSE
+    db.scalar.assert_not_called()
+
+
+def test_toggle_comment_like_returns_400_when_comment_id_is_not_number() -> None:
+    db = Mock(spec=Session)
+
+    response = toggle_comment_like_request(db, comment_id="abc")
+
+    assert response.status_code == 400
+    assert response.json() == INVALID_REQUEST_RESPONSE
+    db.scalar.assert_not_called()
+
+
+def test_toggle_comment_like_rolls_back_when_commit_fails() -> None:
+    db = Mock(spec=Session)
+    set_comment_like_results(
+        db,
+        post=community_post(post_id=1),
+        comment=community_comment(comment_id=1),
+        comment_like=None,
+        like_count=1,
+    )
+    db.commit.side_effect = RuntimeError("db failed")
+
+    response = toggle_comment_like_request(db, raise_server_exceptions=False)
+
+    assert response.status_code == 500
+    db.rollback.assert_called_once()
+
+
+def test_toggle_comment_like_swagger_contract() -> None:
+    operation = app.openapi()["paths"][
+        "/api/v1/community/posts/{postId}/comments/{commentId}/like"
+    ]["patch"]
+
+    assert set(operation["responses"]) == {"200", "404"}
+    assert {parameter["name"] for parameter in operation["parameters"]} == {
+        "postId",
+        "commentId",
+    }
+    assert "requestBody" not in operation
     assert operation["tags"] == ["community"]
     assert operation["security"] == [{"HTTPBearer": []}]

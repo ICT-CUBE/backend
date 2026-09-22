@@ -87,3 +87,8 @@ class CommunityCommentCreateRequest(ApiSchema):
 
 class CommunityCommentCreateResponse(ApiSchema):
     comment: CommunityCommentItemResponse
+
+
+class CommunityCommentLikeResponse(ApiSchema):
+    is_liked: bool
+    like_count: int

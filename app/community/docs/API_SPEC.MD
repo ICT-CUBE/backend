@@ -404,6 +404,117 @@ Status Code : 404
 Path 값이 올바르지 않은 경우의 400, 인증 실패에 대한 401과 서버 내부 오류에 대한 500은 공통 오류 정책을 따른다.
 
 
+## 커뮤니티 댓글 좋아요 토글
+- http 메서드: patch
+- domain: community
+- endpoint: /api/v1/community/posts/{postId}/comments/{commentId}/like
+
+### API 설명
+
+사용자가 커뮤니티 댓글의 좋아요 버튼을 누르면 호출한다.
+
+현재 사용자의 댓글 좋아요 상태를 반전하고, 변경된 좋아요 상태와 해당 댓글의 전체 좋아요 수를 반환한다.
+
+---
+
+### 처리 정책
+
+- 현재 로그인한 사용자와 `commentId`를 기준으로 댓글 좋아요를 처리한다.
+- 큐브 소유권은 댓글 좋아요 처리 조건으로 사용하지 않는다.
+- `postId`에 해당하는 게시글의 `status`가 `ACTIVE` 또는 `REPORTED`이고 `deleted_at IS NULL`인 경우에만 좋아요를 처리한다.
+- 게시글이 존재하지 않거나 `status = DELETED`이거나 `deleted_at IS NOT NULL`이면 404: POST_NOT_FOUND를 반환한다.
+- `commentId`에 해당하는 댓글이 `postId`의 게시글에 속하고, `status`가 `ACTIVE` 또는 `REPORTED`이며 `deleted_at IS NULL`인 경우에만 좋아요를 처리한다.
+- 댓글이 존재하지 않거나 다른 게시글에 속하거나 `status = DELETED`이거나 `deleted_at IS NOT NULL`이면 404: COMMENT_NOT_FOUND를 반환한다.
+- 현재 사용자가 작성한 댓글에도 좋아요를 누를 수 있다.
+- 현재 사용자와 댓글에 해당하는 `comment_like` 행이 없으면 `is_liked = true`인 행을 생성한다.
+- 기존 `comment_like.is_liked = true`이면 `false`로 변경한다.
+- 기존 `comment_like.is_liked = false`이면 `true`로 변경한다.
+- 좋아요를 취소해도 `comment_like` 행을 삭제하지 않는다.
+- `(comment_id, user_id)` 조합은 하나의 좋아요 행만 가질 수 있다.
+- 처리 대상 게시글과 댓글을 잠근 상태에서 좋아요 생성 또는 변경을 수행한다.
+- 좋아요 변경 사항을 반영한 뒤 해당 댓글의 `is_liked = true`인 행만 집계하여 `likeCount`를 계산한다.
+- 처리에 성공하면 트랜잭션을 한 번 커밋하고, 실패하면 롤백한다.
+- 이 API는 요청할 때마다 현재 좋아요 상태를 반전하므로 멱등성을 보장하지 않는다.
+
+---
+
+### 요청 Query
+
+없음
+
+---
+
+### 요청 Path
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `postId` | number | O | 댓글이 속한 게시글 id. 1 이상의 정수 |
+| `commentId` | number | O | 좋아요 상태를 변경할 댓글 id. 1 이상의 정수 |
+
+요청 예시: /api/v1/community/posts/1/comments/4/like
+
+---
+
+### 요청 Body
+
+없음
+
+---
+
+### 정상 응답 데이터
+
+Status Code : 200
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `isLiked` | boolean | 토글 이후 현재 사용자의 댓글 좋아요 상태 |
+| `likeCount` | number | 토글 이후 해당 댓글의 전체 좋아요 수 |
+
+좋아요를 설정한 경우
+
+```json
+{
+  "isLiked": true,
+  "likeCount": 3
+}
+```
+
+좋아요를 취소한 경우
+
+```json
+{
+  "isLiked": false,
+  "likeCount": 2
+}
+```
+
+---
+
+### 오류 응답 데이터
+
+Status Code : 404
+
+게시글이 존재하지 않거나 좋아요를 처리할 수 없는 상태인 경우
+
+```json
+{
+  "code": "POST_NOT_FOUND",
+  "message": "게시글을 찾을 수 없습니다."
+}
+```
+
+댓글이 존재하지 않거나, 요청한 게시글에 속하지 않거나, 좋아요를 처리할 수 없는 상태인 경우
+
+```json
+{
+  "code": "COMMENT_NOT_FOUND",
+  "message": "댓글을 찾을 수 없습니다."
+}
+```
+
+Path 값이 올바르지 않은 경우의 400, 인증 실패에 대한 401과 서버 내부 오류에 대한 500은 공통 오류 정책을 따른다.
+
+
 ## 커뮤니티 댓글 작성
 - http 메서드: post
 - domain: community
@@ -675,5 +786,81 @@ Status Code : 404
 {
   "code": "POST_NOT_FOUND",
   "message": "게시글을 찾을 수 없습니다."
+}
+```
+
+
+## 커뮤니티 댓글 삭제
+- http 메서드: delete
+- domain: community
+- endpoint: /api/v1/community/posts/{postId}/comments/{commentId}
+
+### API 설명
+
+현재 사용자가 작성한 커뮤니티 댓글을 삭제 상태로 변경한다.
+
+---
+
+### 처리 정책
+
+- 삭제되지 않은 `ACTIVE` 또는 `REPORTED` 게시글에 속한 댓글만 삭제할 수 있다.
+- 현재 사용자가 작성한 `ACTIVE` 또는 `REPORTED` 댓글만 삭제할 수 있다.
+- 댓글은 실제 데이터와 좋아요 정보를 제거하지 않고 소프트 삭제한다.
+- 삭제 시 댓글의 `status`를 `DELETED`로 변경하고 `deleted_at`에 삭제 시각을 저장한다.
+- 게시글이 존재하지 않거나 삭제된 경우 `404 POST_NOT_FOUND`를 반환한다.
+- 댓글이 존재하지 않거나 이미 삭제됐거나 현재 사용자가 작성한 댓글이 아니거나 `postId`에 속하지 않으면 동일한 `404 COMMENT_NOT_FOUND`를 반환한다.
+
+---
+
+### 요청 Query
+
+없음
+
+---
+
+### 요청 Path
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `postId` | number | O | 댓글이 속한 게시글 id. 1 이상의 정수 |
+| `commentId` | number | O | 삭제할 댓글 id. 1 이상의 정수 |
+
+요청 예시: /api/v1/community/posts/1/comments/4
+
+---
+
+### 요청 Body
+
+없음
+
+---
+
+### 정상 응답 데이터
+
+Status Code : 204
+
+응답 Body 없음
+
+---
+
+### 오류 응답 데이터
+
+Status Code : 404
+
+게시글이 존재하지 않거나 이미 삭제된 경우
+
+```json
+{
+  "code": "POST_NOT_FOUND",
+  "message": "게시글을 찾을 수 없습니다."
+}
+```
+
+댓글이 존재하지 않거나, 이미 삭제됐거나, 현재 사용자가 작성한 댓글이 아니거나, 요청한 게시글에 속하지 않은 경우
+
+```json
+{
+  "code": "COMMENT_NOT_FOUND",
+  "message": "댓글을 찾을 수 없습니다."
 }
 ```
