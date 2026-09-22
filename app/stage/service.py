@@ -7,9 +7,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.blob_storage import normalize_image_content_type, upload_stage_capture
-from app.core.enums import OwnershipStatus, StageSessionStatus, StageVideoType
+from app.core.enums import (
+    MissionTargetAction,
+    OwnershipStatus,
+    StageSessionStatus,
+    StageVideoType,
+)
 from app.core.exceptions import ApiError
 from app.cube.models import CubeOwnership
+from app.mission.progress import increase_mission_progress
 from app.stage.models import Stage, StageCapture, StageSession
 from app.stage.schemas import (
     StageListItemResponse,
@@ -167,6 +173,11 @@ def create_stage_session(
     )
     try:
         db.add(stage_session)
+        increase_mission_progress(
+            db=db,
+            current_user_id=current_user_id,
+            target_action=MissionTargetAction.PLAY_MUSIC_VIDEO,
+        )
         # INSERT를 실행해 DB가 만든 AUTO_INCREMENT id를 객체에 채웁니다.
         db.flush()
         stage_session_id = stage_session.id

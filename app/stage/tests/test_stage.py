@@ -1,11 +1,14 @@
 """스테이지 재생 세션 API 테스트."""
 
+from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock, patch
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.core.enums import (
+    MissionTargetAction,
     OwnershipStatus,
     StageSessionStatus,
     StageVideoType,
@@ -15,6 +18,13 @@ from app.core.tests.conftest import api_client
 from app.cube.models import CubeOwnership
 from app.main import app
 from app.stage.models import Stage, StageCapture, StageSession
+
+
+@pytest.fixture(autouse=True)
+def mission_progress() -> Iterator[Mock]:
+    """미션 진행도 로직은 app/mission/tests 에서 검증하고 여기서는 호출만 기록합니다."""
+    with patch("app.stage.service.increase_mission_progress") as mocked:
+        yield mocked
 
 
 def request_stage_list(
@@ -590,3 +600,32 @@ def test_save_stage_capture_swagger_contract() -> None:
     assert set(operation["responses"]) == {"204", "400", "404"}
     assert "multipart/form-data" in operation["requestBody"]["content"]
     assert operation["security"] == [{"HTTPBearer": []}]
+
+
+def test_create_stage_session_increases_play_music_video_mission_progress(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    db.scalar.side_effect = [active_stage(), active_ownership()]
+    db.flush.side_effect = lambda: setattr(db.add.call_args.args[0], "id", 501)
+
+    response = request_stage_session(db)
+
+    assert response.status_code == 201
+    mission_progress.assert_called_once_with(
+        db=db,
+        current_user_id=1,
+        target_action=MissionTargetAction.PLAY_MUSIC_VIDEO,
+    )
+
+
+def test_create_stage_session_does_not_increase_progress_when_stage_not_found(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    db.scalar.return_value = None
+
+    response = request_stage_session(db)
+
+    assert response.status_code == 404
+    mission_progress.assert_not_called()

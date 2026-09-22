@@ -1,15 +1,29 @@
 """커뮤니티 도메인 API 테스트."""
 
+from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock, patch
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.community.models import Comment, CommentLike, Post, PostLike, PostMedia
-from app.core.enums import BoardType, CommentStatus, PostStatus
+from app.core.enums import (
+    BoardType,
+    CommentStatus,
+    MissionTargetAction,
+    PostStatus,
+)
 from app.core.tests.conftest import api_client
 from app.main import app
 from app.user.models import User
+
+
+@pytest.fixture(autouse=True)
+def mission_progress() -> Iterator[Mock]:
+    """미션 진행도 로직은 app/mission/tests 에서 검증하고 여기서는 호출만 기록합니다."""
+    with patch("app.community.service.increase_mission_progress") as mocked:
+        yield mocked
 
 INVALID_REQUEST_RESPONSE = {
     "code": "INVALID_REQUEST",
@@ -2325,3 +2339,37 @@ def test_toggle_comment_like_swagger_contract() -> None:
     assert "requestBody" not in operation
     assert operation["tags"] == ["community"]
     assert operation["security"] == [{"HTTPBearer": []}]
+
+
+# --- 미션 진행도 반영: POST /api/v1/community/posts ---
+
+
+def test_create_post_increases_community_post_mission_progress(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+    collect_added_rows(db)
+
+    with patch("app.community.service.upload_community_post_image"):
+        response = create_post_request(db)
+
+    assert response.status_code == 201
+    mission_progress.assert_called_once_with(
+        db=db,
+        current_user_id=1,
+        target_action=MissionTargetAction.COMMUNITY_POST,
+    )
+
+
+def test_create_post_does_not_increase_progress_when_request_is_invalid(
+    mission_progress: Mock,
+) -> None:
+    db = Mock(spec=Session)
+
+    response = create_post_request(
+        db,
+        data={"boardType": "FREE", "title": "   ", "content": "내용"},
+    )
+
+    assert response.status_code == 400
+    mission_progress.assert_not_called()

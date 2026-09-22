@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.album.models import Album, AlbumImage, TrackCapture, TrackSession
 from app.avatar.models import AvatarInteractionPicture, AvatarInteractionSession
-from app.core.enums import AlbumImageType, OwnershipStatus
+from app.core.enums import AlbumImageType, MissionTargetAction, OwnershipStatus
 from app.core.exceptions import ApiError
 from app.cube.models import CubeOwnership
 from app.gallery.schemas import (
@@ -26,6 +26,7 @@ from app.gallery.schemas import (
     GalleryStageResponse,
     GalleryTrackResponse,
 )
+from app.mission.progress import increase_mission_progress
 from app.stage.models import StageCapture, StageSession
 
 GALLERY_PAGE_SIZE = 20
@@ -145,23 +146,36 @@ def get_gallery_ar_experience(
 ) -> GalleryArExperienceResponse:
     """캡처 항목의 원본 콘텐츠와 AR 재경험 시작 위치를 반환합니다."""
     if source_type == GalleryArExperienceSourceType.STAGE_CAPTURE:
-        return _get_stage_ar_experience(
+        response = _get_stage_ar_experience(
             db=db,
             current_user_id=current_user_id,
             gallery_item_id=gallery_item_id,
         )
-    if source_type == GalleryArExperienceSourceType.TRACK_CAPTURE:
-        return _get_track_ar_experience(
+    elif source_type == GalleryArExperienceSourceType.TRACK_CAPTURE:
+        response = _get_track_ar_experience(
             db=db,
             current_user_id=current_user_id,
             gallery_item_id=gallery_item_id,
+        )
+    else:
+        raise ApiError(
+            status_code=400,
+            code="INVALID_REQUEST",
+            message="요청값이 올바르지 않습니다.",
         )
 
-    raise ApiError(
-        status_code=400,
-        code="INVALID_REQUEST",
-        message="요청값이 올바르지 않습니다.",
-    )
+    # 사진 열람도 미션 행동이라 조회 API지만 진행도를 저장합니다.
+    try:
+        increase_mission_progress(
+            db=db,
+            current_user_id=current_user_id,
+            target_action=MissionTargetAction.OPEN_GALLERY,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return response
 
 
 def delete_gallery_item(

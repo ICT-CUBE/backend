@@ -6,7 +6,7 @@ from sqlalchemy import case, select, update
 from sqlalchemy.orm import Session, joinedload
 
 from app.affinity.models import Affinity, Level
-from app.core.enums import NotificationType, OwnershipStatus
+from app.core.enums import MissionTargetAction, NotificationType, OwnershipStatus
 from app.core.exceptions import ApiError
 from app.cube.models import CubeOwnership
 from app.home.schemas import (
@@ -21,6 +21,7 @@ from app.home.schemas import (
     HomeResponse,
     HomeUserResponse,
 )
+from app.mission.progress import increase_mission_progress
 from app.user.models import Notification
 
 KOREA_TIMEZONE = timezone(timedelta(hours=9))
@@ -80,7 +81,7 @@ def get_home(*, db: Session, current_user_id: int) -> HomeResponse:
         .limit(1)
     )
 
-    return HomeResponse(
+    response = HomeResponse(
         user=HomeUserResponse(
             id=user.id,
             profile_character_img_url=user.profile_character_img_url,
@@ -104,6 +105,18 @@ def get_home(*, db: Session, current_user_id: int) -> HomeResponse:
             ),
         ),
     )
+    # 응답을 먼저 만들어 두어야 commit 후 만료된 객체를 다시 조회하지 않습니다.
+    try:
+        increase_mission_progress(
+            db=db,
+            current_user_id=current_user_id,
+            target_action=MissionTargetAction.HOME_VIEW,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return response
 
 
 def get_notifications(
